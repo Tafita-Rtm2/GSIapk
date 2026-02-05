@@ -1,82 +1,82 @@
+"use client";
+
 import { AppLayout } from "@/components/app-layout";
-import { Search, Filter, BookOpen, Video, FileText, CheckCircle } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
+import { Search, BookOpen, FileText, Video, Award, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function SubjectsPage() {
+  const { t } = useLanguage();
+
   const subjects = [
-    { id: 1, name: "Mathématiques", icon: "📐", progress: 75, instructor: "Prof. Smith" },
-    { id: 2, name: "Physique", icon: "⚛️", progress: 60, instructor: "Prof. Alex" },
-    { id: 3, name: "Chimie", icon: "🧪", progress: 45, instructor: "Prof. Jane" },
-    { id: 4, name: "Géographie", icon: "🌍", progress: 90, instructor: "Prof. Clark" },
+    { id: 1, title: "Mathématiques", progress: 75, icon: "📐", color: "bg-pink-500", items: 12 },
+    { id: 2, title: "Physique", progress: 60, icon: "⚛️", color: "bg-indigo-500", items: 8 },
+    { id: 3, title: "Chimie", progress: 45, icon: "🧪", color: "bg-orange-400", items: 6 },
+    { id: 4, title: "Informatique", progress: 90, icon: "💻", color: "bg-blue-500", items: 15 },
+    { id: 5, title: "Anglais", progress: 85, icon: "🇬🇧", color: "bg-cyan-500", items: 10 },
   ];
 
   return (
     <AppLayout>
       <div className="p-6">
-        <h1 className="text-3xl font-bold mb-6">Mes Matières</h1>
+        <h1 className="text-2xl font-bold mb-6">{t("matieres")}</h1>
 
-        <div className="flex gap-2 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input
-              type="text"
-              placeholder="Rechercher..."
-              className="w-full bg-gray-100 rounded-xl py-3 pl-10 pr-4 outline-none focus:ring-2 ring-primary/20"
-            />
-          </div>
-          <button className="bg-gray-100 p-3 rounded-xl">
-            <Filter size={20} className="text-gray-600" />
-          </button>
+        <div className="relative mb-8">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input
+            type="text"
+            placeholder="Rechercher une matière..."
+            className="w-full bg-gray-100 rounded-2xl py-3 pl-12 pr-4 outline-none text-sm focus:ring-2 ring-primary/20 transition-all"
+          />
         </div>
 
-        <div className="space-y-4">
-          {subjects.map((subject) => (
-            <SubjectCard key={subject.id} subject={subject} />
+        <div className="grid grid-cols-1 gap-4 mb-8">
+          {subjects.map((s) => (
+            <SubjectCard key={s.id} {...s} />
           ))}
+        </div>
+
+        {/* Categories / Types */}
+        <h3 className="text-lg font-bold mb-4">Ressources par type</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <ResourceCategory icon={BookOpen} label="Syllabus" color="text-blue-500" bg="bg-blue-50" />
+          <ResourceCategory icon={FileText} label="Supports" color="text-green-500" bg="bg-green-50" />
+          <ResourceCategory icon={Video} label="Vidéos" color="text-red-500" bg="bg-red-50" />
+          <ResourceCategory icon={Award} label="Devoirs" color="text-purple-500" bg="bg-purple-50" />
         </div>
       </div>
     </AppLayout>
   );
 }
 
-function SubjectCard({ subject }: { subject: any }) {
+function SubjectCard({ title, progress, icon, color, items }: any) {
   return (
-    <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-primary/5 flex items-center justify-center text-2xl">
-            {subject.icon}
+    <div className="bg-white p-4 rounded-[28px] shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-all cursor-pointer">
+      <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-2xl text-white shadow-inner", color)}>
+        {icon}
+      </div>
+      <div className="flex-1">
+        <h4 className="font-bold text-gray-800 text-sm mb-1">{title}</h4>
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className={cn("h-full rounded-full transition-all duration-1000", color)} style={{ width: `${progress}%` }}></div>
           </div>
-          <div>
-            <h3 className="font-bold text-lg">{subject.name}</h3>
-            <p className="text-xs text-gray-500">{subject.instructor}</p>
-          </div>
+          <span className="text-[10px] font-bold text-gray-400">{progress}%</span>
         </div>
-        <div className="text-primary font-bold">{subject.progress}%</div>
+        <p className="text-[10px] text-gray-500 mt-1 font-medium">{items} documents disponibles</p>
       </div>
-
-      <div className="w-full bg-gray-100 h-2 rounded-full mb-6">
-        <div
-          className="bg-primary h-full rounded-full transition-all duration-1000"
-          style={{ width: `${subject.progress}%` }}
-        ></div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        <SubjectAction icon={BookOpen} label="Syllabus" />
-        <SubjectAction icon={FileText} label="Supports" />
-        <SubjectAction icon={CheckCircle} label="Notes" />
-      </div>
+      <ChevronRight size={20} className="text-gray-300" />
     </div>
   );
 }
 
-function SubjectAction({ icon: Icon, label }: { icon: any, label: string }) {
+function ResourceCategory({ icon: Icon, label, color, bg }: any) {
   return (
-    <button className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-gray-50 transition-colors">
-      <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600">
-        <Icon size={16} />
+    <div className={cn("p-6 rounded-[32px] flex flex-col items-center gap-2 cursor-pointer transition-transform hover:scale-105", bg)}>
+      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center bg-white shadow-sm mb-1", color)}>
+        <Icon size={24} />
       </div>
-      <span className="text-[10px] font-medium text-gray-500">{label}</span>
-    </button>
+      <span className="text-xs font-bold text-gray-700">{label}</span>
+    </div>
   );
 }

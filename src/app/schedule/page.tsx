@@ -1,128 +1,140 @@
+"use client";
+
 import { AppLayout } from "@/components/app-layout";
-import { Plus } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 export default function SchedulePage() {
-  const days = [
-    { day: "Lun", date: "14" },
-    { day: "Mar", date: "15" },
-    { day: "Mer", date: "16" },
-    { day: "Jeu", date: "17", active: true },
-    { day: "Ven", date: "18" },
-    { day: "Sam", date: "19" },
-    { day: "Dim", date: "20" },
-  ];
+  const { t } = useLanguage();
+  const [view, setView] = useState<"week" | "month">("week");
+
+  const days = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+  const currentDay = 2; // Mercredi
 
   return (
     <AppLayout>
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
-          <div>
-            <p className="text-gray-500 text-sm">16 Septembre</p>
-            <h1 className="text-3xl font-bold">Aujourd'hui</h1>
+          <h1 className="text-2xl font-bold">{t("planning")}</h1>
+          <div className="bg-gray-100 p-1 rounded-xl flex">
+            <button
+              onClick={() => setView("week")}
+              className={cn(
+                "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                view === "week" ? "bg-white shadow-sm text-primary" : "text-gray-500"
+              )}
+            >
+              Semaine
+            </button>
+            <button
+              onClick={() => setView("month")}
+              className={cn(
+                "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                view === "month" ? "bg-white shadow-sm text-primary" : "text-gray-500"
+              )}
+            >
+              Mois
+            </button>
           </div>
-          <button className="bg-primary/10 text-primary px-4 py-2 rounded-xl flex items-center gap-2 font-semibold">
-            <Plus size={20} />
-            <span>Tâche</span>
-          </button>
-        </div>
-
-        {/* Toggle Semaine / Mois */}
-        <div className="flex bg-gray-100 p-1 rounded-2xl mb-8">
-          <button className="flex-1 py-2 text-sm font-bold bg-white rounded-xl shadow-sm">Semaine</button>
-          <button className="flex-1 py-2 text-sm font-bold text-gray-500">Mois</button>
         </div>
 
         {/* Date Selector */}
+        <div className="flex justify-between items-center mb-8 bg-primary/5 p-4 rounded-3xl border border-primary/10">
+          <button className="p-2 bg-white rounded-full shadow-sm">
+            <ChevronLeft size={20} className="text-primary" />
+          </button>
+          <div className="text-center">
+            <p className="text-sm font-bold">12 - 17 Octobre 2025</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Semestre 1 • Semaine 4</p>
+          </div>
+          <button className="p-2 bg-white rounded-full shadow-sm">
+            <ChevronRight size={20} className="text-primary" />
+          </button>
+        </div>
+
+        {/* Days Row */}
         <div className="flex justify-between mb-8">
-          {days.map((d) => (
-            <div key={d.date} className="flex flex-col items-center">
-              <span className="text-xs text-gray-400 mb-2">{d.day}</span>
+          {days.map((day, i) => (
+            <div key={day} className="flex flex-col items-center">
+              <span className="text-[10px] text-gray-400 font-bold mb-2 uppercase">{day}</span>
               <div className={cn(
-                "w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-colors",
-                d.active ? "bg-primary text-white" : "text-gray-600"
+                "w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm transition-all",
+                i === currentDay ? "bg-primary text-white shadow-lg scale-110" : "bg-white text-gray-700 border border-gray-100"
               )}>
-                {d.date}
+                {12 + i}
               </div>
-              {d.active && <div className="w-1 h-1 bg-primary rounded-full mt-1"></div>}
+              {i === 2 && <div className="w-1.5 h-1.5 bg-accent rounded-full mt-2"></div>}
             </div>
           ))}
         </div>
 
-        {/* Timeline */}
-        <div className="space-y-8 relative">
-           <div className="absolute left-[45px] top-0 bottom-0 w-[2px] bg-gray-100"></div>
-
-           <TimelineItem
-            time="9:30"
-            endTime="10:20"
-            title="Physique"
-            subtitle="Chapitre 3: Force"
-            instructor="Alex Jesus"
-            location="Google Meet"
-            color="bg-indigo-500"
-            active
-           />
-
-           <TimelineItem
-            time="11:00"
-            endTime="11:50"
-            title="Géographie"
-            subtitle="Chapitre 12: Profil du sol"
-            instructor="Jenifer Clark"
-            location="Zoom"
-            color="bg-cyan-500"
-           />
-
-           <TimelineItem
-            time="12:20"
-            endTime="13:00"
-            title="Devoir"
-            subtitle="Modèle régional mondial"
-            instructor="Alexa Tenorio"
-            location="Google Docs"
-            color="bg-emerald-500"
-           />
+        {/* Schedule Items */}
+        <div className="space-y-6">
+          <ScheduleCard
+            time="08:00"
+            duration="90 min"
+            title="Algèbre Linéaire"
+            room="Salle 102"
+            instructor="Dr. Kamga"
+            color="border-l-pink-500"
+          />
+          <ScheduleCard
+            time="10:00"
+            duration="120 min"
+            title="Physique Quantique"
+            room="Amphi B"
+            instructor="Pr. Tagne"
+            color="border-l-indigo-500"
+            isCurrent
+          />
+          <ScheduleCard
+            time="14:00"
+            duration="90 min"
+            title="Anglais Technique"
+            room="Labo Langues"
+            instructor="Mrs. Smith"
+            color="border-l-orange-400"
+          />
         </div>
       </div>
     </AppLayout>
   );
 }
 
-function TimelineItem({ time, endTime, title, subtitle, instructor, location, color, active }: { time: string, endTime: string, title: string, subtitle: string, instructor: string, location: string, color: string, active?: boolean }) {
+function ScheduleCard({ time, duration, title, room, instructor, color, isCurrent }: any) {
   return (
-    <div className="flex gap-6 items-start">
-      <div className="w-12 pt-1">
-        <span className="text-sm font-bold text-gray-800">{time}</span>
-        <div className="text-[10px] text-gray-400">{endTime}</div>
+    <div className={cn(
+      "flex gap-4 group",
+      isCurrent ? "opacity-100" : "opacity-80"
+    )}>
+      <div className="flex flex-col items-center py-1">
+        <span className="text-sm font-bold text-gray-700">{time}</span>
+        <span className="text-[10px] text-gray-400">{duration}</span>
       </div>
-
-      <div className="relative flex-1">
-        {/* Dot on timeline */}
-        <div className={cn(
-          "absolute left-[-21px] top-2 w-4 h-4 rounded-full border-4 border-white z-10",
-          active ? "bg-primary ring-4 ring-primary/20" : "bg-gray-200"
-        )}></div>
-
-        <div className={`${color} p-5 rounded-3xl text-white shadow-md relative overflow-hidden`}>
-          <div className="flex justify-between items-start mb-1">
-            <h3 className="text-lg font-bold">{title}</h3>
-            <button className="opacity-80">•••</button>
+      <div className={cn(
+        "flex-1 bg-white p-5 rounded-[24px] border-l-4 shadow-sm hover:shadow-md transition-all relative overflow-hidden",
+        color,
+        isCurrent && "ring-2 ring-primary ring-offset-2"
+      )}>
+        {isCurrent && (
+          <div className="absolute top-4 right-4 bg-green-500 text-white text-[8px] font-bold px-2 py-1 rounded-full animate-pulse">
+            EN COURS
           </div>
-          <p className="text-xs opacity-80 mb-4">{subtitle}</p>
-
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-full bg-white/30 overflow-hidden text-[8px] flex items-center justify-center">
-                 <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${instructor}`} alt={instructor} />
-              </div>
-              <span className="text-[10px]">{instructor}</span>
+        )}
+        <h4 className="font-bold text-gray-800 mb-1">{title}</h4>
+        <div className="flex items-center gap-4 text-[10px] text-gray-500 font-medium">
+          <span className="flex items-center gap-1">
+            <CalendarIcon size={12} className="text-gray-400" />
+            {room}
+          </span>
+          <span className="flex items-center gap-1">
+            <div className="w-4 h-4 rounded-full bg-gray-200 overflow-hidden">
+              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${instructor}`} alt="" />
             </div>
-            <div className="flex items-center gap-1">
-               <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80"></div>
-              <span className="text-[10px]">{location}</span>
-            </div>
-          </div>
+            {instructor}
+          </span>
         </div>
       </div>
     </div>

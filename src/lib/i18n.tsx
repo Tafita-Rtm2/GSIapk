@@ -29,6 +29,27 @@ export const translations: Translations = {
   password: { fr: "Mot de passe", en: "Password" },
   no_account: { fr: "Vous n'avez pas de compte ?", en: "Don't have an account?" },
   request_access: { fr: "Demander l'accès", en: "Request access" },
+  services: { fr: "Services", en: "Services" },
+  documents: { fr: "Documents", en: "Documents" },
+  paiements: { fr: "Paiements", en: "Payments" },
+  attestation: { fr: "Attestation", en: "Certificate" },
+  releve_notes: { fr: "Relevé de notes", en: "Transcript" },
+  certificat: { fr: "Certificat", en: "Certificate" },
+  scolarite: { fr: "Scolarité", en: "Tuition" },
+  examen: { fr: "Examen", en: "Exam" },
+  divers: { fr: "Divers", en: "Other" },
+  valide: { fr: "Validé", en: "Approved" },
+  en_cours: { fr: "En cours", en: "In progress" },
+  stages: { fr: "Stages", en: "Internships" },
+  opportunites: { fr: "Opportunités", en: "Opportunities" },
+  competences: { fr: "Compétences", en: "Skills" },
+  semaine: { fr: "Semaine", en: "Week" },
+  mois: { fr: "Mois", en: "Month" },
+  en_cours_badge: { fr: "EN COURS", en: "ONGOING" },
+  rechercher: { fr: "Rechercher", en: "Search" },
+  tous: { fr: "Tous", en: "All" },
+  favoris: { fr: "Favoris", en: "Favorites" },
+  recents: { fr: "Récents", en: "Recent" },
 };
 
 interface LanguageContextType {
@@ -42,12 +63,24 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<Language>("fr");
 
+  useEffect(() => {
+    const saved = localStorage.getItem("app_lang") as Language;
+    if (saved && (saved === "fr" || saved === "en")) {
+      setLanguage(saved);
+    }
+  }, []);
+
+  const handleSetLanguage = (lang: Language) => {
+    setLanguage(lang);
+    localStorage.setItem("app_lang", lang);
+  };
+
   const t = (key: string) => {
     return translations[key]?.[language] || key;
   };
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ language, setLanguage: handleSetLanguage, t }}>
       {children}
     </LanguageContext.Provider>
   );
