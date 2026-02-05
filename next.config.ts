@@ -1,7 +1,8 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  output: 'export', // AJOUTÉ : Indispensable pour l'APK
   transpilePackages: ['@genkit-ai/next'],
   typescript: {
     ignoreBuildErrors: true,
@@ -10,6 +11,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
+    unoptimized: true, // AJOUTÉ : Obligatoire avec 'output: export'
     remotePatterns: [
       {
         protocol: 'https',
