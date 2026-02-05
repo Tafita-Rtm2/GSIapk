@@ -6,10 +6,17 @@ import { usePathname } from "next/navigation";
 import { Home, Calendar, BookOpen, Library, User, MessageCircle, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n";
+import { useState, useEffect } from "react";
+import { GSIStore, User as GSIUser } from "@/lib/store";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();
   const pathname = usePathname();
+  const [user, setUser] = useState<GSIUser | null>(null);
+
+  useEffect(() => {
+    setUser(GSIStore.getCurrentUser());
+  }, []);
 
   const navItems = [
     { icon: Home, label: t("accueil"), href: "/" },
@@ -46,12 +53,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Floating Action Button for Ask Insight */}
-      <Link
-        href="/chat"
-        className="absolute bottom-24 right-4 bg-accent text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform z-20"
-      >
-        <MessageCircle size={24} />
-      </Link>
+      {!pathname.includes('chat') && (
+        <Link
+          href="/chat"
+          className="absolute bottom-24 right-4 bg-accent text-white p-4 rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all z-20"
+        >
+          <MessageCircle size={24} />
+        </Link>
+      )}
     </div>
   );
 }

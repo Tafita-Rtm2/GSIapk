@@ -1,46 +1,69 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
-import { CreditCard, FileText, Clock, CheckCircle, AlertCircle, ChevronRight, Plus } from "lucide-react";
+import { CreditCard, FileText, CheckCircle, AlertCircle, Plus, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { GSIStore, User, Payment } from "@/lib/store";
+import Link from "next/link";
 
 export default function ServicesPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
+
+  useEffect(() => {
+    const currentUser = GSIStore.getCurrentUser();
+    if (!currentUser) {
+      router.push("/login");
+      return;
+    }
+    setUser(currentUser);
+    const allPayments = GSIStore.getPayments();
+    setPayments(allPayments.filter(p => p.studentId === currentUser.id));
+  }, [router]);
+
   const requests = [
     { id: "REQ-001", type: "Attestation de scolarité", status: "Validé", date: "12 Sept 2024", color: "text-green-500", bg: "bg-green-100" },
     { id: "REQ-002", type: "Relevé de notes (S2)", status: "En cours", date: "15 Sept 2024", color: "text-orange-500", bg: "bg-orange-100" },
   ];
 
-  const payments = [
-    { title: "Frais d'inscription", amount: "150.000 FCFA", status: "Payé", date: "01 Sept 2024" },
-    { title: "Scolarité - Échéance 1", amount: "300.000 FCFA", status: "Payé", date: "05 Sept 2024" },
-    { title: "Scolarité - Échéance 2", amount: "300.000 FCFA", status: "En attente", date: "01 Oct 2024" },
-  ];
+  if (!user) return null;
 
   return (
     <AppLayout>
-      <div className="p-6">
-        <h1 className="text-3xl font-bold mb-6">Services Admin</h1>
+      <div className="p-6 pb-24">
+        <div className="flex items-center gap-4 mb-8">
+           <Link href="/profile" className="p-2 bg-gray-100 rounded-full text-gray-500">
+              <ChevronLeft size={20} />
+           </Link>
+           <h1 className="text-2xl font-black text-gray-800">Services GSI</h1>
+        </div>
 
-        <section className="mb-8">
+        <section className="mb-10">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-bold">Demandes de documents</h2>
-            <button className="bg-primary text-white p-2 rounded-xl">
+            <h2 className="text-lg font-bold text-gray-700">Demandes de documents</h2>
+            <button
+              onClick={() => alert("Nouvelle demande enregistrée. Notre équipe administrative vous contactera bientôt.")}
+              className="bg-primary text-white p-2.5 rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-transform"
+            >
               <Plus size={20} />
             </button>
           </div>
           <div className="space-y-3">
             {requests.map((req) => (
-              <div key={req.id} className="bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center shadow-sm">
+              <div key={req.id} className="bg-white p-5 rounded-[24px] border border-gray-100 flex justify-between items-center shadow-sm">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-500">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
                     <FileText size={20} />
                   </div>
                   <div>
                     <h3 className="font-bold text-sm">{req.type}</h3>
-                    <p className="text-[10px] text-gray-400">{req.id} • {req.date}</p>
+                    <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">{req.id} • {req.date}</p>
                   </div>
                 </div>
-                <div className={cn("px-3 py-1 rounded-full text-[10px] font-bold", req.bg, req.color)}>
+                <div className={cn("px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider", req.bg, req.color)}>
                   {req.status}
                 </div>
               </div>
@@ -48,45 +71,55 @@ export default function ServicesPage() {
           </div>
         </section>
 
-        <section className="mb-8">
-          <h2 className="text-lg font-bold mb-4">Paiements & Reçus</h2>
-          <div className="bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm">
+        <section className="mb-10">
+          <h2 className="text-lg font-bold text-gray-700 mb-4">Paiements & Reçus</h2>
+          <div className="bg-white rounded-[32px] overflow-hidden border border-gray-100 shadow-sm divide-y divide-gray-50">
             {payments.map((p, i) => (
-              <div key={i} className={cn(
-                "p-4 flex justify-between items-center",
-                i !== payments.length - 1 && "border-bottom border-gray-50"
-              )}>
+              <div key={i} className="p-5 flex justify-between items-center hover:bg-gray-50/50 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className={cn(
-                    "w-10 h-10 rounded-xl flex items-center justify-center",
-                    p.status === "Payé" ? "bg-green-50 text-green-500" : "bg-red-50 text-red-500"
+                    "w-11 h-11 rounded-2xl flex items-center justify-center shadow-sm",
+                    p.status === "paid" ? "bg-emerald-50 text-emerald-500" : "bg-rose-50 text-rose-500"
                   )}>
                     <CreditCard size={20} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm">{p.title}</h4>
-                    <p className="text-[10px] text-gray-400">{p.date}</p>
+                    <h4 className="font-bold text-sm">{p.description}</h4>
+                    <p className="text-[10px] text-gray-400 font-medium">{p.date}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-sm">{p.amount}</p>
+                  <p className="font-black text-sm text-gray-800">{p.amount}</p>
                   <p className={cn(
-                    "text-[10px] font-bold",
-                    p.status === "Payé" ? "text-green-500" : "text-red-500"
+                    "text-[10px] font-black uppercase tracking-widest",
+                    p.status === "paid" ? "text-emerald-500" : "text-rose-500"
                   )}>{p.status}</p>
                 </div>
               </div>
             ))}
+            {payments.length === 0 && (
+               <div className="p-10 text-center text-gray-400">
+                  <CreditCard size={32} className="mx-auto mb-3 opacity-20" />
+                  <p className="text-xs font-medium">Aucun historique de paiement.</p>
+               </div>
+            )}
           </div>
         </section>
 
-        <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 flex gap-4">
-          <AlertCircle className="text-blue-500 shrink-0" size={24} />
-          <div>
-            <h4 className="font-bold text-sm text-blue-900 mb-1">Besoin d'aide ?</h4>
-            <p className="text-xs text-blue-800 opacity-80 mb-3">Pour toute erreur sur vos paiements ou documents, veuillez contacter le service scolarité.</p>
-            <button className="text-blue-600 text-xs font-bold underline">Contacter le support</button>
+        <div className="bg-indigo-600 p-8 rounded-[32px] text-white shadow-xl shadow-indigo-100 flex flex-col gap-4 relative overflow-hidden">
+          <div className="absolute right-[-20px] top-[-20px] w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+          <div className="flex items-center gap-4">
+            <div className="bg-white/20 p-2.5 rounded-xl backdrop-blur-md">
+               <AlertCircle size={24} />
+            </div>
+            <h4 className="font-bold text-lg">Besoin d'assistance ?</h4>
           </div>
+          <p className="text-xs text-white/80 leading-relaxed font-medium">
+             Notre service administratif est disponible du Lundi au Vendredi de 08h à 17h pour répondre à toutes vos questions.
+          </p>
+          <button className="bg-white text-indigo-600 py-3 rounded-2xl text-xs font-black shadow-lg shadow-black/5 active:scale-95 transition-transform uppercase tracking-widest mt-2">
+             Contacter le support scolarité
+          </button>
         </div>
       </div>
     </AppLayout>
