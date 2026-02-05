@@ -11,7 +11,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Install Dependencies
         run: npm install --legacy-peer-deps
@@ -19,7 +18,7 @@ jobs:
       - name: Next.js Static Export
         run: npm run build
 
-      - name: Setup Capacitor (The APK Bridge)
+      - name: Setup Capacitor
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init "FirebaseStudio" "com.tafita.rtm2" --web-dir out
@@ -32,11 +31,19 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
+      # CETTE ÉTAPE RÈGLE L'ERREUR DES DOUBLONS (Duplicate Class)
+      - name: Force Fix Duplicate Classes
+        run: |
+          cd android
+          echo "android.useAndroidX=true" >> gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
+          sed -i 's/implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"/implementation(platform("org.jetbrains.kotlin:kotlin-bom:1.9.0"))/g' app/build.gradle
+
       - name: Build Final APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload Result
         uses: actions/upload-artifact@v4
