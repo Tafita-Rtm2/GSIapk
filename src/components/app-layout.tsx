@@ -17,6 +17,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { icon: BookOpen, label: t("matieres"), href: "/subjects" },
     { icon: Library, label: t("biblio"), href: "/library" },
     { icon: Briefcase, label: t("career"), href: "/career" },
+    { icon: User, label: t("profil"), href: "/profile" },
   ];
 
   return (
