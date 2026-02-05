@@ -1,28 +1,34 @@
+"use client";
+
 import { AppLayout } from "@/components/app-layout";
 import { Bell, Search } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import Link from "next/link";
+import { useLanguage } from "@/lib/i18n";
 
 export default function Home() {
+  const { t } = useLanguage();
+
   return (
     <AppLayout>
       <div className="p-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div>
-            <p className="text-gray-500 text-sm">Bonjour Liana</p>
-            <h1 className="text-2xl font-bold">Vous avez <span className="text-green-500">4 tâches</span> aujourd'hui</h1>
+            <p className="text-gray-500 text-sm">{t("bonjour")} Liana</p>
+            <h1 className="text-2xl font-bold">Vous avez <span className="text-green-500">4 {t("tasks_today")}</span></h1>
           </div>
-          <div className="relative">
-            <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
+          <Link href="/profile" className="relative">
+            <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border-2 border-primary/20">
               <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Liana" alt="Avatar" />
             </div>
-            <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></div>
-          </div>
+            <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full animate-pulse"></div>
+          </Link>
         </div>
 
         {/* Progression Section (New) */}
         <div className="mb-8">
-           <h2 className="text-lg font-semibold mb-4">Votre progression</h2>
+           <h2 className="text-lg font-semibold mb-4">{t("votre_progression")}</h2>
            <div className="space-y-4 bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
               <div className="space-y-2">
                 <div className="flex justify-between text-xs font-medium">
@@ -44,7 +50,7 @@ export default function Home() {
         {/* Courses Section */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Cours en cours</h2>
+            <h2 className="text-lg font-semibold">{t("cours_en_cours")}</h2>
             <button className="text-primary text-xs font-medium italic">GSI Insight — “Where data meets your future.”</button>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
@@ -69,7 +75,7 @@ export default function Home() {
         {/* Schedule Section */}
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Votre emploi du temps</h2>
+            <h2 className="text-lg font-semibold">{t("votre_emploi_du_temps")}</h2>
           </div>
 
           <div className="space-y-4">
