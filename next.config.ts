@@ -5,10 +5,10 @@ const nextConfig: NextConfig = {
   output: 'export', // AJOUTÉ : Indispensable pour l'APK
   transpilePackages: ['@genkit-ai/next'],
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
   images: {
     unoptimized: true, // AJOUTÉ : Obligatoire avec 'output: export'

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 export default function ChatPage() {
   const [messages, setMessages] = useState([
-    { role: "assistant", content: "Hello Liana! I am Insight, your GSI academic assistant. How can I help you today?" },
+    { role: "assistant", content: "Bonjour Liana ! Je suis Insight, votre assistant académique GSI. Comment puis-je vous aider aujourd'hui ?" },
   ]);
   const [input, setInput] = useState("");
 
@@ -19,18 +19,22 @@ export default function ChatPage() {
     setMessages(newMessages);
     setInput("");
 
-    // Call API
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: input }),
-      });
-      const data = await response.json();
-      setMessages([...newMessages, { role: "assistant", content: data.text || data.error }]);
-    } catch (error) {
-      setMessages([...newMessages, { role: "assistant", content: "Sorry, I'm having trouble connecting right now." }]);
+    // Simple mock response for MVP (Client-side to work in APK)
+    let responseText = "Je suis Insight, votre assistant académique GSI. ";
+
+    if (input.toLowerCase().includes("cours")) {
+      responseText += "Votre prochain cours est la Physique à 09h30 en salle 102.";
+    } else if (input.toLowerCase().includes("devoir") || input.toLowerCase().includes("tâche")) {
+      responseText += "Vous avez un devoir de Géographie à rendre pour demain.";
+    } else if (input.toLowerCase().includes("examen")) {
+      responseText += "Les examens de mi-semestre commencent le 15 Octobre.";
+    } else {
+      responseText += "Comment puis-je vous aider davantage dans votre parcours à GSI Internationale ?";
     }
+
+    setTimeout(() => {
+      setMessages([...newMessages, { role: "assistant", content: responseText }]);
+    }, 500);
   };
 
   return (
@@ -46,7 +50,7 @@ export default function ChatPage() {
           </div>
           <div>
             <h1 className="font-bold">Ask Insight</h1>
-            <p className="text-[10px] opacity-80">Online • AI Assistant</p>
+            <p className="text-[10px] opacity-80">En ligne • Assistant IA</p>
           </div>
         </div>
       </div>
@@ -77,7 +81,7 @@ export default function ChatPage() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder="Ask anything..."
+          placeholder="Posez votre question..."
           className="flex-1 bg-gray-100 rounded-2xl px-4 py-3 outline-none text-sm"
         />
         <button

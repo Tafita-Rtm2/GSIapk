@@ -43,3 +43,8 @@ next-env.d.ts
 # firebase
 firebase-debug.log
 firestore-debug.log
+
+# android
+android/app/build
+android/app/src/main/assets/public
+android/app/src/main/assets/capacitor.config.json

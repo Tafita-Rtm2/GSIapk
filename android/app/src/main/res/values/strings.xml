@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GSI Insight</string>
+    <string name="title_activity_main">GSI Insight</string>
+    <string name="package_name">com.gsi.insight</string>
+    <string name="custom_url_scheme">com.gsi.insight</string>
+</resources>
