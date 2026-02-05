@@ -4,8 +4,11 @@ import { AppLayout } from "@/components/app-layout";
 import { Settings, ChevronRight, CreditCard, FileCheck, Award, LogOut, QrCode, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import Link from "next/link";
+import { useLanguage } from "@/lib/i18n";
 
 export default function ProfilePage() {
+  const { language, setLanguage } = useLanguage();
   const [showQr, setShowQr] = useState(false);
 
   return (
@@ -49,17 +52,46 @@ export default function ProfilePage() {
 
         <div className="space-y-2 mb-8">
           <h3 className="text-lg font-bold px-2 mb-4">Paramètres du compte</h3>
-          <ProfileLink icon={CreditCard} label="Paiements & Reçus" color="text-blue-500" />
-          <ProfileLink icon={FileCheck} label="Documents Administratifs" color="text-green-500" />
-          <div className="bg-gradient-to-r from-purple-500 to-indigo-600 rounded-3xl p-6 text-white mb-4 mt-4 shadow-lg">
-            <div className="flex justify-between items-center mb-4">
-              <h4 className="font-bold text-lg">Career Insight</h4>
-              <Award size={24} />
+          <Link href="/services">
+            <ProfileLink icon={CreditCard} label="Paiements & Reçus" color="text-blue-500" />
+          </Link>
+          <Link href="/services">
+            <ProfileLink icon={FileCheck} label="Documents Administratifs" color="text-green-500" />
+          </Link>
+          <Link href="/career">
+            <div className="bg-gradient-to-r from-purple-500 to-indigo-600 rounded-3xl p-6 text-white mb-4 mt-4 shadow-lg cursor-pointer hover:scale-[1.02] transition-transform">
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="font-bold text-lg">Career Insight</h4>
+                <Award size={24} />
+              </div>
+              <p className="text-xs opacity-90 mb-4">Nouvelles opportunités de stage disponibles chez les partenaires GSI !</p>
+              <button className="bg-white text-primary px-4 py-2 rounded-xl text-xs font-bold">
+                Voir les opportunités
+              </button>
             </div>
-            <p className="text-xs opacity-90 mb-4">Nouvelles opportunités de stage disponibles chez les partenaires GSI !</p>
-            <button className="bg-white text-primary px-4 py-2 rounded-xl text-xs font-bold">
-              Voir les opportunités
-            </button>
+          </Link>
+          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 mt-4">
+            <h4 className="text-sm font-bold mb-3">Langue / Language</h4>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setLanguage("fr")}
+                className={cn(
+                  "flex-1 py-2 rounded-xl text-xs font-bold transition-all",
+                  language === "fr" ? "bg-primary text-white" : "bg-white text-gray-500"
+                )}
+              >
+                Français
+              </button>
+              <button
+                onClick={() => setLanguage("en")}
+                className={cn(
+                  "flex-1 py-2 rounded-xl text-xs font-bold transition-all",
+                  language === "en" ? "bg-primary text-white" : "bg-white text-gray-500"
+                )}
+              >
+                English
+              </button>
+            </div>
           </div>
           <ProfileLink icon={Settings} label="Préférences" color="text-gray-500" />
         </div>

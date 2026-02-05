@@ -3,19 +3,21 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, BookOpen, Library, User, MessageCircle } from "lucide-react";
+import { Home, Calendar, BookOpen, Library, User, MessageCircle, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { icon: Home, label: "Accueil", href: "/" },
-  { icon: Calendar, label: "Planning", href: "/schedule" },
-  { icon: BookOpen, label: "Matières", href: "/subjects" },
-  { icon: Library, label: "Biblio", href: "/library" },
-  { icon: User, label: "Profil", href: "/profile" },
-];
+import { useLanguage } from "@/lib/i18n";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  const { t } = useLanguage();
   const pathname = usePathname();
+
+  const navItems = [
+    { icon: Home, label: t("accueil"), href: "/" },
+    { icon: Calendar, label: t("planning"), href: "/schedule" },
+    { icon: BookOpen, label: t("matieres"), href: "/subjects" },
+    { icon: Library, label: t("biblio"), href: "/library" },
+    { icon: Briefcase, label: t("career"), href: "/career" },
+  ];
 
   return (
     <div className="flex flex-col h-screen max-w-md mx-auto bg-background shadow-xl overflow-hidden relative">
