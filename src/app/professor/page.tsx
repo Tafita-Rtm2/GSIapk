@@ -16,11 +16,20 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { GSIStore } from "@/lib/store";
 
 export default function ProfessorPage() {
   const { t } = useLanguage();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("dashboard");
+
+  useEffect(() => {
+    const user = GSIStore.getCurrentUser();
+    if (!user || user.role !== 'professor') {
+      router.push("/login");
+    }
+  }, [router]);
 
   const menuItems = [
     { id: "schedule", icon: Calendar, label: t("modifier_edt"), color: "bg-blue-500" },
@@ -46,7 +55,10 @@ export default function ProfessorPage() {
             </div>
           </div>
           <button
-            onClick={() => router.push("/login")}
+            onClick={() => {
+              GSIStore.setCurrentUser(null);
+              router.push("/login");
+            }}
             className="p-3 bg-gray-100 rounded-xl text-gray-400 hover:text-red-500 transition-colors"
           >
             <LogOut size={20} />

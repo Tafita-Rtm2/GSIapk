@@ -7,16 +7,29 @@ import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { GSIStore, User } from "@/lib/store";
 
 export default function Home() {
   const { t } = useLanguage();
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
-    setUser(GSIStore.getCurrentUser());
-  }, []);
+    const currentUser = GSIStore.getCurrentUser();
+    if (!currentUser) {
+      router.push("/login");
+    } else if (currentUser.role === 'admin') {
+      router.push("/admin");
+    } else if (currentUser.role === 'professor') {
+      router.push("/professor");
+    } else {
+      setUser(currentUser);
+    }
+  }, [router]);
+
+  if (!user) return null;
 
   const firstName = user?.fullName.split(' ')[0] || "Étudiant";
 
