@@ -123,11 +123,95 @@ export default function AdminPage() {
           </>
         )}
 
-        {activeTab !== "dashboard" && (
-          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm min-h-[400px] flex flex-col items-center justify-center text-center">
+        {activeTab === "payments" && (
+          <div className="space-y-4">
+            <button onClick={() => setActiveTab("dashboard")} className="flex items-center gap-2 text-gray-500 font-bold mb-2">
+              <ChevronRight className="rotate-180" size={20} /> Retour
+            </button>
+            <h2 className="text-2xl font-black mb-4">{t("gestion_paiements")}</h2>
+            <div className="space-y-3">
+              {[
+                { name: "Rakoto Jean", level: "L1 Info", amount: "800.000 Ar", status: "Paid", date: "10/02/2025" },
+                { name: "Andria Marie", level: "M1 Gest", amount: "1.200.000 Ar", status: "Pending", date: "05/02/2025" },
+                { name: "Rabe Eric", level: "L2 Droit", amount: "500.000 Ar", status: "Overdue", date: "25/01/2025" },
+              ].map((p, i) => (
+                <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center">
+                  <div>
+                    <h4 className="font-bold">{p.name}</h4>
+                    <p className="text-xs text-gray-500">{p.level} • {p.date}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-sm">{p.amount}</p>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      p.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' :
+                      p.status === 'Pending' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
+                    }`}>{p.status}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "users" && (
+          <div className="space-y-4">
+             <button onClick={() => setActiveTab("dashboard")} className="flex items-center gap-2 text-gray-500 font-bold mb-2">
+              <ChevronRight className="rotate-180" size={20} /> Retour
+            </button>
+            <h2 className="text-2xl font-black mb-4">{t("gestion_utilisateurs")}</h2>
+            <div className="space-y-3">
+              {[
+                { name: "Liana Rakoto", role: "Étudiant", campus: "Antananarivo" },
+                { name: "Dr. Solofo", role: "Professeur", campus: "Antsirabe" },
+                { name: "Nina GSI", role: "Admin", campus: "Antananarivo" },
+              ].map((u, i) => (
+                <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4">
+                  <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
+                    <Users size={20} />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-sm">{u.name}</h4>
+                    <p className="text-[10px] text-gray-500">{u.role} • {u.campus}</p>
+                  </div>
+                  <button className="text-red-500 p-2 hover:bg-red-50 rounded-xl">
+                    <Plus className="rotate-45" size={18} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "communication" && (
+          <div className="space-y-6">
+            <button onClick={() => setActiveTab("dashboard")} className="flex items-center gap-2 text-gray-500 font-bold mb-2">
+              <ChevronRight className="rotate-180" size={20} /> Retour
+            </button>
+            <h2 className="text-2xl font-black">{t("communication")}</h2>
+            <div className="bg-white p-6 rounded-[32px] border border-gray-100 space-y-4">
+              <div>
+                <label className="block text-sm font-bold mb-2">Titre de l'annonce</label>
+                <input type="text" className="w-full bg-gray-50 border-none rounded-xl p-3 outline-none" placeholder="Ex: Report des examens" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">Message</label>
+                <textarea className="w-full bg-gray-50 border-none rounded-xl p-3 outline-none min-h-[100px]" placeholder="Saisissez votre message ici..."></textarea>
+              </div>
+              <button
+                onClick={() => alert("Annonce diffusée avec succès !")}
+                className="w-full bg-orange-500 text-white py-4 rounded-xl font-bold shadow-lg shadow-orange-500/20 active:scale-95 transition-transform"
+              >
+                Diffuser l'annonce
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(!["dashboard", "payments", "users", "communication"].includes(activeTab)) && (
+          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm min-h-[400px] flex flex-col items-center justify-center text-center relative">
              <button
               onClick={() => setActiveTab("dashboard")}
-              className="absolute left-6 top-32 bg-gray-100 p-2 rounded-full text-gray-400"
+              className="absolute left-6 top-6 bg-gray-100 p-2 rounded-full text-gray-400"
              >
                 <ChevronRight className="rotate-180" size={20} />
              </button>

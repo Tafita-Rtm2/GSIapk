@@ -34,8 +34,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center p-2 rounded-lg transition-colors",
-                isActive ? "text-primary" : "text-gray-500"
+                "flex flex-col items-center p-2 rounded-lg transition-all active:scale-90",
+                isActive ? "text-primary scale-110" : "text-gray-500"
               )}
             >
               <item.icon size={24} />

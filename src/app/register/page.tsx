@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Sparkles, ArrowLeft, Camera } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import Link from "next/link";
+import { GSIStore } from "@/lib/store";
 
 const CAMPUSES = [
   "Campus Antananarivo",
@@ -40,7 +41,24 @@ export default function RegisterPage() {
       alert("Les mots de passe ne correspondent pas");
       return;
     }
-    // Mock registration
+
+    const newUser: any = {
+      id: Math.random().toString(36).substr(2, 9),
+      fullName: formData.fullName,
+      email: formData.email,
+      role: 'student' as const,
+      campus: formData.campus,
+      filiere: formData.filiere,
+      niveau: formData.niveau,
+      payments: [
+        { id: 'p1', amount: '1.200.000 Ar', date: '2025-01-15', status: 'paid', description: 'Frais d\'inscription' },
+        { id: 'p2', amount: '800.000 Ar', date: '2025-02-01', status: 'pending', description: 'Écolage Février' }
+      ]
+    };
+
+    GSIStore.addUser(newUser);
+    GSIStore.setCurrentUser(newUser);
+
     router.push("/");
   };
 

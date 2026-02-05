@@ -9,9 +9,33 @@ import { cn } from "@/lib/utils";
 export default function SchedulePage() {
   const { t } = useLanguage();
   const [view, setView] = useState<"week" | "month">("week");
+  const [selectedDay, setSelectedDay] = useState(2);
 
   const days = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
-  const currentDay = 2; // Mercredi
+
+  const scheduleData: any = {
+    0: [
+      { time: "08:00", duration: "120 min", title: "Mathématiques", room: "Salle 101", instructor: "Dr. Rakoto", color: "border-l-blue-500" },
+      { time: "10:30", duration: "90 min", title: "Gestion", room: "Salle 204", instructor: "Mme. Perle", color: "border-l-emerald-500" }
+    ],
+    1: [
+      { time: "09:00", duration: "180 min", title: "Informatique", room: "Labo 1", instructor: "M. Jean", color: "border-l-purple-500" }
+    ],
+    2: [
+      { time: "08:00", duration: "90 min", title: "Algèbre Linéaire", room: "Salle 102", instructor: "Dr. Kamga", color: "border-l-pink-500" },
+      { time: "10:00", duration: "120 min", title: "Physique Quantique", room: "Amphi B", instructor: "Pr. Tagne", color: "border-l-indigo-500", isCurrent: true },
+      { time: "14:00", duration: "90 min", title: "Anglais Technique", room: "Labo Langues", instructor: "Mrs. Smith", color: "border-l-orange-400" }
+    ],
+    3: [
+      { time: "08:30", duration: "90 min", title: "Marketing Digital", room: "Salle 302", instructor: "M. Solo", color: "border-l-amber-500" }
+    ],
+    4: [
+      { time: "10:00", duration: "120 min", title: "Comptabilité", room: "Salle 105", instructor: "Mme. Rova", color: "border-l-teal-500" }
+    ],
+    5: [
+      { time: "08:00", duration: "240 min", title: "Projet Fin d'Études", room: "Bibliothèque", instructor: "Equipe GSI", color: "border-l-rose-500" }
+    ]
+  };
 
   return (
     <AppLayout>
@@ -57,46 +81,30 @@ export default function SchedulePage() {
         {/* Days Row */}
         <div className="flex justify-between mb-8">
           {days.map((day, i) => (
-            <div key={day} className="flex flex-col items-center">
+            <button key={day} onClick={() => setSelectedDay(i)} className="flex flex-col items-center">
               <span className="text-[10px] text-gray-400 font-bold mb-2 uppercase">{day}</span>
               <div className={cn(
                 "w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm transition-all",
-                i === currentDay ? "bg-primary text-white shadow-lg scale-110" : "bg-white text-gray-700 border border-gray-100"
+                i === selectedDay ? "bg-primary text-white shadow-lg scale-110" : "bg-white text-gray-700 border border-gray-100"
               )}>
                 {12 + i}
               </div>
               {i === 2 && <div className="w-1.5 h-1.5 bg-accent rounded-full mt-2"></div>}
-            </div>
+            </button>
           ))}
         </div>
 
         {/* Schedule Items */}
         <div className="space-y-6">
-          <ScheduleCard
-            time="08:00"
-            duration="90 min"
-            title="Algèbre Linéaire"
-            room="Salle 102"
-            instructor="Dr. Kamga"
-            color="border-l-pink-500"
-          />
-          <ScheduleCard
-            time="10:00"
-            duration="120 min"
-            title="Physique Quantique"
-            room="Amphi B"
-            instructor="Pr. Tagne"
-            color="border-l-indigo-500"
-            isCurrent
-          />
-          <ScheduleCard
-            time="14:00"
-            duration="90 min"
-            title="Anglais Technique"
-            room="Labo Langues"
-            instructor="Mrs. Smith"
-            color="border-l-orange-400"
-          />
+          {scheduleData[selectedDay]?.map((item: any, i: number) => (
+            <ScheduleCard
+              key={i}
+              {...item}
+            />
+          ))}
+          {(!scheduleData[selectedDay] || scheduleData[selectedDay].length === 0) && (
+            <p className="text-center text-gray-400 italic">Aucun cours prévu pour ce jour.</p>
+          )}
         </div>
       </div>
     </AppLayout>

@@ -6,25 +6,72 @@ import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
+import { GSIStore, User } from "@/lib/store";
 
 export default function Home() {
   const { t } = useLanguage();
+  const [user, setUser] = useState<User | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  useEffect(() => {
+    setUser(GSIStore.getCurrentUser());
+  }, []);
+
+  const firstName = user?.fullName.split(' ')[0] || "Étudiant";
+
+  const notifications = [
+    { title: "Nouveau cours", message: "Le support d'Algorithmique est disponible.", time: "10 min" },
+    { title: "Rappel Devoir", message: "Devoir de Gestion à rendre demain !", time: "1h" },
+    { title: "Note publiée", message: "Votre note de Mathématiques est en ligne.", time: "2h" },
+  ];
 
   return (
     <AppLayout>
       <div className="p-6">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-6 relative">
           <div>
-            <p className="text-gray-500 text-sm">{t("bonjour")} Liana</p>
+            <p className="text-gray-500 text-sm">{t("bonjour")} {firstName}</p>
             <h1 className="text-2xl font-bold">Vous avez <span className="text-green-500">4 {t("tasks_today")}</span></h1>
           </div>
-          <Link href="/profile" className="relative">
-            <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border-2 border-primary/20">
-              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Liana" alt="Avatar" />
+          <div className="flex items-center gap-3">
+             <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-2 bg-gray-100 rounded-full text-gray-500">
+                <Bell size={20} />
+                <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 border border-white rounded-full"></div>
+             </button>
+             <Link href="/profile" className="relative">
+                <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border-2 border-primary/20">
+                  <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Liana" alt="Avatar" />
+                </div>
+             </Link>
+          </div>
+
+          {/* Notifications Dropdown */}
+          {showNotifications && (
+            <div className="absolute top-16 right-0 w-72 bg-white rounded-3xl shadow-2xl z-50 border border-gray-100 p-4 animate-in fade-in slide-in-from-top-2">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-sm">Notifications</h3>
+                <button onClick={() => setShowNotifications(false)} className="text-[10px] text-primary font-bold">Marquer tout lu</button>
+              </div>
+              <div className="space-y-3">
+                {notifications.map((n, i) => (
+                  <div key={i} className="flex gap-3 pb-3 border-b border-gray-50 last:border-0">
+                    <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center text-primary flex-shrink-0">
+                      <Bell size={14} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold">{n.title}</h4>
+                      <p className="text-[10px] text-gray-500">{n.message}</p>
+                      <span className="text-[8px] text-gray-400">{n.time} ago</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full animate-pulse"></div>
-          </Link>
+          )}
         </div>
 
         {/* Ask Insight Call to Action */}
@@ -45,7 +92,7 @@ export default function Home() {
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-bold">{t("cours_en_cours")}</h2>
-            <button className="text-primary text-xs font-bold hover:underline">{t("tous")}</button>
+            <Link href="/performance" className="text-primary text-xs font-bold hover:underline">Voir mes notes</Link>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide px-1">
             <CourseCard
@@ -139,6 +186,8 @@ function CourseCard({ title, icon, color, count }: { title: string, icon: string
 }
 
 function TaskCard({ title, subject, date, progress, status, statusColor }: any) {
+  const [submitted, setSubmitted] = useState(false);
+
   return (
     <div className="bg-white p-5 rounded-[32px] shadow-sm border border-gray-100 group hover:shadow-md transition-all">
       <div className="flex justify-between items-start mb-3">
@@ -155,13 +204,29 @@ function TaskCard({ title, subject, date, progress, status, statusColor }: any) 
          <span className="text-[10px] font-bold text-gray-400">💬 12 commentaires</span>
       </div>
 
-      {progress !== undefined && (
-        <div className="flex items-center gap-3">
+      {progress !== undefined && !submitted && (
+        <div className="flex items-center gap-3 mb-4">
           <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
              <div className="h-full bg-green-500 rounded-full" style={{ width: `${progress}%` }}></div>
           </div>
           <span className="text-[10px] font-bold text-green-600">{progress}%</span>
         </div>
+      )}
+
+      {submitted ? (
+        <div className="bg-green-50 p-3 rounded-2xl flex items-center gap-2 text-green-700 font-bold text-xs">
+           <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center">✓</div>
+           Devoir envoyé avec succès !
+        </div>
+      ) : (
+        <button
+          onClick={() => {
+            const ok = confirm("Voulez-vous soumettre ce devoir ?");
+            if(ok) setSubmitted(true);
+          }}
+          className="w-full py-3 bg-gray-50 text-primary rounded-2xl text-xs font-bold hover:bg-primary hover:text-white transition-all">
+          Soumettre le travail
+        </button>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Sparkles, ShieldCheck, GraduationCap, Languages, X } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import Link from "next/link";
+import { GSIStore } from "@/lib/store";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -18,12 +19,40 @@ export default function LoginPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    router.push("/");
+    const users = GSIStore.getUsers();
+    const user = users.find((u: any) => u.email === email);
+
+    if (user) {
+      GSIStore.setCurrentUser(user);
+      router.push("/");
+    } else {
+      // For demo purposes, if not found, create a default one
+      const newUser = {
+        id: 'demo-user',
+        fullName: 'Liana Rakoto',
+        email: email,
+        role: 'student' as const,
+        campus: 'Antananarivo',
+        filiere: 'Informatique',
+        niveau: 'L1'
+      };
+      GSIStore.setCurrentUser(newUser);
+      router.push("/");
+    }
   };
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (adminCode === "Nina GSI") {
+      GSIStore.setCurrentUser({
+        id: 'admin-id',
+        fullName: 'Nina GSI',
+        email: 'admin@gsi.mg',
+        role: 'admin',
+        campus: 'Antananarivo',
+        filiere: 'Administration',
+        niveau: 'N/A'
+      });
       router.push("/admin");
     } else {
       alert("Code incorrect");
@@ -33,6 +62,15 @@ export default function LoginPage() {
   const handleProfLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (profPass === "prof-gsi-mg") {
+      GSIStore.setCurrentUser({
+        id: 'prof-id',
+        fullName: 'Professeur GSI',
+        email: 'prof@gsi.mg',
+        role: 'professor',
+        campus: 'Antananarivo',
+        filiere: 'Multiple',
+        niveau: 'Multiple'
+      });
       router.push("/professor");
     } else {
       alert("Mot de passe incorrect");

@@ -10,12 +10,21 @@ export default function LibraryPage() {
   const { t } = useLanguage();
   const [filter, setFilter] = useState("all");
 
-  const books = [
-    { id: 1, title: "Algèbre Moderne", author: "Pr. Bernard", type: "PDF", size: "4.2 MB", favorite: true },
-    { id: 2, title: "Mécanique des Fluides", author: "Dr. Liana", type: "PDF", size: "12.8 MB", favorite: false },
-    { id: 3, title: "Génie Logiciel V2", author: "GSI Internationale", type: "EPUB", size: "2.1 MB", favorite: true },
-    { id: 4, title: "Base de Données SQL", author: "Lab GSI", type: "PDF", size: "8.5 MB", favorite: false },
-  ];
+  const [books, setBooks] = useState([
+    { id: 1, title: "Algèbre Moderne", author: "Pr. Bernard", type: "PDF", size: "4.2 MB", favorite: true, downloaded: false },
+    { id: 2, title: "Mécanique des Fluides", author: "Dr. Liana", type: "PDF", size: "12.8 MB", favorite: false, downloaded: false },
+    { id: 3, title: "Génie Logiciel V2", author: "GSI Internationale", type: "EPUB", size: "2.1 MB", favorite: true, downloaded: false },
+    { id: 4, title: "Base de Données SQL", author: "Lab GSI", type: "PDF", size: "8.5 MB", favorite: false, downloaded: false },
+  ]);
+
+  const handleDownload = (id: number) => {
+    setBooks(books.map(b => b.id === id ? { ...b, downloaded: true } : b));
+    alert("Document disponible hors-ligne !");
+  };
+
+  const handleToggleFavorite = (id: number) => {
+    setBooks(books.map(b => b.id === id ? { ...b, favorite: !b.favorite } : b));
+  };
 
   return (
     <AppLayout>
@@ -71,13 +80,20 @@ export default function LibraryPage() {
                 <p className="text-[10px] text-gray-400 font-medium">{book.author} • {book.size}</p>
               </div>
               <div className="flex gap-2">
-                <button className={cn(
-                  "p-2 rounded-xl transition-colors",
-                  book.favorite ? "text-accent bg-accent/10" : "text-gray-300 bg-gray-50"
-                )}>
+                <button
+                  onClick={() => handleToggleFavorite(book.id)}
+                  className={cn(
+                    "p-2 rounded-xl transition-colors",
+                    book.favorite ? "text-accent bg-accent/10" : "text-gray-300 bg-gray-50"
+                  )}>
                   <Star size={16} fill={book.favorite ? "currentColor" : "none"} />
                 </button>
-                <button className="p-2 bg-gray-50 text-primary rounded-xl hover:bg-primary/10 transition-colors">
+                <button
+                  onClick={() => handleDownload(book.id)}
+                  className={cn(
+                    "p-2 rounded-xl transition-colors",
+                    book.downloaded ? "bg-green-100 text-green-600" : "bg-gray-50 text-primary hover:bg-primary/10"
+                  )}>
                   <Download size={16} />
                 </button>
               </div>

@@ -115,7 +115,106 @@ export default function ProfessorPage() {
           </>
         )}
 
-        {activeTab !== "dashboard" && (
+        {(activeTab === "lessons" || activeTab === "assignments") && (
+           <div className="space-y-6">
+            <button onClick={() => setActiveTab("dashboard")} className="flex items-center gap-2 text-gray-500 font-bold mb-2">
+              <ChevronRight className="rotate-180" size={20} /> Retour
+            </button>
+            <h2 className="text-2xl font-black">{menuItems.find(i => i.id === activeTab)?.label}</h2>
+            <div className="bg-white p-6 rounded-[32px] border border-gray-100 space-y-4">
+              <div>
+                <label className="block text-sm font-bold mb-2">{t("titre")}</label>
+                <input type="text" className="w-full bg-gray-50 border-none rounded-xl p-3 outline-none" placeholder="Ex: Algèbre Linéaire" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">{t("description")}</label>
+                <textarea className="w-full bg-gray-50 border-none rounded-xl p-3 outline-none" placeholder="Description du contenu..."></textarea>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold mb-2">{t("filiere")}</label>
+                  <select className="w-full bg-gray-50 border-none rounded-xl p-3 outline-none">
+                    <option>Informatique</option>
+                    <option>Gestion</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-2">{t("niveau")}</label>
+                  <select className="w-full bg-gray-50 border-none rounded-xl p-3 outline-none">
+                    <option>L1</option>
+                    <option>L2</option>
+                  </select>
+                </div>
+              </div>
+              {activeTab === "assignments" && (
+                <div>
+                  <label className="block text-sm font-bold mb-2">{t("date_limite")}</label>
+                  <input type="date" className="w-full bg-gray-50 border-none rounded-xl p-3 outline-none" />
+                </div>
+              )}
+              <button
+                onClick={() => {
+                  alert(activeTab === 'lessons' ? "Leçon publiée !" : "Devoir publié !");
+                  setActiveTab("dashboard");
+                }}
+                className={`w-full text-white py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-transform ${activeTab === 'lessons' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-orange-500 shadow-orange-500/20'}`}>
+                {activeTab === 'lessons' ? t("publier_lecon") : t("publier_devoir")}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "grades" && (
+          <div className="space-y-4">
+             <button onClick={() => setActiveTab("dashboard")} className="flex items-center gap-2 text-gray-500 font-bold mb-2">
+              <ChevronRight className="rotate-180" size={20} /> Retour
+            </button>
+            <h2 className="text-2xl font-black mb-4">{t("gestion_notes")}</h2>
+            <div className="bg-white p-4 rounded-2xl border border-gray-100 overflow-hidden">
+               <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="text-gray-400 font-bold">
+                      <th className="pb-4">Étudiant</th>
+                      <th className="pb-4 text-center">Note</th>
+                    </tr>
+                  </thead>
+                  <tbody className="font-medium">
+                    <tr className="border-t border-gray-50">
+                      <td className="py-4">Rakoto Jean</td>
+                      <td className="py-4 text-center"><input type="number" className="w-12 bg-gray-50 border-none rounded-lg p-1 text-center" defaultValue="14" /> / 20</td>
+                    </tr>
+                    <tr className="border-t border-gray-50">
+                      <td className="py-4">Andria Marie</td>
+                      <td className="py-4 text-center"><input type="number" className="w-12 bg-gray-50 border-none rounded-lg p-1 text-center" defaultValue="16" /> / 20</td>
+                    </tr>
+                  </tbody>
+               </table>
+               <button onClick={() => alert("Notes enregistrées !")} className="w-full bg-pink-500 text-white py-3 rounded-xl font-bold mt-4 shadow-lg shadow-pink-500/20">
+                  Enregistrer les notes
+               </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "schedule" && (
+           <div className="space-y-4">
+             <button onClick={() => setActiveTab("dashboard")} className="flex items-center gap-2 text-gray-500 font-bold mb-2">
+              <ChevronRight className="rotate-180" size={20} /> Retour
+            </button>
+            <h2 className="text-2xl font-black mb-4">{t("modifier_edt")}</h2>
+            <div className="bg-white p-6 rounded-[32px] border border-gray-100 space-y-4 text-center">
+               <div className="w-20 h-20 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-dashed border-blue-200">
+                  <Upload size={32} />
+               </div>
+               <p className="text-sm text-gray-500">Glissez-déposez l'emploi du temps (PDF, Excel, JPG)</p>
+               <button onClick={() => alert("Fichier téléchargé et synchronisé !")} className="w-full bg-blue-500 text-white py-4 rounded-xl font-bold">
+                  Télécharger le fichier
+               </button>
+            </div>
+          </div>
+        )}
+
+        {(!["dashboard", "lessons", "assignments", "grades", "schedule"].includes(activeTab)) && (
           <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm min-h-[400px] flex flex-col items-center justify-center text-center relative">
              <button
               onClick={() => setActiveTab("dashboard")}
