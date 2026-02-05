@@ -1,10 +1,11 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, Sparkles } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 export default function Home() {
   const { t } = useLanguage();
@@ -26,56 +27,78 @@ export default function Home() {
           </Link>
         </div>
 
-        {/* Progression Section (New) */}
-        <div className="mb-8">
-           <h2 className="text-lg font-semibold mb-4">{t("votre_progression")}</h2>
-           <div className="space-y-4 bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-medium">
-                  <span>Mathématiques</span>
-                  <span>75%</span>
-                </div>
-                <Progress value={75} className="h-2" />
+        {/* Ask Insight Call to Action */}
+        <Link href="/chat" className="block mb-8 bg-gradient-to-r from-primary to-accent p-5 rounded-[32px] text-white shadow-lg shadow-primary/20 relative overflow-hidden group">
+           <div className="absolute right-[-10px] top-[-10px] w-24 h-24 bg-white/10 rounded-full group-hover:scale-110 transition-transform"></div>
+           <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-2">
+                 <div className="p-2 bg-white/20 rounded-xl">
+                    <Sparkles size={20} className="text-white" />
+                 </div>
+                 <h3 className="font-bold text-lg">{t("ask_insight")}</h3>
               </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-medium">
-                  <span>Physique</span>
-                  <span>60%</span>
-                </div>
-                <Progress value={60} className="h-2" />
-              </div>
+              <p className="text-sm text-white/80 italic font-medium">“Where data meets your future.”</p>
            </div>
-        </div>
+        </Link>
 
         {/* Courses Section */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">{t("cours_en_cours")}</h2>
-            <button className="text-primary text-xs font-medium italic">GSI Insight — “Where data meets your future.”</button>
+            <h2 className="text-lg font-bold">{t("cours_en_cours")}</h2>
+            <button className="text-primary text-xs font-bold hover:underline">{t("tous")}</button>
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+          <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide px-1">
             <CourseCard
               title="Mathématiques"
               icon="📐"
-              color="bg-pink-500"
+              color="bg-rose-500"
+              count="12"
             />
             <CourseCard
-              title="Chimie"
-              icon="🧪"
-              color="bg-orange-400"
+              title="Gestion"
+              icon="📊"
+              color="bg-amber-500"
+              count="8"
             />
             <CourseCard
-              title="Physique"
-              icon="⚛️"
-              color="bg-blue-500"
+              title="Marketing"
+              icon="🎯"
+              color="bg-indigo-500"
+              count="5"
+            />
+          </div>
+        </div>
+
+        {/* Tasks Section (from Prototype) */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-bold">Mes Tâches</h2>
+            <button className="text-primary text-xs font-bold hover:underline">Voir tout</button>
+          </div>
+          <div className="space-y-4">
+            <TaskCard
+              title="Lire le poème & répondre aux questions"
+              subject="Littérature Anglaise"
+              date="28 Mai 2025"
+              progress={40}
+              status="En cours"
+              statusColor="bg-amber-100 text-amber-600"
+            />
+            <TaskCard
+              title="Créer une bande dessinée"
+              subject="Sciences Sociales"
+              date="30 Mai 2025"
+              status="À faire"
+              statusColor="bg-indigo-100 text-indigo-600"
             />
           </div>
         </div>
 
         {/* Schedule Section */}
-        <div>
+        <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">{t("votre_emploi_du_temps")}</h2>
+            <h2 className="text-lg font-bold">{t("votre_emploi_du_temps")}</h2>
+            <Link href="/schedule" className="text-primary text-xs font-bold hover:underline">Ouvrir</Link>
           </div>
 
           <div className="space-y-4">
@@ -102,13 +125,44 @@ export default function Home() {
   );
 }
 
-function CourseCard({ title, icon, color }: { title: string, icon: string, color: string }) {
+function CourseCard({ title, icon, color, count }: { title: string, icon: string, color: string, count: string }) {
   return (
-    <div className={`${color} min-w-[140px] p-4 rounded-3xl text-white shadow-lg`}>
-      <div className="bg-white/20 w-10 h-10 rounded-xl flex items-center justify-center text-xl mb-4">
+    <div className={`${color} min-w-[140px] p-5 rounded-[32px] text-white shadow-lg shadow-${color.split('-')[1]}-500/20 relative overflow-hidden group hover:scale-[1.02] transition-transform`}>
+      <div className="absolute right-[-10px] top-[-10px] w-16 h-16 bg-white/10 rounded-full"></div>
+      <div className="bg-white/20 w-10 h-10 rounded-2xl flex items-center justify-center text-xl mb-4">
         {icon}
       </div>
-      <h3 className="font-semibold">{title}</h3>
+      <h3 className="font-bold text-base leading-tight mb-1">{title}</h3>
+      <p className="text-[10px] opacity-80 font-bold uppercase tracking-wider">{count} supports</p>
+    </div>
+  );
+}
+
+function TaskCard({ title, subject, date, progress, status, statusColor }: any) {
+  return (
+    <div className="bg-white p-5 rounded-[32px] shadow-sm border border-gray-100 group hover:shadow-md transition-all">
+      <div className="flex justify-between items-start mb-3">
+        <span className={cn("text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider", statusColor)}>
+          {status}
+        </span>
+        <button className="text-gray-300">•••</button>
+      </div>
+      <h4 className="font-bold text-gray-800 mb-1 leading-tight">{title}</h4>
+      <p className="text-xs text-gray-500 mb-4">{subject}</p>
+
+      <div className="flex items-center justify-between mb-2">
+         <span className="text-[10px] font-bold text-gray-400">📅 {date}</span>
+         <span className="text-[10px] font-bold text-gray-400">💬 12 commentaires</span>
+      </div>
+
+      {progress !== undefined && (
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+             <div className="h-full bg-green-500 rounded-full" style={{ width: `${progress}%` }}></div>
+          </div>
+          <span className="text-[10px] font-bold text-green-600">{progress}%</span>
+        </div>
+      )}
     </div>
   );
 }
