@@ -22,7 +22,7 @@ export default function ServicesPage() {
       }
       setUser(currentUser);
       const allPayments = await GSIStore.getPayments();
-      setPayments(allPayments.filter(p => p.studentId === currentUser.id));
+      setPayments(allPayments.filter((p: Payment) => p.studentId === currentUser.id));
     };
     init();
   }, [router]);
