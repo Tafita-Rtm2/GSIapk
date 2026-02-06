@@ -28,7 +28,6 @@ export interface Grade { id: string; studentId: string; studentName: string; sub
 export interface Announcement { id: string; title: string; message: string; date: string; author: string; }
 
 // --- MONGODB ATLAS CONFIGURATION (SYNC & ACCELERATION) ---
-// Note: Pour le web, Atlas nécessite un App ID (Realm/App Services).
 const MONGODB_APP_ID = process.env.NEXT_PUBLIC_MONGODB_APP_ID || "gsi-insight-data-v1";
 
 let mongoApp: any = null;
@@ -75,7 +74,7 @@ const notifyStoreListeners = (key: string, data: any) => {
 if (typeof window !== 'undefined') {
   const keys = ['currentUser', 'users', 'lessons', 'assignments', 'submissions', 'grades', 'announcements', 'payments', 'schedules'];
   keys.forEach(key => {
-    const saved = localStorage.getItem(`gsi_data_pack_${key}`);
+    const saved = localStorage.getItem(`gsi_data_pack_v2_${key}`);
     if (saved) MemoryStore[key as keyof typeof MemoryStore] = JSON.parse(saved);
   });
 
@@ -104,7 +103,7 @@ export const GSIStore = {
   // Sync to local disk
   saveToDisk(key: string, data: any) {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(`gsi_data_pack_${key}`, JSON.stringify(data));
+      localStorage.setItem(`gsi_data_pack_v2_${key}`, JSON.stringify(data));
     }
   },
 
@@ -158,6 +157,14 @@ export const GSIStore = {
       MemoryStore.users = users;
       GSIStore.saveToDisk('users', users);
       callback(users);
+    }, (err) => {
+      // Fallback if index missing
+      getDocs(collection(db, "users")).then(snap => {
+         const users = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+         MemoryStore.users = users;
+         GSIStore.saveToDisk('users', users);
+         callback(users);
+      });
     });
   },
 
@@ -294,7 +301,7 @@ export const GSIStore = {
   // UTILS
   getCache: <T>(key: string): T | null => {
     if (typeof window === 'undefined') return null;
-    const data = localStorage.getItem(`gsi_data_pack_${key}`);
+    const data = localStorage.getItem(`gsi_data_pack_v2_${key}`);
     return data ? JSON.parse(data) : null;
   },
   setCache: (key: string, data: any) => GSIStore.saveToDisk(key, data),
