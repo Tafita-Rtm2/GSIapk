@@ -26,22 +26,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
+    let unsubscribeAuth = () => {};
+
     // Auth Listener for Firebase (Background sync)
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Background update of user data
-        const userData = await GSIStore.getUser(firebaseUser.uid);
-        if (userData) {
-          GSIStore.setCurrentUser(userData);
-        }
-      } else {
-        const current = GSIStore.getCurrentUser();
-        if (current && current.id !== 'admin-id' && current.id !== 'prof-id') {
-           setUser(null);
-        }
+    if (auth) {
+      try {
+        unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+          if (firebaseUser) {
+            // Background update of user data
+            try {
+              const userData = await GSIStore.getUser(firebaseUser.uid);
+              if (userData) {
+                GSIStore.setCurrentUser(userData);
+              }
+            } catch (e) {
+              console.warn("Auth sync: Could not fetch user data from cloud.");
+            }
+          } else {
+            const current = GSIStore.getCurrentUser();
+            // Only clear if it's a real student account (not bypass)
+            if (current && !['admin-id', 'prof-id'].includes(current.id)) {
+               GSIStore.setCurrentUser(null);
+            }
+          }
+          setLoading(false);
+        });
+      } catch (e) {
+        console.error("Firebase Auth failed to attach listener", e);
+        setLoading(false);
       }
+    } else {
+      console.warn("Firebase Auth not available. Running in local/bypass mode.");
       setLoading(false);
-    });
+    }
 
     // Store Listener (handles role-based manual login and sync updates)
     const unsubscribeStore = GSIStore.subscribe((newUser) => {
@@ -49,8 +66,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    // Final safety to avoid stuck loading, but extremely short for fluid feel
-    const timer = setTimeout(() => setLoading(false), 200);
+    // Final safety to avoid stuck loading
+    const timer = setTimeout(() => setLoading(false), 500);
 
     return () => {
       unsubscribeAuth();
@@ -81,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           <Sparkles size={32} />
         </div>
         <h1 className="text-xl font-black text-primary">GSI Insight</h1>
+        <p className="text-xs text-gray-400 mt-2 animate-bounce">Initialisation du Pack GSI...</p>
       </div>
     );
   }

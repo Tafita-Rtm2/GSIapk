@@ -81,6 +81,13 @@ export const translations: Translations = {
   matiere: { fr: "Matière", en: "Subject" },
   date_limite: { fr: "Date limite", en: "Deadline" },
   soumettre: { fr: "Soumettre", en: "Submit" },
+  success_today: { fr: "la réussite aujourd'hui", en: "success today" },
+  gsi_insight_tagline: { fr: "Comprendre aujourd'hui, réussir demain.", en: "Understanding today, succeeding tomorrow." },
+  gsi_mission: { fr: "L'application intelligente de GSI Internationale conçue pour accompagner chaque étudiant.", en: "The intelligent application of GSI Internationale designed to accompany every student." },
+  convoquer: { fr: "Convoquer", en: "Summon" },
+  convocation: { fr: "Convocation", en: "Summons" },
+  import_excel: { fr: "Import Excel", en: "Excel Import" },
+  moyenne_classe: { fr: "Moyenne de classe", en: "Class average" },
 };
 
 interface LanguageContextType {

@@ -27,7 +27,7 @@ export interface Submission { id: string; assignmentId: string; studentId: strin
 export interface Grade { id: string; studentId: string; studentName: string; subject: string; score: number; maxScore: number; date: string; niveau: string; filiere: string; }
 export interface Announcement { id: string; title: string; message: string; date: string; author: string; }
 
-// --- MONGODB ATLAS CONFIGURATION (SYNC & ACCELERATION) ---
+// --- MONGODB ATLAS CONFIGURATION ---
 const MONGODB_APP_ID = process.env.NEXT_PUBLIC_MONGODB_APP_ID || "gsi-insight-data-v1";
 
 let mongoApp: any = null;
@@ -35,11 +35,11 @@ if (typeof window !== 'undefined') {
   try {
     mongoApp = new Realm.App({ id: MONGODB_APP_ID });
   } catch (e) {
-    console.warn("MongoDB Atlas initialization... Local Pack enabled.");
+    console.warn("MongoDB Atlas disabled.");
   }
 }
 
-// --- LOCAL DATA PACK STORE (Game Pack Logic - Ultra Fluid) ---
+// --- LOCAL DATA PACK STORE ---
 const MemoryStore: {
   currentUser: User | null;
   users: User[];
@@ -67,47 +67,64 @@ const storeListeners: Record<string, ((data: any) => void)[]> = {
 };
 
 const notifyStoreListeners = (key: string, data: any) => {
-  if (storeListeners[key]) storeListeners[key].forEach(callback => callback(data));
+  if (storeListeners[key]) {
+    storeListeners[key].forEach(callback => {
+      try { callback(data); } catch(e) { console.error(`Listener error for ${key}`, e); }
+    });
+  }
 };
 
-// --- INITIAL LOAD FROM DISK (0s Loading) ---
+// --- INITIAL LOAD FROM DISK ---
 if (typeof window !== 'undefined') {
   const keys = ['currentUser', 'users', 'lessons', 'assignments', 'submissions', 'grades', 'announcements', 'payments', 'schedules'];
   keys.forEach(key => {
-    const saved = localStorage.getItem(`gsi_data_pack_v2_${key}`);
-    if (saved) MemoryStore[key as keyof typeof MemoryStore] = JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem(`gsi_v4_pack_${key}`);
+      if (saved) MemoryStore[key as keyof typeof MemoryStore] = JSON.parse(saved);
+    } catch (e) {}
   });
 
-  // Launch Background Sync with MongoDB
-  setTimeout(() => {
-    GSIStore.syncWithMongoDB();
-  }, 1000);
+  // Mock initial data if completely empty to avoid "rien ne fonctionne"
+  if (MemoryStore.users.length === 0) {
+     console.log("GSI Store: Generating Mock Pack Data...");
+     MemoryStore.users = [
+       { id: 'mock-1', fullName: 'Étudiant Test', email: 'test@gsi.mg', role: 'student', campus: 'Antananarivo', filiere: 'Informatique', niveau: 'L1' },
+       { id: 'mock-2', fullName: 'Professeur Test', email: 'prof@gsi.mg', role: 'professor', campus: 'Antananarivo', filiere: 'Informatique', niveau: 'L1' }
+     ];
+     MemoryStore.lessons = [
+       { id: 'l1', title: 'Introduction GSI', description: 'Bienvenue sur GSI Insight.', subject: 'Général', niveau: 'L1', filiere: [], campus: [], date: new Date().toISOString(), files: [] }
+     ];
+     MemoryStore.payments = [
+       { id: 'p1', studentId: 'mock-1', studentName: 'Étudiant Test', amount: '1.200.000 Ar', date: new Date().toISOString().split('T')[0], status: 'paid', description: 'Frais Inscription', campus: 'Antananarivo', filiere: 'Informatique', niveau: 'L1' }
+     ];
+  }
 }
 
-// Firebase Auth remains for secure account access
+// --- CLOUD SYNC ---
 if (typeof window !== 'undefined') {
-  onAuthStateChanged(auth, async (firebaseUser) => {
-    if (firebaseUser) {
-      const docRef = doc(db, "users", firebaseUser.uid);
-      onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) GSIStore.setCurrentUser(docSnap.data() as User);
-      });
-    } else {
-      const current = MemoryStore.currentUser;
-      if (current && !['admin-id', 'prof-id'].includes(current.id)) GSIStore.setCurrentUser(null);
-    }
-  });
+  if (auth) {
+    onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        if (db) {
+          onSnapshot(doc(db, "users", firebaseUser.uid), (docSnap) => {
+            if (docSnap.exists()) GSIStore.setCurrentUser(docSnap.data() as User);
+          }, (err) => console.error("Firebase Sync User Error", err));
+        }
+      }
+    });
+  }
+
+  // Background MongoDB Sync
+  setTimeout(() => GSIStore.syncWithMongoDB(), 3000);
 }
 
 export const GSIStore = {
-  // Sync to local disk
   saveToDisk(key: string, data: any) {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(`gsi_data_pack_v2_${key}`, JSON.stringify(data));
+      localStorage.setItem(`gsi_v4_pack_${key}`, JSON.stringify(data));
     }
   },
 
-  // Auth
   subscribe: (callback: (user: User | null) => void) => {
     storeListeners.auth.push(callback);
     callback(MemoryStore.currentUser);
@@ -122,70 +139,62 @@ export const GSIStore = {
     notifyStoreListeners('auth', user);
   },
 
-  // CORE DATA SYNC (MongoDB Ready)
   async syncWithMongoDB() {
     if (!mongoApp) return;
     try {
-      // 1. Authenticate with Atlas App Services
-      if (!mongoApp.currentUser) {
-        await mongoApp.logIn(Realm.Credentials.anonymous());
-      }
-
+      if (!mongoApp.currentUser) await mongoApp.logIn(Realm.Credentials.anonymous());
       const mongodb = mongoApp.currentUser.mongoClient("mongodb-atlas");
-      const lessonsColl = mongodb.db("gsi_insight").collection("lessons");
+      const db_name = "gsi_insight";
 
-      // 2. High Speed Fetch from MongoDB
-      const remoteLessons = await lessonsColl.find({});
-      if (remoteLessons && remoteLessons.length > 0) {
+      const remoteLessons = await mongodb.db(db_name).collection("lessons").find({});
+      if (remoteLessons.length > 0) {
         MemoryStore.lessons = remoteLessons.map((l: any) => ({ ...l, id: l._id.toString() }));
         GSIStore.saveToDisk('lessons', MemoryStore.lessons);
         notifyStoreListeners('lessons', MemoryStore.lessons);
-        console.log("Sync MongoDB: Lessons updated.");
       }
     } catch (e) {
-      console.warn("MongoDB Sync failed, using Local Pack + Firebase.", e);
+      console.warn("MongoDB Sync Skip.");
     }
   },
 
-  // USERS
   subscribeUsers(callback: (users: User[]) => void) {
     storeListeners.users.push(callback);
     callback(MemoryStore.users);
 
-    return onSnapshot(query(collection(db, "users"), orderBy("fullName", "asc")), (snapshot) => {
+    if (!db) return () => {};
+    return onSnapshot(collection(db, "users"), (snapshot) => {
       const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-      MemoryStore.users = users;
-      GSIStore.saveToDisk('users', users);
-      callback(users);
+      MemoryStore.users = users.sort((a,b) => (a.fullName || "").localeCompare(b.fullName || ""));
+      GSIStore.saveToDisk('users', MemoryStore.users);
+      callback(MemoryStore.users);
+      notifyStoreListeners('users', MemoryStore.users);
     }, (err) => {
-      // Fallback if index missing
       getDocs(collection(db, "users")).then(snap => {
          const users = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-         MemoryStore.users = users;
-         GSIStore.saveToDisk('users', users);
-         callback(users);
-      });
+         MemoryStore.users = users.sort((a,b) => (a.fullName || "").localeCompare(b.fullName || ""));
+         callback(MemoryStore.users);
+      }).catch(e => console.error("Firebase Critical Error", e));
     });
   },
 
   async addUser(user: User) {
     MemoryStore.users = [...MemoryStore.users, user].sort((a,b) => a.fullName.localeCompare(b.fullName));
     GSIStore.saveToDisk('users', MemoryStore.users);
-    await setDoc(doc(db, "users", user.id), { ...user, createdAt: Timestamp.now() });
+    notifyStoreListeners('users', MemoryStore.users);
+    if (db) await setDoc(doc(db, "users", user.id), { ...user, createdAt: Timestamp.now() });
   },
 
-  // LESSONS
   subscribeLessons(filter: { niveau?: string }, callback: (lessons: Lesson[]) => void) {
     storeListeners.lessons.push(callback);
-    const initial = filter.niveau ? MemoryStore.lessons.filter(l => l.niveau === filter.niveau) : MemoryStore.lessons;
-    callback(initial);
+    const getFiltered = (ls: Lesson[]) => filter.niveau ? ls.filter(l => l.niveau === filter.niveau) : ls;
+    callback(getFiltered(MemoryStore.lessons));
 
+    if (!db) return () => {};
     return onSnapshot(query(collection(db, "lessons"), orderBy("date", "desc")), (snapshot) => {
       const lessons = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lesson));
       MemoryStore.lessons = lessons;
       GSIStore.saveToDisk('lessons', lessons);
-      const filtered = filter.niveau ? lessons.filter(l => l.niveau === filter.niveau) : lessons;
-      callback(filtered);
+      callback(getFiltered(lessons));
     });
   },
 
@@ -193,19 +202,21 @@ export const GSIStore = {
     const newL = { ...lesson, id: Math.random().toString(36).substr(2, 9) };
     MemoryStore.lessons = [newL, ...MemoryStore.lessons];
     GSIStore.saveToDisk('lessons', MemoryStore.lessons);
-    await addDoc(collection(db, "lessons"), { ...lesson, createdAt: Timestamp.now() });
+    notifyStoreListeners('lessons', MemoryStore.lessons);
+    if (db) await addDoc(collection(db, "lessons"), { ...lesson, createdAt: Timestamp.now() });
   },
 
-  // ASSIGNMENTS
   subscribeAssignments(filter: { niveau?: string }, callback: (assignments: Assignment[]) => void) {
     storeListeners.assignments.push(callback);
-    callback(filter.niveau ? MemoryStore.assignments.filter(a => a.niveau === filter.niveau) : MemoryStore.assignments);
+    const getFiltered = (as: Assignment[]) => filter.niveau ? as.filter(a => a.niveau === filter.niveau) : as;
+    callback(getFiltered(MemoryStore.assignments));
 
+    if (!db) return () => {};
     return onSnapshot(query(collection(db, "assignments"), orderBy("deadline", "asc")), (snapshot) => {
       const as = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Assignment));
       MemoryStore.assignments = as;
       GSIStore.saveToDisk('assignments', as);
-      callback(filter.niveau ? as.filter(a => a.niveau === filter.niveau) : as);
+      callback(getFiltered(as));
     });
   },
 
@@ -213,12 +224,13 @@ export const GSIStore = {
     const newA = { ...assignment, id: Math.random().toString(36).substr(2, 9) };
     MemoryStore.assignments = [newA, ...MemoryStore.assignments];
     GSIStore.saveToDisk('assignments', MemoryStore.assignments);
-    await addDoc(collection(db, "assignments"), { ...assignment, createdAt: Timestamp.now() });
+    notifyStoreListeners('assignments', MemoryStore.assignments);
+    if (db) await addDoc(collection(db, "assignments"), { ...assignment, createdAt: Timestamp.now() });
   },
 
-  // GRADES
   subscribeGrades(studentId: string, callback: (grades: Grade[]) => void) {
     callback(MemoryStore.grades.filter(g => g.studentId === studentId));
+    if (!db) return () => {};
     return onSnapshot(query(collection(db, "grades"), where("studentId", "==", studentId)), (snapshot) => {
       const gs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade));
       MemoryStore.grades = [...MemoryStore.grades.filter(g => g.studentId !== studentId), ...gs];
@@ -230,12 +242,12 @@ export const GSIStore = {
   async addGrade(grade: Grade) {
     MemoryStore.grades = [grade, ...MemoryStore.grades];
     GSIStore.saveToDisk('grades', MemoryStore.grades);
-    await addDoc(collection(db, "grades"), { ...grade, createdAt: Timestamp.now() });
+    if (db) await addDoc(collection(db, "grades"), { ...grade, createdAt: Timestamp.now() });
   },
 
-  // PAYMENTS
   subscribePayments(callback: (payments: Payment[]) => void) {
     callback(MemoryStore.payments);
+    if (!db) return () => {};
     return onSnapshot(query(collection(db, "payments"), orderBy("date", "desc")), (snapshot) => {
       const ps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
       MemoryStore.payments = ps;
@@ -247,12 +259,12 @@ export const GSIStore = {
   async addPayment(payment: Payment) {
     MemoryStore.payments = [payment, ...MemoryStore.payments];
     GSIStore.saveToDisk('payments', MemoryStore.payments);
-    await addDoc(collection(db, "payments"), { ...payment, createdAt: Timestamp.now() });
+    if (db) await addDoc(collection(db, "payments"), { ...payment, createdAt: Timestamp.now() });
   },
 
-  // ANNOUNCEMENTS
   subscribeAnnouncements(callback: (anns: Announcement[]) => void) {
     callback(MemoryStore.announcements);
+    if (!db) return () => {};
     return onSnapshot(query(collection(db, "announcements"), orderBy("date", "desc")), (snapshot) => {
       const anns = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement));
       MemoryStore.announcements = anns;
@@ -264,13 +276,13 @@ export const GSIStore = {
   async addAnnouncement(ann: Announcement) {
     MemoryStore.announcements = [ann, ...MemoryStore.announcements];
     GSIStore.saveToDisk('announcements', MemoryStore.announcements);
-    await addDoc(collection(db, "announcements"), { ...ann, createdAt: Timestamp.now() });
+    if (db) await addDoc(collection(db, "announcements"), { ...ann, createdAt: Timestamp.now() });
   },
 
-  // SCHEDULES
   subscribeLatestSchedule(campus: string, niveau: string, callback: (schedule: any) => void) {
     const key = `${campus}_${niveau}`;
     callback(MemoryStore.schedules[key] || null);
+    if (!db) return () => {};
     return onSnapshot(query(collection(db, "schedules"), where("campus", "==", campus), where("niveau", "==", niveau), orderBy("createdAt", "desc")), (snapshot) => {
       if (!snapshot.empty) {
         const s = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
@@ -282,26 +294,44 @@ export const GSIStore = {
   },
 
   async addSchedule(schedule: any) {
-    await addDoc(collection(db, "schedules"), { ...schedule, createdAt: Timestamp.now() });
+    if (db) await addDoc(collection(db, "schedules"), { ...schedule, createdAt: Timestamp.now() });
   },
 
-  // FILE UPLOAD
   async uploadFile(file: File, path: string, onProgress?: (progress: number) => void): Promise<string> {
+    if (!storage) {
+      console.warn("Storage not available, skipping upload.");
+      return "";
+    }
     const storageRef = ref(storage, path);
     return new Promise((resolve, reject) => {
       const uploadTask = uploadBytesResumable(storageRef, file);
+
+      const timeout = setTimeout(() => {
+        uploadTask.cancel();
+        reject(new Error("Upload timeout (60s)"));
+      }, 60000);
+
       uploadTask.on('state_changed',
-        (snapshot) => { if (onProgress) onProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100); },
-        (error) => reject(error),
-        () => getDownloadURL(uploadTask.snapshot.ref).then(url => resolve(url))
+        (snapshot) => {
+          if (onProgress) onProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+        },
+        (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        },
+        () => {
+          clearTimeout(timeout);
+          getDownloadURL(uploadTask.snapshot.ref)
+            .then(url => resolve(url))
+            .catch(err => reject(err));
+        }
       );
     });
   },
 
-  // UTILS
   getCache: <T>(key: string): T | null => {
     if (typeof window === 'undefined') return null;
-    const data = localStorage.getItem(`gsi_data_pack_v2_${key}`);
+    const data = localStorage.getItem(`gsi_v4_pack_${key}`);
     return data ? JSON.parse(data) : null;
   },
   setCache: (key: string, data: any) => GSIStore.saveToDisk(key, data),
@@ -311,9 +341,25 @@ export const GSIStore = {
   async getGrades() { return MemoryStore.grades; },
   async getPayments() { return MemoryStore.payments; },
   async getAnnouncements() { return MemoryStore.announcements; },
-  async getUser(id: string) { return MemoryStore.users.find(u => u.id === id) || null; },
-  async deleteUser(id: string) { await deleteDoc(doc(db, "users", id)); },
-  async updateUser(user: User) { await updateDoc(doc(db, "users", user.id), { ...user }); },
+  async getUser(id: string) {
+    if (db) {
+      try {
+        const snap = await getDoc(doc(db, "users", id));
+        if (snap.exists()) return snap.data() as User;
+      } catch(e) {}
+    }
+    return MemoryStore.users.find(u => u.id === id) || null;
+  },
+  async deleteUser(id: string) {
+    MemoryStore.users = MemoryStore.users.filter(u => u.id !== id);
+    notifyStoreListeners('users', MemoryStore.users);
+    if (db) await deleteDoc(doc(db, "users", id));
+  },
+  async updateUser(user: User) {
+    MemoryStore.users = MemoryStore.users.map(u => u.id === user.id ? user : u);
+    notifyStoreListeners('users', MemoryStore.users);
+    if (db) await updateDoc(doc(db, "users", user.id), { ...user });
+  },
   saveProgress: (id: string, p: any) => {
     const all = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
     all[id] = { ...p, ts: Date.now() };
@@ -326,5 +372,5 @@ export const GSIStore = {
     localStorage.setItem('gsi_downloaded', JSON.stringify(all));
   },
   isDownloaded: (id: string) => !!JSON.parse(localStorage.getItem('gsi_downloaded') || '{}')[id],
-  async addSubmission(s: Submission) { await addDoc(collection(db, "submissions"), { ...s, createdAt: Timestamp.now() }); }
+  async addSubmission(s: Submission) { if (db) await addDoc(collection(db, "submissions"), { ...s, createdAt: Timestamp.now() }); }
 };

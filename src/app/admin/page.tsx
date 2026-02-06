@@ -16,7 +16,9 @@ import {
   Edit2,
   RefreshCcw,
   BookOpen,
-  FileText
+  FileText,
+  Mail,
+  X
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
@@ -33,6 +35,8 @@ export default function AdminPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [users, setUsers] = useState<User[]>([]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [showConvocationModal, setShowConvocationModal] = useState(false);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -130,8 +134,11 @@ export default function AdminPage() {
             </div>
             <button
               onClick={async () => {
-                setUsers(await GSIStore.getUsers());
-                setPayments(await GSIStore.getPayments());
+                const u = await GSIStore.getUsers();
+                const p = await GSIStore.getPayments();
+                setUsers(u);
+                setPayments(p);
+                toast.success(`${u.length} utilisateurs et ${p.length} paiements synchronisés`);
               }}
               className="ml-auto p-2 text-indigo-600 hover:rotate-180 transition-transform duration-500"
             >
@@ -268,6 +275,13 @@ export default function AdminPage() {
                       <Edit2 size={16} />
                     </button>
                     <button
+                      onClick={() => { setSelectedUser(u); setShowConvocationModal(true); }}
+                      className="text-orange-500 p-2 hover:bg-orange-50 rounded-xl"
+                      title={t("convoquer")}
+                    >
+                      <Mail size={16} />
+                    </button>
+                    <button
                       onClick={() => handleDeleteUser(u.id)}
                       className="text-red-500 p-2 hover:bg-red-50 rounded-xl"
                     >
@@ -375,6 +389,51 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+
+      {/* Convocation Modal */}
+      {showConvocationModal && selectedUser && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative">
+            <button onClick={() => setShowConvocationModal(false)} className="absolute right-6 top-6 text-gray-400">
+              <X size={20} />
+            </button>
+            <h2 className="text-xl font-black mb-2">{t("convocation")}</h2>
+            <p className="text-xs text-gray-500 mb-6 font-medium">Envoyer une convocation officielle à <span className="text-indigo-600 font-bold">{selectedUser.fullName}</span>.</p>
+
+            <form onSubmit={async (e: any) => {
+              e.preventDefault();
+              const motive = e.target.motive.value;
+              const date = e.target.date.value;
+              const toastId = toast.loading("Envoi de la convocation...");
+              try {
+                await GSIStore.addAnnouncement({
+                  id: Math.random().toString(36).substr(2, 9),
+                  title: `CONVOCATION: ${selectedUser.fullName}`,
+                  message: `Vous êtes convoqué(e) à l'administration le ${date} pour le motif suivant : ${motive}.`,
+                  date: new Date().toISOString(),
+                  author: "Administration"
+                });
+                toast.success("Convocation envoyée !", { id: toastId });
+                setShowConvocationModal(false);
+              } catch (err: any) {
+                toast.error("Erreur: " + err.message, { id: toastId });
+              }
+            }} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Motif de la convocation</label>
+                <textarea name="motive" required className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold outline-none min-h-[100px]" placeholder="Ex: Dossier administratif incomplet..."></textarea>
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Date du rendez-vous</label>
+                <input name="date" required type="datetime-local" className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold outline-none" />
+              </div>
+              <button type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-indigo-100 active:scale-95 transition-all">
+                Envoyer Convocation
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Floating Action Button */}
       <button
