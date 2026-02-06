@@ -5,6 +5,7 @@ import { Send, Sparkles, ChevronLeft, X } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { GSIStore, User } from "@/lib/store";
+import { PageHeader } from "@/components/page-header";
 
 export default function ChatPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -81,20 +82,16 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col h-screen max-w-md mx-auto bg-white shadow-xl overflow-hidden relative">
       {/* Header */}
-      <div className="bg-primary p-6 text-white flex items-center gap-4 shadow-lg z-10">
-        <Link href="/" className="hover:scale-110 transition-transform">
-          <ChevronLeft size={24} />
-        </Link>
-        <div className="flex items-center gap-3">
+      <PageHeader
+        title="Ask Insight"
+        subtitle="Assistant IA GSI"
+        className="p-6 bg-primary text-white mb-0"
+        rightElement={
           <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md">
             <Sparkles size={20} />
           </div>
-          <div>
-            <h1 className="font-bold text-lg leading-tight">Ask Insight</h1>
-            <p className="text-[10px] opacity-80 font-medium">En ligne • Assistant IA GSI</p>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/50">

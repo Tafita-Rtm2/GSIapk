@@ -19,6 +19,8 @@ import {
 import { useLanguage } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
 import { GSIStore, User, Lesson, Assignment, Grade } from "@/lib/store";
+import { toast } from "sonner";
+import { PageHeader } from "@/components/page-header";
 
 const CAMPUSES = ["Antananarivo", "Antsirabe", "Bypass", "Tamatave"];
 const FILIERES = ["Informatique", "Gestion", "Commerce International", "Marketing Digital", "Comptabilité", "Finance", "Ressources Humaines", "Logistique", "Tourisme", "Communication", "Management", "Droit des Affaires", "Entrepreneuriat"];
@@ -50,27 +52,34 @@ export default function ProfessorPage() {
   const [selectedFilieres, setSelectedFilieres] = useState<string[]>([]);
   const [selectedCampuses, setSelectedCampuses] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const handlePublishLesson = async (e: any) => {
     e.preventDefault();
     if (selectedFilieres.length === 0 || selectedCampuses.length === 0) {
-      alert("Veuillez sélectionner au moins une filière et un campus.");
+      toast.error("Sélectionnez au moins une filière et un campus.");
       return;
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
     let fileUrls: string[] = [];
     const filesInput = e.target.elements.namedItem('files') as HTMLInputElement;
     const files = filesInput?.files;
 
+    const toastId = toast.loading("Publication de la leçon...");
+
     if (files && files.length > 0) {
       try {
         for (let i = 0; i < files.length; i++) {
-          const url = await GSIStore.uploadFile(files[i], `lessons/${Date.now()}_${files[i].name}`);
+          toast.loading(`Upload du fichier ${i+1}/${files.length}...`, { id: toastId });
+          const url = await GSIStore.uploadFile(files[i], `lessons/${Date.now()}_${files[i].name}`, (p) => {
+            setUploadProgress(Math.round(((i / files.length) * 100) + (p / files.length)));
+          });
           fileUrls.push(url);
         }
       } catch (err: any) {
-        alert("Erreur d'upload : " + err.message);
+        toast.error("Erreur d'upload : " + err.message, { id: toastId });
         setIsUploading(false);
         return;
       }
@@ -89,7 +98,7 @@ export default function ProfessorPage() {
     };
     await GSIStore.addLesson(lesson);
     setLessons(await GSIStore.getLessons());
-    alert("Leçon publiée !");
+    toast.success("Leçon publiée avec succès !", { id: toastId });
     setSelectedFilieres([]);
     setSelectedCampuses([]);
     setIsUploading(false);
@@ -99,23 +108,29 @@ export default function ProfessorPage() {
   const handlePublishAssignment = async (e: any) => {
     e.preventDefault();
     if (selectedFilieres.length === 0 || selectedCampuses.length === 0) {
-      alert("Veuillez sélectionner au moins une filière et un campus.");
+      toast.error("Sélectionnez au moins une filière et un campus.");
       return;
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
     let fileUrls: string[] = [];
     const filesInput = e.target.elements.namedItem('files') as HTMLInputElement;
     const files = filesInput?.files;
 
+    const toastId = toast.loading("Publication du devoir...");
+
     if (files && files.length > 0) {
       try {
         for (let i = 0; i < files.length; i++) {
-          const url = await GSIStore.uploadFile(files[i], `assignments/${Date.now()}_${files[i].name}`);
+          toast.loading(`Upload du fichier ${i+1}/${files.length}...`, { id: toastId });
+          const url = await GSIStore.uploadFile(files[i], `assignments/${Date.now()}_${files[i].name}`, (p) => {
+            setUploadProgress(Math.round(((i / files.length) * 100) + (p / files.length)));
+          });
           fileUrls.push(url);
         }
       } catch (err: any) {
-        alert("Erreur d'upload : " + err.message);
+        toast.error("Erreur d'upload : " + err.message, { id: toastId });
         setIsUploading(false);
         return;
       }
@@ -131,11 +146,12 @@ export default function ProfessorPage() {
       campus: selectedCampuses,
       deadline: e.target.deadline.value,
       timeLimit: "23:59",
-      maxScore: 20
+      maxScore: 20,
+      files: fileUrls
     };
     await GSIStore.addAssignment(assignment);
     setAssignments(await GSIStore.getAssignments());
-    alert("Devoir publié !");
+    toast.success("Devoir publié avec succès !", { id: toastId });
     setIsUploading(false);
     setActiveTab("dashboard");
   };
@@ -240,10 +256,7 @@ export default function ProfessorPage() {
 
         {(activeTab === "lessons" || activeTab === "assignments") && (
            <div className="space-y-6">
-            <button onClick={() => setActiveTab("dashboard")} className="flex items-center gap-2 text-gray-500 font-bold mb-2">
-              <ChevronRight className="rotate-180" size={20} /> Retour
-            </button>
-            <h2 className="text-2xl font-black">{menuItems.find(i => i.id === activeTab)?.label}</h2>
+            <PageHeader title={menuItems.find(i => i.id === activeTab)?.label || ""} onBack={() => setActiveTab("dashboard")} />
             <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
               <form onSubmit={activeTab === 'lessons' ? handlePublishLesson : handlePublishAssignment} className="space-y-4">
                 <div>
@@ -326,11 +339,21 @@ export default function ProfessorPage() {
                     <input name="deadline" required type="date" className="w-full bg-gray-50 border-none rounded-xl p-3 outline-none" />
                   </div>
                 )}
+                {isUploading && (
+                  <div className="w-full bg-gray-100 rounded-full h-2 mb-4">
+                    <div
+                      className="bg-primary h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                    <p className="text-[10px] text-center mt-1 font-bold text-gray-500">{uploadProgress}%</p>
+                  </div>
+                )}
+
                 <button
                   type="submit"
                 disabled={isUploading}
                 className={`w-full text-white py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-transform disabled:opacity-50 ${activeTab === 'lessons' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-orange-500 shadow-orange-500/20'}`}>
-                {isUploading ? "Upload en cours..." : (activeTab === 'lessons' ? t("publier_lecon") : t("publier_devoir"))}
+                {isUploading ? `Upload en cours (${uploadProgress}%)` : (activeTab === 'lessons' ? t("publier_lecon") : t("publier_devoir"))}
                 </button>
               </form>
             </div>
@@ -339,10 +362,7 @@ export default function ProfessorPage() {
 
         {activeTab === "grades" && (
           <div className="space-y-4">
-             <button onClick={() => setActiveTab("dashboard")} className="flex items-center gap-2 text-gray-500 font-bold mb-2">
-              <ChevronRight className="rotate-180" size={20} /> Retour
-            </button>
-            <h2 className="text-2xl font-black mb-4">{t("gestion_notes")}</h2>
+            <PageHeader title={t("gestion_notes")} onBack={() => setActiveTab("dashboard")} />
             <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
                <div className="mb-4">
                   <label className="block text-sm font-bold mb-2">Matière</label>
@@ -376,26 +396,31 @@ export default function ProfessorPage() {
                <button
                 onClick={async () => {
                   const subject = (document.getElementById('grade-subject') as HTMLInputElement).value;
-                  if(!subject) return alert("Veuillez saisir une matière");
+                  if(!subject) return toast.error("Veuillez saisir une matière");
 
-                  for (const s of students) {
-                    const score = (document.getElementById(`grade-${s.id}`) as HTMLInputElement).value;
-                    if(score) {
-                      await GSIStore.addGrade({
-                        id: Math.random().toString(36).substr(2, 9),
-                        studentId: s.id,
-                        studentName: s.fullName,
-                        subject,
-                        score: parseFloat(score),
-                        maxScore: 20,
-                        date: new Date().toISOString().split('T')[0],
-                        niveau: s.niveau,
-                        filiere: s.filiere
-                      });
+                  const toastId = toast.loading("Enregistrement des notes...");
+                  try {
+                    for (const s of students) {
+                      const score = (document.getElementById(`grade-${s.id}`) as HTMLInputElement).value;
+                      if(score) {
+                        await GSIStore.addGrade({
+                          id: Math.random().toString(36).substr(2, 9),
+                          studentId: s.id,
+                          studentName: s.fullName,
+                          subject,
+                          score: parseFloat(score),
+                          maxScore: 20,
+                          date: new Date().toISOString().split('T')[0],
+                          niveau: s.niveau,
+                          filiere: s.filiere
+                        });
+                      }
                     }
+                    toast.success("Notes enregistrées avec succès !", { id: toastId });
+                    setActiveTab("dashboard");
+                  } catch (err: any) {
+                    toast.error("Erreur lors de l'enregistrement: " + err.message, { id: toastId });
                   }
-                  alert("Notes enregistrées !");
-                  setActiveTab("dashboard");
                 }}
                 className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold shadow-lg shadow-pink-500/20 active:scale-95 transition-transform flex items-center justify-center gap-2">
                   <Save size={20} /> Enregistrer les notes
@@ -406,10 +431,7 @@ export default function ProfessorPage() {
 
         {activeTab === "students" && (
            <div className="space-y-4">
-             <button onClick={() => setActiveTab("dashboard")} className="flex items-center gap-2 text-gray-500 font-bold mb-2">
-              <ChevronRight className="rotate-180" size={20} /> Retour
-            </button>
-            <h2 className="text-2xl font-black mb-4">Suivi des Étudiants</h2>
+            <PageHeader title="Suivi des Étudiants" onBack={() => setActiveTab("dashboard")} />
             <div className="space-y-3">
               {students.map((s, i) => (
                 <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-sm">
@@ -434,10 +456,7 @@ export default function ProfessorPage() {
 
         {activeTab === "schedule" && (
            <div className="space-y-4">
-             <button onClick={() => setActiveTab("dashboard")} className="flex items-center gap-2 text-gray-500 font-bold mb-2">
-              <ChevronRight className="rotate-180" size={20} /> Retour
-            </button>
-            <h2 className="text-2xl font-black mb-4">{t("modifier_edt")}</h2>
+            <PageHeader title={t("modifier_edt")} onBack={() => setActiveTab("dashboard")} />
             <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm text-center">
                <div className="w-20 h-20 bg-blue-50 text-blue-500 rounded-[30%] flex items-center justify-center mx-auto mb-6 border-2 border-dashed border-blue-200">
                   <Upload size={32} />
@@ -485,11 +504,12 @@ export default function ProfessorPage() {
                               professorName: GSIStore.getCurrentUser()?.fullName,
                               date: new Date().toISOString()
                             });
-                            alert("Emploi du temps uploadé et enregistré avec succès !");
+                            toast.success("Emploi du temps mis à jour !");
                           } catch (err: any) {
-                            alert("Erreur upload: " + err.message);
+                            toast.error("Erreur upload: " + err.message);
                           } finally {
                             setIsUploading(false);
+                            setUploadProgress(0);
                           }
                         }
                       }}

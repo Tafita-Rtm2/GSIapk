@@ -6,6 +6,8 @@ import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Download, FileText
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { GSIStore } from "@/lib/store";
+import { PageHeader } from "@/components/page-header";
+import { toast } from "sonner";
 
 export default function SchedulePage() {
   const { t } = useLanguage();
@@ -63,29 +65,31 @@ export default function SchedulePage() {
   return (
     <AppLayout>
       <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">{t("planning")}</h1>
-          <div className="bg-gray-100 p-1 rounded-xl flex">
-            <button
-              onClick={() => setView("week")}
-              className={cn(
-                "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
-                view === "week" ? "bg-white shadow-sm text-primary" : "text-gray-500"
-              )}
-            >
-              Semaine
-            </button>
-            <button
-              onClick={() => setView("month")}
-              className={cn(
-                "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
-                view === "month" ? "bg-white shadow-sm text-primary" : "text-gray-500"
-              )}
-            >
-              Mois
-            </button>
-          </div>
-        </div>
+        <PageHeader
+          title={t("planning")}
+          rightElement={
+            <div className="bg-gray-100 p-1 rounded-xl flex">
+              <button
+                onClick={() => setView("week")}
+                className={cn(
+                  "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                  view === "week" ? "bg-white shadow-sm text-primary" : "text-gray-500"
+                )}
+              >
+                Semaine
+              </button>
+              <button
+                onClick={() => setView("month")}
+                className={cn(
+                  "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                  view === "month" ? "bg-white shadow-sm text-primary" : "text-gray-500"
+                )}
+              >
+                Mois
+              </button>
+            </div>
+          }
+        />
 
         {/* Date Selector */}
         <div className="flex justify-between items-center mb-8 bg-primary/5 p-4 rounded-3xl border border-primary/10">

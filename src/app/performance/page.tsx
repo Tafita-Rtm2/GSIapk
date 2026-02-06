@@ -6,6 +6,7 @@ import { useLanguage } from "@/lib/i18n";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { GSIStore, User, Grade } from "@/lib/store";
+import { PageHeader } from "@/components/page-header";
 
 export default function PerformancePage() {
   const { t } = useLanguage();
@@ -36,12 +37,14 @@ export default function PerformancePage() {
   return (
     <AppLayout>
       <div className="p-6 pb-24">
-        <div className="flex justify-between items-center mb-8">
-           <h1 className="text-2xl font-black text-gray-800">Ma Performance</h1>
-           <div className="bg-primary/10 p-2 rounded-xl text-primary">
+        <PageHeader
+          title="Ma Performance"
+          rightElement={
+            <div className="bg-primary/10 p-2 rounded-xl text-primary">
               <Award size={24} />
-           </div>
-        </div>
+            </div>
+          }
+        />
 
         {/* Global Score Card */}
         <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-6 rounded-[32px] text-white shadow-xl shadow-indigo-200 mb-8 relative overflow-hidden">

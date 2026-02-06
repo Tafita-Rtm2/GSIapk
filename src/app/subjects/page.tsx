@@ -4,22 +4,50 @@ import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
 import { Search, BookOpen, FileText, Video, Award, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/page-header";
+import { useState, useEffect } from "react";
+import { GSIStore, Lesson, Assignment } from "@/lib/store";
 
 export default function SubjectsPage() {
   const { t } = useLanguage();
+  const [subjects, setSubjects] = useState<any[]>([]);
 
-  const subjects = [
-    { id: 1, title: "Mathématiques", progress: 75, icon: "📐", color: "bg-pink-500", items: 12 },
-    { id: 2, title: "Physique", progress: 60, icon: "⚛️", color: "bg-indigo-500", items: 8 },
-    { id: 3, title: "Chimie", progress: 45, icon: "🧪", color: "bg-orange-400", items: 6 },
-    { id: 4, title: "Informatique", progress: 90, icon: "💻", color: "bg-blue-500", items: 15 },
-    { id: 5, title: "Anglais", progress: 85, icon: "🇬🇧", color: "bg-cyan-500", items: 10 },
-  ];
+  useEffect(() => {
+    const init = async () => {
+      const user = GSIStore.getCurrentUser();
+      const [lessons, assignments] = await Promise.all([
+        GSIStore.getLessons(),
+        GSIStore.getAssignments()
+      ]);
+
+      const studentLessons = lessons.filter(l =>
+        !user || (l.niveau === user.niveau && (l.filiere.includes(user.filiere) || l.filiere.length === 0))
+      );
+
+      // Extract unique subjects
+      const subjectNames = Array.from(new Set(studentLessons.map(l => l.subject)));
+      const mappedSubjects = subjectNames.map((name, i) => {
+        const count = studentLessons.filter(l => l.subject === name).length;
+        const colors = ["bg-pink-500", "bg-indigo-500", "bg-orange-400", "bg-blue-500", "bg-cyan-500"];
+        const icons = ["📐", "⚛️", "🧪", "💻", "🌍", "📖", "📊"];
+        return {
+          id: i,
+          title: name,
+          progress: Math.floor(Math.random() * 40) + 60, // Simulate progress
+          icon: icons[i % icons.length],
+          color: colors[i % colors.length],
+          items: count
+        };
+      });
+      setSubjects(mappedSubjects);
+    };
+    init();
+  }, []);
 
   return (
     <AppLayout>
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">{t("matieres")}</h1>
+        <PageHeader title={t("matieres")} />
 
         <div className="relative mb-8">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />

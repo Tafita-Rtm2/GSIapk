@@ -8,6 +8,7 @@ import Link from "next/link";
 import { GSIStore } from "@/lib/store";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { toast } from "sonner";
 
 const CAMPUSES = [
   "Campus Antananarivo",
@@ -42,11 +43,12 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
-      alert("Les mots de passe ne correspondent pas");
+      toast.error("Les mots de passe ne correspondent pas");
       return;
     }
 
     setLoading(true);
+    const toastId = toast.loading("Création de votre compte...");
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
 
@@ -63,12 +65,15 @@ export default function RegisterPage() {
       await GSIStore.addUser(newUser);
       GSIStore.setCurrentUser(newUser);
 
+      toast.success("Bienvenue chez GSI Insight !", { id: toastId });
       router.push("/");
     } catch (error: any) {
       if (error.code === 'auth/configuration-not-found') {
-        alert("Erreur de configuration Firebase : L'authentification par email/mot de passe n'est pas activée dans la console Firebase. Veuillez l'activer dans Authentication > Sign-in method.");
+        toast.error("Veuillez activer l'email/mot de passe dans Firebase.", { id: toastId });
+      } else if (error.code === 'auth/email-already-in-use') {
+        toast.error("Cet email est déjà utilisé.", { id: toastId });
       } else {
-        alert("Erreur de création: " + error.message);
+        toast.error("Erreur: " + error.message, { id: toastId });
       }
     } finally {
       setLoading(false);

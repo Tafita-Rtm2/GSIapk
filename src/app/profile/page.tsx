@@ -8,6 +8,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
 import { GSIStore, User } from "@/lib/store";
+import { toast } from "sonner";
+import { Camera } from "lucide-react";
 
 export default function ProfilePage() {
   const { t, language, setLanguage } = useLanguage();
@@ -73,15 +75,16 @@ export default function ProfilePage() {
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (file && user) {
+                      const toastId = toast.loading("Mise à jour de la photo...");
                       try {
                         setIsUploading(true);
                         const url = await GSIStore.uploadFile(file, `profiles/${user.id}_${Date.now()}`);
                         const updated = { ...user, photo: url };
                         await GSIStore.updateUser(updated);
                         setUser(updated);
-                        alert("Photo mise à jour !");
+                        toast.success("Photo mise à jour avec succès !", { id: toastId });
                       } catch (err: any) {
-                        alert("Erreur: " + err.message);
+                        toast.error("Erreur: " + err.message, { id: toastId });
                       } finally {
                         setIsUploading(false);
                       }
@@ -93,7 +96,7 @@ export default function ProfilePage() {
                   disabled={isUploading}
                   className="absolute bottom-0 right-0 bg-accent text-white p-2 rounded-full shadow-lg active:scale-95 transition-transform disabled:opacity-50"
                 >
-                  <QrCode size={14} className="rotate-45" />
+                  <Camera size={14} />
                 </button>
               </>
             )}

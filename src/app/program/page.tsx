@@ -5,6 +5,8 @@ import { useState, useEffect } from "react";
 import { Clock, Plus, Trash2, Bell, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { PageHeader } from "@/components/page-header";
 
 interface ProgramItem {
   id: string;
@@ -37,21 +39,18 @@ export default function ProgramPage() {
     };
     save([...items, newItem]);
     setShowAdd(false);
+    toast.success("Session ajoutée au programme !");
   };
 
   const deleteItem = (id: string) => {
     save(items.filter(i => i.id !== id));
+    toast.info("Session supprimée.");
   };
 
   return (
     <AppLayout>
       <div className="p-6 pb-24">
-        <div className="flex items-center gap-4 mb-8">
-           <Link href="/" className="p-2 bg-gray-100 rounded-full text-gray-500">
-              <ChevronLeft size={20} />
-           </Link>
-           <h1 className="text-2xl font-black text-gray-800">Mon Programme</h1>
-        </div>
+        <PageHeader title="Mon Programme" onBack={() => router.push("/")} />
 
         <div className="bg-indigo-600 rounded-[32px] p-6 text-white mb-8 shadow-lg relative overflow-hidden">
            <div className="relative z-10">

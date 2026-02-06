@@ -2,64 +2,87 @@
 
 import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
-import { Search, Filter, Download, Star, FileText, Bookmark, Clock, ArrowRight, BookOpen } from "lucide-react";
+import { Search, Filter, Download, Star, FileText, Bookmark, Clock, ArrowRight, BookOpen, RefreshCw, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { GSIStore, Lesson } from "@/lib/store";
+import { toast } from "sonner";
 
 export default function LibraryPage() {
   const { t } = useLanguage();
   const [filter, setFilter] = useState("all");
   const [books, setBooks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchContent = async (silent = false) => {
+    if(!silent) setLoading(true);
+    else setIsRefreshing(true);
+
+    try {
+      const user = GSIStore.getCurrentUser();
+      const [lessons, assignments] = await Promise.all([
+        GSIStore.getLessons(),
+        GSIStore.getAssignments()
+      ]);
+
+      const lessonItems = lessons.filter(l =>
+        !user || (l.niveau === user.niveau && (l.filiere.includes(user.filiere) || l.filiere.length === 0))
+      ).map(l => ({
+        id: l.id,
+        title: l.title,
+        author: `Cours: ${l.subject}`,
+        type: "Leçon",
+        url: l.files?.[0] || "",
+        favorite: false,
+        downloaded: GSIStore.isDownloaded(l.id)
+      }));
+
+      const assignmentItems = assignments.filter(a =>
+        !user || (a.niveau === user.niveau && (a.filiere.includes(user.filiere) || a.filiere.length === 0))
+      ).map(a => ({
+        id: a.id,
+        title: a.title,
+        author: `Devoir: ${a.subject}`,
+        type: "Devoir",
+        url: a.files?.[0] || "",
+        favorite: false,
+        downloaded: GSIStore.isDownloaded(a.id)
+      }));
+
+      setBooks([...lessonItems, ...assignmentItems]);
+      if(silent) toast.success("Bibliothèque mise à jour !");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erreur de synchronisation.");
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        const user = GSIStore.getCurrentUser();
-        const [lessons, assignments] = await Promise.all([
-          GSIStore.getLessons(),
-          GSIStore.getAssignments()
-        ]);
-
-        const lessonItems = lessons.filter(l =>
-          !user || (l.niveau === user.niveau && (l.filiere.includes(user.filiere) || l.filiere.length === 0))
-        ).map(l => ({
-          id: l.id,
-          title: l.title,
-          author: `Cours: ${l.subject}`,
-          type: "Leçon",
-          url: l.files?.[0] || "",
-          favorite: false,
-          downloaded: false
-        }));
-
-        const assignmentItems = assignments.filter(a =>
-          !user || (a.niveau === user.niveau && (a.filiere.includes(user.filiere) || a.filiere.length === 0))
-        ).map(a => ({
-          id: a.id,
-          title: a.title,
-          author: `Devoir: ${a.subject}`,
-          type: "Devoir",
-          url: a.files?.[0] || "",
-          favorite: false,
-          downloaded: false
-        }));
-
-        setBooks([...lessonItems, ...assignmentItems]);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    init();
+    fetchContent();
   }, []);
 
   const handleDownload = (url: string, id: string) => {
-    if (!url) return alert("Pas de fichier joint.");
-    window.open(url, '_blank');
-    setBooks(books.map(b => b.id === id ? { ...b, downloaded: true } : b));
+    if (!url) return toast.error("Pas de fichier joint.");
+
+    toast.promise(
+      new Promise((resolve) => {
+        window.open(url, '_blank');
+        GSIStore.setDownloaded(id);
+        setTimeout(() => {
+          setBooks(prev => prev.map(b => b.id === id ? { ...b, downloaded: true } : b));
+          resolve(true);
+        }, 1000);
+      }),
+      {
+        loading: 'Préparation du document...',
+        success: 'Document prêt pour consultation hors-ligne !',
+        error: 'Erreur lors du téléchargement.',
+      }
+    );
   };
 
   const handleToggleFavorite = (id: string) => {
@@ -70,10 +93,23 @@ export default function LibraryPage() {
     <AppLayout>
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">{t("biblio")}</h1>
-          <button className="bg-gray-100 p-2 rounded-xl text-gray-500">
-            <Filter size={20} />
-          </button>
+          <div>
+            <h1 className="text-2xl font-bold">{t("biblio")}</h1>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest flex items-center gap-1">
+               <CheckCircle2 size={10} className="text-green-500" /> Mode Hors-Ligne Actif
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => fetchContent(true)}
+              className={cn("bg-gray-100 p-2 rounded-xl text-gray-500 transition-all", isRefreshing && "animate-spin")}
+            >
+              <RefreshCw size={20} />
+            </button>
+            <button className="bg-gray-100 p-2 rounded-xl text-gray-500">
+              <Filter size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="relative mb-8">

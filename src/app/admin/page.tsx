@@ -18,7 +18,9 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
-import { GSIStore, User, Payment } from "@/lib/store";
+import { GSIStore, User, Payment, Lesson, Assignment } from "@/lib/store";
+import { toast } from "sonner";
+import { PageHeader } from "@/components/page-header";
 
 export default function AdminPage() {
   const { t } = useLanguage();
@@ -26,8 +28,23 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [users, setUsers] = useState<User[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCampus, setFilterCampus] = useState("");
+
+  const fetchData = async () => {
+    const [u, p, l, a] = await Promise.all([
+      GSIStore.getUsers(),
+      GSIStore.getPayments(),
+      GSIStore.getLessons(),
+      GSIStore.getAssignments()
+    ]);
+    setUsers(u);
+    setPayments(p);
+    setLessons(l);
+    setAssignments(a);
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -36,16 +53,21 @@ export default function AdminPage() {
         router.push("/login");
         return;
       }
-      setUsers(await GSIStore.getUsers());
-      setPayments(await GSIStore.getPayments());
+      await fetchData();
     };
     init();
   }, [router]);
 
   const handleDeleteUser = async (id: string) => {
     if (confirm("Supprimer cet utilisateur ?")) {
-      await GSIStore.deleteUser(id);
-      setUsers(await GSIStore.getUsers());
+      const toastId = toast.loading("Suppression...");
+      try {
+        await GSIStore.deleteUser(id);
+        await fetchData();
+        toast.success("Utilisateur supprimé", { id: toastId });
+      } catch (err: any) {
+        toast.error("Erreur: " + err.message, { id: toastId });
+      }
     }
   };
 
@@ -53,20 +75,26 @@ export default function AdminPage() {
     e.preventDefault();
     const title = e.target.title.value;
     const message = e.target.message.value;
-    await GSIStore.addAnnouncement({
-      id: Math.random().toString(36).substr(2, 9),
-      title,
-      message,
-      date: new Date().toISOString(),
-      author: "Administration"
-    });
-    alert("Annonce diffusée !");
-    e.target.reset();
+    const toastId = toast.loading("Diffusion...");
+    try {
+      await GSIStore.addAnnouncement({
+        id: Math.random().toString(36).substr(2, 9),
+        title,
+        message,
+        date: new Date().toISOString(),
+        author: "Administration"
+      });
+      toast.success("Annonce diffusée !", { id: toastId });
+      e.target.reset();
+      setActiveTab("dashboard");
+    } catch (err: any) {
+      toast.error("Erreur: " + err.message, { id: toastId });
+    }
   };
 
   const filteredUsers = users.filter(u =>
-    u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchQuery.toLowerCase())
+    (u.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (u.email || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const menuItems = [
@@ -160,16 +188,16 @@ export default function AdminPage() {
 
         {activeTab === "payments" && (
           <div className="space-y-4">
-            <button onClick={() => setActiveTab("dashboard")} className="flex items-center gap-2 text-gray-500 font-bold mb-2">
-              <ChevronRight className="rotate-180" size={20} /> Retour
-            </button>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-black">{t("gestion_paiements")}</h2>
-              <div className="flex gap-2">
-                <button onClick={() => handleExport('PDF')} className="p-2 bg-red-50 text-red-600 rounded-lg text-[10px] font-bold">PDF</button>
-                <button onClick={() => handleExport('Excel')} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold">EXCEL</button>
-              </div>
-            </div>
+            <PageHeader
+              title={t("gestion_paiements")}
+              onBack={() => setActiveTab("dashboard")}
+              rightElement={
+                <div className="flex gap-2">
+                  <button onClick={() => handleExport('PDF')} className="p-2 bg-red-50 text-red-600 rounded-lg text-[10px] font-bold">PDF</button>
+                  <button onClick={() => handleExport('Excel')} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold">EXCEL</button>
+                </div>
+              }
+            />
 
             <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
               {["", "Antananarivo", "Antsirabe", "Bypass", "Tamatave"].map(c => (
@@ -207,10 +235,7 @@ export default function AdminPage() {
 
         {activeTab === "users" && (
           <div className="space-y-4">
-             <button onClick={() => setActiveTab("dashboard")} className="flex items-center gap-2 text-gray-500 font-bold mb-2">
-              <ChevronRight className="rotate-180" size={20} /> Retour
-            </button>
-            <h2 className="text-2xl font-black mb-4">{t("gestion_utilisateurs")}</h2>
+            <PageHeader title={t("gestion_utilisateurs")} onBack={() => setActiveTab("dashboard")} />
             <div className="space-y-3">
               {filteredUsers.map((u, i) => (
                 <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-sm">
@@ -251,10 +276,7 @@ export default function AdminPage() {
 
         {activeTab === "communication" && (
           <div className="space-y-6">
-            <button onClick={() => setActiveTab("dashboard")} className="flex items-center gap-2 text-gray-500 font-bold mb-2">
-              <ChevronRight className="rotate-180" size={20} /> Retour
-            </button>
-            <h2 className="text-2xl font-black">{t("communication")}</h2>
+            <PageHeader title={t("communication")} onBack={() => setActiveTab("dashboard")} />
             <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
               <form onSubmit={handleSendAnnouncement} className="space-y-4">
                 <div>
@@ -276,28 +298,73 @@ export default function AdminPage() {
           </div>
         )}
 
-        {(!["dashboard", "payments", "users", "communication"].includes(activeTab)) && (
-          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm min-h-[400px] flex flex-col items-center justify-center text-center relative">
-             <button
-              onClick={() => setActiveTab("dashboard")}
-              className="absolute left-6 top-6 bg-gray-100 p-2 rounded-full text-gray-400"
-             >
-                <ChevronRight className="rotate-180" size={20} />
-             </button>
-             <div className={`w-20 h-20 rounded-[30%] flex items-center justify-center text-white mb-6 shadow-xl ${menuItems.find(i => i.id === activeTab)?.color}`}>
-                {(() => {
-                  const Icon = menuItems.find(i => i.id === activeTab)?.icon || ShieldCheck;
-                  return <Icon size={40} />;
-                })()}
-             </div>
-             <h2 className="text-2xl font-black mb-2">{menuItems.find(i => i.id === activeTab)?.label}</h2>
-             <p className="text-gray-500 text-sm max-w-[200px]">Cette section est prête à recevoir les données réelles du campus.</p>
-             <button
-              onClick={() => setActiveTab("dashboard")}
-              className="mt-8 bg-gray-100 text-gray-600 px-6 py-3 rounded-2xl font-bold"
-             >
-                Retour au dashboard
-             </button>
+        {activeTab === "academic" && (
+          <div className="space-y-4">
+            <PageHeader title={t("gestion_academique")} onBack={() => setActiveTab("dashboard")} />
+            <div className="space-y-6">
+               <div className="bg-white p-5 rounded-3xl border border-gray-100">
+                  <h3 className="font-bold mb-4 flex items-center gap-2"><BookOpen size={18} className="text-emerald-500" /> Leçons publiées</h3>
+                  <div className="space-y-2">
+                    {lessons.slice(0, 5).map((l, i) => (
+                      <div key={i} className="flex justify-between items-center text-xs p-2 bg-gray-50 rounded-lg">
+                        <span className="font-medium truncate max-w-[150px]">{l.title}</span>
+                        <span className="text-[10px] text-gray-400 font-bold">{l.subject} • {l.niveau}</span>
+                      </div>
+                    ))}
+                    {lessons.length === 0 && <p className="text-center text-gray-400 py-4 text-xs">Aucune leçon.</p>}
+                  </div>
+               </div>
+               <div className="bg-white p-5 rounded-3xl border border-gray-100">
+                  <h3 className="font-bold mb-4 flex items-center gap-2"><FileText size={18} className="text-orange-500" /> Devoirs en cours</h3>
+                  <div className="space-y-2">
+                    {assignments.slice(0, 5).map((a, i) => (
+                      <div key={i} className="flex justify-between items-center text-xs p-2 bg-gray-50 rounded-lg">
+                        <span className="font-medium truncate max-w-[150px]">{a.title}</span>
+                        <span className="text-[10px] text-red-400 font-bold">{a.deadline}</span>
+                      </div>
+                    ))}
+                    {assignments.length === 0 && <p className="text-center text-gray-400 py-4 text-xs">Aucun devoir.</p>}
+                  </div>
+               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "stats" && (
+           <div className="space-y-4">
+            <PageHeader title={t("stats_rapports")} onBack={() => setActiveTab("dashboard")} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-indigo-600 p-6 rounded-[32px] text-white flex flex-col items-center shadow-lg">
+                 <Users size={32} className="mb-2 opacity-50" />
+                 <span className="text-2xl font-black">{users.length}</span>
+                 <span className="text-[10px] font-bold uppercase opacity-80 text-center">Utilisateurs Totaux</span>
+              </div>
+              <div className="bg-emerald-600 p-6 rounded-[32px] text-white flex flex-col items-center shadow-lg">
+                 <CreditCard size={32} className="mb-2 opacity-50" />
+                 <span className="text-2xl font-black">{payments.length}</span>
+                 <span className="text-[10px] font-bold uppercase opacity-80 text-center">Transactions</span>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
+               <h3 className="font-bold mb-4">Répartition par Campus</h3>
+               <div className="space-y-4">
+                  {CAMPUSES.map(c => {
+                    const count = users.filter(u => u.campus === c).length;
+                    const percent = users.length > 0 ? (count / users.length) * 100 : 0;
+                    return (
+                      <div key={c}>
+                        <div className="flex justify-between text-xs font-bold mb-1">
+                           <span>{c}</span>
+                           <span>{count} ({Math.round(percent)}%)</span>
+                        </div>
+                        <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                           <div className="bg-indigo-500 h-full" style={{ width: `${percent}%` }}></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+               </div>
+            </div>
           </div>
         )}
       </div>

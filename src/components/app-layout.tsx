@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n";
 import { useState, useEffect } from "react";
 import { GSIStore, User as GSIUser } from "@/lib/store";
+import { toast } from "sonner";
+import { BellRing } from "lucide-react";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();
@@ -27,9 +29,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         items.forEach((item: any) => {
           if (item.time === currentTime) {
-            // Show alert (alarm simulation)
+            // Show toast alarm
             if (!window.sessionStorage.getItem(`alarm_${item.id}_${currentTime}`)) {
-              alert(`🚨 ALARME GSI INSIGHT : C'est l'heure de votre session "${item.title}" !`);
+              toast.info(`C'est l'heure de votre session : ${item.title}`, {
+                icon: <BellRing className="text-primary animate-bounce" size={20} />,
+                duration: 10000,
+                description: "GSI Insight — Assistant Académique",
+              });
               window.sessionStorage.setItem(`alarm_${item.id}_${currentTime}`, 'true');
             }
           }

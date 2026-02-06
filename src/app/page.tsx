@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { GSIStore, User, Lesson, Assignment, Announcement } from "@/lib/store";
+import { toast } from "sonner";
 
 export default function Home() {
   const { t } = useLanguage();
@@ -307,19 +308,24 @@ function TaskCard({ title, subject, date, id, files }: any) {
       ) : (
         <button
           onClick={async () => {
-            const ok = confirm("Confirmer la soumission de ce travail ?");
-            if(ok) {
+            if(confirm("Soumettre ce travail ?")) {
               const user = GSIStore.getCurrentUser();
               if(user) {
-                await GSIStore.addSubmission({
-                   id: Math.random().toString(36).substr(2, 9),
-                   assignmentId: id,
-                   studentId: user.id,
-                   studentName: user.fullName,
-                   date: new Date().toISOString(),
-                   file: "devoir_gsi.pdf"
-                });
-                setSubmitted(true);
+                const toastId = toast.loading("Soumission en cours...");
+                try {
+                  await GSIStore.addSubmission({
+                    id: Math.random().toString(36).substr(2, 9),
+                    assignmentId: id,
+                    studentId: user.id,
+                    studentName: user.fullName,
+                    date: new Date().toISOString(),
+                    file: "devoir_gsi.pdf"
+                  });
+                  setSubmitted(true);
+                  toast.success("Devoir soumis avec succès !", { id: toastId });
+                } catch (e) {
+                  toast.error("Erreur de soumission.", { id: toastId });
+                }
               }
             }
           }}

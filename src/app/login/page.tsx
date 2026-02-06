@@ -6,8 +6,10 @@ import { Sparkles, ShieldCheck, GraduationCap, Languages, X } from "lucide-react
 import { useLanguage } from "@/lib/i18n";
 import Link from "next/link";
 import { GSIStore } from "@/lib/store";
-import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
+import { toast } from "sonner";
+import { useEffect } from "react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -21,24 +23,67 @@ export default function LoginPage() {
 
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    // Check for Google redirect result
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          setLoading(true);
+          const userData = await GSIStore.getUser(result.user.uid);
+          if (userData) {
+            GSIStore.setCurrentUser(userData);
+            toast.success("Bienvenue, " + userData.fullName);
+            router.push("/");
+          } else {
+            const newUser: any = {
+              id: result.user.uid,
+              fullName: result.user.displayName || "Étudiant GSI",
+              email: result.user.email || "",
+              role: 'student',
+              campus: 'Antananarivo',
+              filiere: 'Informatique',
+              niveau: 'L1',
+              photo: result.user.photoURL || ""
+            };
+            await GSIStore.addUser(newUser);
+            GSIStore.setCurrentUser(newUser);
+            toast.success("Compte Google créé avec succès !");
+            router.push("/");
+          }
+        }
+      } catch (error: any) {
+        console.error("Google redirect error:", error);
+        toast.error("Erreur d'authentification Google.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkRedirect();
+  }, [router]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    const toastId = toast.loading("Connexion en cours...");
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const userData = await GSIStore.getUser(userCredential.user.uid);
 
       if (userData) {
         GSIStore.setCurrentUser(userData);
+        toast.success("Connexion réussie !", { id: toastId });
         router.push("/");
       } else {
-        alert("Profil non trouvé dans la base de données.");
+        toast.error("Profil non trouvé dans la base de données.", { id: toastId });
       }
     } catch (error: any) {
       if (error.code === 'auth/configuration-not-found') {
-        alert("Erreur de configuration Firebase : L'authentification par email/mot de passe n'est pas activée dans la console Firebase. Veuillez l'activer dans Authentication > Sign-in method.");
+        toast.error("Veuillez activer l'email/mot de passe dans Firebase.", { id: toastId });
+      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        toast.error("Email ou mot de passe incorrect.", { id: toastId });
       } else {
-        alert("Erreur de connexion: " + error.message);
+        toast.error("Erreur: " + error.message, { id: toastId });
       }
     } finally {
       setLoading(false);
@@ -48,32 +93,10 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const userData = await GSIStore.getUser(result.user.uid);
-
-      if (userData) {
-        GSIStore.setCurrentUser(userData);
-        router.push("/");
-      } else {
-        // If first time Google login, we need to register them or ask for info
-        // For simplicity, let's create a default student profile
-        const newUser: any = {
-          id: result.user.uid,
-          fullName: result.user.displayName || "Étudiant GSI",
-          email: result.user.email || "",
-          role: 'student',
-          campus: 'Antananarivo',
-          filiere: 'Informatique',
-          niveau: 'L1',
-          photo: result.user.photoURL || ""
-        };
-        await GSIStore.addUser(newUser);
-        GSIStore.setCurrentUser(newUser);
-        router.push("/");
-      }
+      // Use redirect for better mobile compatibility
+      await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
-      alert("Erreur Google: " + error.message);
-    } finally {
+      toast.error("Erreur Google: " + error.message);
       setLoading(false);
     }
   };
@@ -90,9 +113,10 @@ export default function LoginPage() {
         filiere: 'Administration',
         niveau: 'N/A'
       });
+      toast.success("Accès Administrateur accordé");
       router.push("/admin");
     } else {
-      alert("Code incorrect");
+      toast.error("Code administrateur incorrect");
     }
   };
 
@@ -109,9 +133,10 @@ export default function LoginPage() {
         niveau: 'Multiple'
       };
       GSIStore.setCurrentUser(profUser);
+      toast.success("Accès Professeur accordé");
       router.push("/professor");
     } else {
-      alert("Mot de passe incorrect");
+      toast.error("Mot de passe professeur incorrect");
     }
   };
 

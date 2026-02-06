@@ -17,7 +17,7 @@ import {
   Timestamp
 } from "firebase/firestore";
 import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from "firebase/storage";
 import { storage } from "./firebase";
 
 // Types
@@ -288,19 +288,31 @@ export const GSIStore = {
   },
 
   // File Upload
-  async uploadFile(file: File, path: string): Promise<string> {
+  async uploadFile(file: File, path: string, onProgress?: (progress: number) => void): Promise<string> {
     console.log(`Starting upload to ${path}...`);
     const storageRef = ref(storage, path);
-    try {
-      const snapshot = await uploadBytes(storageRef, file);
-      console.log("Upload successful, getting URL...");
-      const url = await getDownloadURL(snapshot.ref);
-      console.log("URL obtained:", url);
-      return url;
-    } catch (err: any) {
-      console.error("Upload error details:", err);
-      throw new Error(`Erreur Firebase Storage: ${err.message || 'Inconnue'}`);
-    }
+
+    return new Promise((resolve, reject) => {
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          console.log('Upload is ' + progress + '% done');
+          if (onProgress) onProgress(progress);
+        },
+        (error) => {
+          console.error("Upload error details:", error);
+          reject(new Error(`Erreur Firebase Storage: ${error.message || 'Inconnue'}`));
+        },
+        () => {
+          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+            console.log('File available at', downloadURL);
+            resolve(downloadURL);
+          });
+        }
+      );
+    });
   },
 
   // Progress Tracking
@@ -318,5 +330,21 @@ export const GSIStore = {
       return allProgress[itemId] || null;
     }
     return null;
+  },
+
+  setDownloaded(itemId: string, status: boolean = true) {
+    if (typeof window !== 'undefined') {
+      const downloaded = JSON.parse(localStorage.getItem('gsi_downloaded') || '{}');
+      downloaded[itemId] = status;
+      localStorage.setItem('gsi_downloaded', JSON.stringify(downloaded));
+    }
+  },
+
+  isDownloaded(itemId: string) {
+    if (typeof window !== 'undefined') {
+      const downloaded = JSON.parse(localStorage.getItem('gsi_downloaded') || '{}');
+      return !!downloaded[itemId];
+    }
+    return false;
   }
 };
