@@ -105,6 +105,11 @@ export interface Announcement {
 
 // Global state for current user to avoid too many Firestore calls
 let cachedUser: User | null = null;
+let listeners: ((user: User | null) => void)[] = [];
+
+const notifyListeners = (user: User | null) => {
+  listeners.forEach(l => l(user));
+};
 
 // Auth Listener
 if (typeof window !== 'undefined') {
@@ -115,18 +120,34 @@ if (typeof window !== 'undefined') {
         GSIStore.setCurrentUser(userData);
       }
     } else {
-      GSIStore.setCurrentUser(null);
+      // Only clear if it's a firebase role (not bypass)
+      const current = GSIStore.getCurrentUser();
+      if (current && current.id !== 'admin-id' && current.id !== 'prof-id') {
+        GSIStore.setCurrentUser(null);
+      }
     }
   });
 }
 
 export const GSIStore = {
   // Auth & User Management
+  subscribe: (callback: (user: User | null) => void) => {
+    listeners.push(callback);
+    return () => {
+      listeners = listeners.filter(l => l !== callback);
+    };
+  },
+
   getCurrentUser: (): User | null => {
-    // This is synchronous for initial render, will be updated by listener
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('gsi_current_user_v2');
-      return saved ? JSON.parse(saved) : cachedUser;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (!cachedUser || cachedUser.id !== parsed.id) {
+          cachedUser = parsed;
+        }
+      }
+      return cachedUser;
     }
     return cachedUser;
   },
@@ -137,6 +158,7 @@ export const GSIStore = {
       if (user) localStorage.setItem('gsi_current_user_v2', JSON.stringify(user));
       else localStorage.removeItem('gsi_current_user_v2');
     }
+    notifyListeners(user);
   },
 
   // Users

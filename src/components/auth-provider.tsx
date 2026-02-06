@@ -23,29 +23,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    // Initial check for cached user (Admin/Prof bypass)
-    const cached = GSIStore.getCurrentUser();
-    if (cached) {
-      setUser(cached);
-      setLoading(false);
-    }
+    // Initial sync
+    const initialUser = GSIStore.getCurrentUser();
+    setUser(initialUser);
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    // Auth Listener for Firebase
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Only fetch if not already in store or if we want to refresh
         const userData = await GSIStore.getUser(firebaseUser.uid);
         if (userData) {
           GSIStore.setCurrentUser(userData);
-          setUser(userData);
         }
-      } else if (!GSIStore.getCurrentUser()) {
-        // Only clear if no bypass user is set
-        setUser(null);
       }
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    // Store Listener for Manual logins (Admin/Prof) and Firebase sync
+    const unsubscribeStore = GSIStore.subscribe((newUser) => {
+      setUser(newUser);
+      setLoading(false);
+    });
+
+    // Final safety timeout to prevent stuck loading
+    const timer = setTimeout(() => setLoading(false), 3000);
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribeStore();
+      clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {

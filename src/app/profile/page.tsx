@@ -9,6 +9,8 @@ import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
 import { GSIStore, User } from "@/lib/store";
 import { toast } from "sonner";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { Camera } from "lucide-react";
 
 export default function ProfilePage() {
@@ -18,6 +20,7 @@ export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
     const currentUser = GSIStore.getCurrentUser();
@@ -28,9 +31,18 @@ export default function ProfilePage() {
     }
   }, [router]);
 
-  const handleLogout = () => {
-    GSIStore.setCurrentUser(null);
-    router.push("/login");
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      GSIStore.setCurrentUser(null);
+      toast.success("Déconnexion réussie");
+      router.push("/login");
+    } catch (err: any) {
+      toast.error("Erreur de déconnexion");
+      // Fallback
+      GSIStore.setCurrentUser(null);
+      router.push("/login");
+    }
   };
 
   if (!user) return null;
@@ -76,17 +88,29 @@ export default function ProfilePage() {
                     const file = e.target.files?.[0];
                     if (file && user) {
                       const toastId = toast.loading("Mise à jour de la photo...");
+                      setUploadProgress(0);
                       try {
                         setIsUploading(true);
-                        const url = await GSIStore.uploadFile(file, `profiles/${user.id}_${Date.now()}`);
+                        // Optimistic Preview
+                        const previewUrl = URL.createObjectURL(file);
+                        setUser({ ...user, photo: previewUrl });
+
+                        const url = await GSIStore.uploadFile(file, `profiles/${user.id}_${Date.now()}`, (p) => {
+                          setUploadProgress(Math.round(p));
+                        });
+
                         const updated = { ...user, photo: url };
                         await GSIStore.updateUser(updated);
                         setUser(updated);
                         toast.success("Photo mise à jour avec succès !", { id: toastId });
                       } catch (err: any) {
                         toast.error("Erreur: " + err.message, { id: toastId });
+                        // Revert preview on error
+                        const original = GSIStore.getCurrentUser();
+                        setUser(original);
                       } finally {
                         setIsUploading(false);
+                        setUploadProgress(0);
                       }
                     }
                   }}

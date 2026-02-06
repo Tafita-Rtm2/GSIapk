@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n";
 import { AuthProvider } from "@/components/auth-provider";
+import { AlarmProvider } from "@/components/alarm-provider";
 import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -31,7 +32,9 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans antialiased`}>
         <LanguageProvider>
           <AuthProvider>
-            {children}
+            <AlarmProvider>
+              {children}
+            </AlarmProvider>
           </AuthProvider>
         </LanguageProvider>
         <Toaster position="top-center" expand={true} richColors />

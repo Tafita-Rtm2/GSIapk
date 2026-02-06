@@ -23,6 +23,8 @@ import { useRouter } from "next/navigation";
 import { GSIStore, User, Payment, Lesson, Assignment } from "@/lib/store";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 const CAMPUSES = ["Antananarivo", "Antsirabe", "Bypass", "Tamatave"];
 
@@ -138,8 +140,10 @@ export default function AdminPage() {
             </button>
           </div>
           <button
-            onClick={() => {
+            onClick={async () => {
+              await signOut(auth);
               GSIStore.setCurrentUser(null);
+              toast.success("Déconnexion");
               router.push("/login");
             }}
             className="p-3 bg-gray-100 rounded-xl text-gray-400 hover:text-red-500 transition-colors"

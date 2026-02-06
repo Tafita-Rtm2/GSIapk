@@ -18,32 +18,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setUser(GSIStore.getCurrentUser());
-
-    // Study Alarm System
-    const interval = setInterval(() => {
-      const saved = localStorage.getItem('gsi_study_program');
-      if (saved) {
-        const items = JSON.parse(saved);
-        const now = new Date();
-        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-
-        items.forEach((item: any) => {
-          if (item.time === currentTime) {
-            // Show toast alarm
-            if (!window.sessionStorage.getItem(`alarm_${item.id}_${currentTime}`)) {
-              toast.info(`C'est l'heure de votre session : ${item.title}`, {
-                icon: <BellRing className="text-primary animate-bounce" size={20} />,
-                duration: 10000,
-                description: "GSI Insight — Assistant Académique",
-              });
-              window.sessionStorage.setItem(`alarm_${item.id}_${currentTime}`, 'true');
-            }
-          }
-        });
-      }
-    }, 30000); // Check every 30 seconds
-
-    return () => clearInterval(interval);
   }, []);
 
   const navItems = [

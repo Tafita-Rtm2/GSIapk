@@ -21,6 +21,8 @@ import { useRouter } from "next/navigation";
 import { GSIStore, User, Lesson, Assignment, Grade } from "@/lib/store";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 const CAMPUSES = ["Antananarivo", "Antsirabe", "Bypass", "Tamatave"];
 const FILIERES = ["Informatique", "Gestion", "Commerce International", "Marketing Digital", "Comptabilité", "Finance", "Ressources Humaines", "Logistique", "Tourisme", "Communication", "Management", "Droit des Affaires", "Entrepreneuriat"];
@@ -179,8 +181,10 @@ export default function ProfessorPage() {
             </div>
           </div>
           <button
-            onClick={() => {
+            onClick={async () => {
+              await signOut(auth);
               GSIStore.setCurrentUser(null);
+              toast.success("Déconnexion");
               router.push("/login");
             }}
             className="p-3 bg-gray-100 rounded-xl text-gray-400 hover:text-red-500 transition-colors"
