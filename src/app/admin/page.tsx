@@ -18,7 +18,10 @@ import {
   BookOpen,
   FileText,
   Mail,
-  X
+  X,
+  Wifi,
+  WifiOff,
+  CheckCircle2
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
@@ -27,6 +30,7 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { cn } from "@/lib/utils";
 
 const CAMPUSES = ["Antananarivo", "Antsirabe", "Bypass", "Tamatave"];
 
@@ -42,6 +46,7 @@ export default function AdminPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCampus, setFilterCampus] = useState("");
+  const [syncStatus, setSyncStatus] = useState<'syncing' | 'ready' | 'offline'>('syncing');
 
   useEffect(() => {
     const user = GSIStore.getCurrentUser();
@@ -50,33 +55,30 @@ export default function AdminPage() {
       return;
     }
 
-    // Cache
-    setUsers(GSIStore.getCache<User[]>("admin_users") || []);
-    setPayments(GSIStore.getCache<Payment[]>("admin_payments") || []);
-    setLessons(GSIStore.getCache<Lesson[]>("admin_lessons") || []);
-    setAssignments(GSIStore.getCache<Assignment[]>("admin_assignments") || []);
-
     const unsubs = [
-      GSIStore.subscribeUsers((us) => { setUsers(us); GSIStore.setCache("admin_users", us); }),
-      GSIStore.subscribePayments((ps) => { setPayments(ps); GSIStore.setCache("admin_payments", ps); }),
-      GSIStore.subscribeLessons({}, (ls) => { setLessons(ls); GSIStore.setCache("admin_lessons", ls); }),
-      GSIStore.subscribeAssignments({}, (as) => { setAssignments(as); GSIStore.setCache("admin_assignments", as); }),
-      GSIStore.subscribeAnnouncements(() => {}) // Trigger RTDB listener
+      GSIStore.subscribeUsers((us) => { setUsers(us); setSyncStatus('ready'); }),
+      GSIStore.subscribePayments((ps) => setPayments(ps)),
+      GSIStore.subscribeLessons({}, (ls) => setLessons(ls)),
+      GSIStore.subscribeAssignments({}, (as) => setAssignments(as)),
+      GSIStore.subscribeAnnouncements(() => {})
     ];
 
-    return () => unsubs.forEach(u => u());
+    const handleOffline = () => setSyncStatus('offline');
+    const handleOnline = () => setSyncStatus('syncing');
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      unsubs.forEach(u => u());
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
   }, [router]);
 
   const handleDeleteUser = async (id: string) => {
     if (confirm("Supprimer cet utilisateur ?")) {
-      const toastId = toast.loading("Suppression...");
-      try {
-        await GSIStore.deleteUser(id);
-        // fetchData removed, but subscriptions will handle UI update
-        toast.success("Utilisateur supprimé", { id: toastId });
-      } catch (err: any) {
-        toast.error("Erreur: " + err.message, { id: toastId });
-      }
+      await GSIStore.deleteUser(id);
+      toast.success("Demande de suppression envoyée au cloud.");
     }
   };
 
@@ -84,21 +86,18 @@ export default function AdminPage() {
     e.preventDefault();
     const title = e.target.title.value;
     const message = e.target.message.value;
-    const toastId = toast.loading("Diffusion...");
-    try {
-      await GSIStore.addAnnouncement({
-        id: Math.random().toString(36).substr(2, 9),
-        title,
-        message,
-        date: new Date().toISOString(),
-        author: "Administration"
-      });
-      toast.success("Annonce diffusée !", { id: toastId });
-      e.target.reset();
-      setActiveTab("dashboard");
-    } catch (err: any) {
-      toast.error("Erreur: " + err.message, { id: toastId });
-    }
+
+    GSIStore.addAnnouncement({
+      id: Math.random().toString(36).substr(2, 9),
+      title,
+      message,
+      date: new Date().toISOString(),
+      author: "Administration"
+    });
+
+    toast.success("Annonce diffusée !");
+    e.target.reset();
+    setActiveTab("dashboard");
   };
 
   const filteredUsers = users.filter(u =>
@@ -115,12 +114,22 @@ export default function AdminPage() {
     { id: "stats", icon: BarChart3, label: t("stats_rapports"), color: "bg-pink-500" },
   ];
 
-  const handleExport = (type: string) => {
-    alert(`Génération du rapport financier en format ${type}...\nCampus: ${filterCampus || 'Tous'}\nLe fichier sera téléchargé sous peu.`);
-  };
-
   return (
     <div className="flex flex-col min-h-screen max-w-md mx-auto bg-gray-50 pb-20">
+      {/* Sync Status Banner */}
+      <div className={cn(
+        "px-6 py-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest transition-all",
+        syncStatus === 'ready' ? "bg-emerald-500 text-white" :
+        syncStatus === 'offline' ? "bg-orange-500 text-white" : "bg-indigo-600 text-white animate-pulse"
+      )}>
+        <div className="flex items-center gap-2">
+           {syncStatus === 'ready' ? <CheckCircle2 size={12} /> :
+            syncStatus === 'offline' ? <WifiOff size={12} /> : <RefreshCcw size={12} className="animate-spin" />}
+           <span>{syncStatus === 'ready' ? "GSI Cloud : Connecté" : syncStatus === 'offline' ? "Mode Hors-ligne" : "Synchronisation..."}</span>
+        </div>
+        <span className="opacity-70">v5.0.1</span>
+      </div>
+
       {/* Header */}
       <div className="bg-white p-6 rounded-b-[40px] shadow-sm mb-6">
         <div className="flex justify-between items-center mb-6">
@@ -132,18 +141,6 @@ export default function AdminPage() {
               <h1 className="text-xl font-bold">Admin Portal</h1>
               <p className="text-xs text-gray-500 font-medium italic">Nina GSI — Principal</p>
             </div>
-            <button
-              onClick={async () => {
-                const u = await GSIStore.getUsers();
-                const p = await GSIStore.getPayments();
-                setUsers(u);
-                setPayments(p);
-                toast.success(`${u.length} utilisateurs et ${p.length} paiements synchronisés`);
-              }}
-              className="ml-auto p-2 text-indigo-600 hover:rotate-180 transition-transform duration-500"
-            >
-              <RefreshCcw size={20} />
-            </button>
           </div>
           <button
             onClick={async () => {
@@ -152,7 +149,7 @@ export default function AdminPage() {
               toast.success("Déconnexion");
               router.push("/login");
             }}
-            className="p-3 bg-gray-100 rounded-xl text-gray-400 hover:text-red-500 transition-colors"
+            className="p-3 bg-gray-100 rounded-xl text-gray-400 hover:text-red-500 transition-colors active:scale-90"
           >
             <LogOut size={20} />
           </button>
@@ -173,13 +170,11 @@ export default function AdminPage() {
       <div className="px-6 space-y-8 flex-1 pb-10">
         {activeTab === "dashboard" && (
           <>
-            {/* Stats Grid */}
             <div className="grid grid-cols-2 gap-4">
               <StatCard label="Étudiants" value={users.filter(u => u.role === 'student').length.toString()} change="+12%" color="text-blue-600" />
               <StatCard label="Recettes" value="45.2M Ar" change="+5%" color="text-emerald-600" />
             </div>
 
-            {/* Menu Grid */}
             <div>
               <h2 className="text-lg font-bold mb-4">{t("tous")}</h2>
               <div className="grid grid-cols-2 gap-4">
@@ -202,47 +197,21 @@ export default function AdminPage() {
 
         {activeTab === "payments" && (
           <div className="space-y-4">
-            <PageHeader
-              title={t("gestion_paiements")}
-              onBack={() => setActiveTab("dashboard")}
-              rightElement={
-                <div className="flex gap-2">
-                  <button onClick={() => handleExport('PDF')} className="p-2 bg-red-50 text-red-600 rounded-lg text-[10px] font-bold">PDF</button>
-                  <button onClick={() => handleExport('Excel')} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold">EXCEL</button>
-                </div>
-              }
-            />
-
-            <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-              {["", "Antananarivo", "Antsirabe", "Bypass", "Tamatave"].map(c => (
-                <button
-                  key={c}
-                  onClick={() => setFilterCampus(c)}
-                  className={`px-4 py-2 rounded-xl text-[10px] font-bold whitespace-nowrap ${filterCampus === c ? 'bg-indigo-600 text-white' : 'bg-white text-gray-400'}`}
-                >
-                  {c || "TOUS LES CAMPUS"}
-                </button>
-              ))}
-            </div>
-
+            <PageHeader title={t("gestion_paiements")} onBack={() => setActiveTab("dashboard")} />
             <div className="space-y-3">
               {payments.filter(p => !filterCampus || p.campus.includes(filterCampus)).map((p, i) => (
                 <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center shadow-sm">
                   <div>
                     <h4 className="font-bold text-sm">{p.studentName}</h4>
-                    <p className="text-[10px] text-gray-500">{p.filiere} • {p.niveau} • {p.campus}</p>
-                    <p className="text-[10px] text-gray-400 mt-1">{p.description} • {p.date}</p>
+                    <p className="text-[10px] text-gray-500">{p.filiere} • {p.niveau}</p>
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-sm text-indigo-600">{p.amount}</p>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      p.status === 'paid' ? 'bg-emerald-100 text-emerald-600' :
-                      p.status === 'pending' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
-                    }`}>{p.status.toUpperCase()}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.status === 'paid' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>{p.status.toUpperCase()}</span>
                   </div>
                 </div>
               ))}
-              {payments.length === 0 && <p className="text-center text-gray-400 py-10">Aucun paiement enregistré.</p>}
+              {payments.length === 0 && <p className="text-center text-gray-400 py-10 italic text-xs">Aucun paiement en cache.</p>}
             </div>
           </div>
         )}
@@ -258,39 +227,14 @@ export default function AdminPage() {
                   </div>
                   <div className="flex-1">
                     <h4 className="font-bold text-sm">{u.fullName}</h4>
-                    <p className="text-[10px] text-gray-500 font-medium">{u.role.toUpperCase()} • {u.filiere} • {u.campus}</p>
-                    <p className="text-[9px] text-gray-400">{u.email}</p>
+                    <p className="text-[10px] text-gray-500">{u.role.toUpperCase()} • {u.filiere}</p>
                   </div>
                   <div className="flex gap-1">
-                    <button
-                      onClick={async () => {
-                        const newName = prompt("Nouveau nom :", u.fullName);
-                        if(newName) {
-                          await GSIStore.updateUser({...u, fullName: newName});
-                          setUsers(await GSIStore.getUsers());
-                        }
-                      }}
-                      className="text-blue-500 p-2 hover:bg-blue-50 rounded-xl"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button
-                      onClick={() => { setSelectedUser(u); setShowConvocationModal(true); }}
-                      className="text-orange-500 p-2 hover:bg-orange-50 rounded-xl"
-                      title={t("convoquer")}
-                    >
-                      <Mail size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteUser(u.id)}
-                      className="text-red-500 p-2 hover:bg-red-50 rounded-xl"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <button onClick={() => { setSelectedUser(u); setShowConvocationModal(true); }} className="text-orange-500 p-2 hover:bg-orange-50 rounded-xl"><Mail size={16} /></button>
+                    <button onClick={() => handleDeleteUser(u.id)} className="text-red-500 p-2 hover:bg-red-50 rounded-xl"><Trash2 size={16} /></button>
                   </div>
                 </div>
               ))}
-              {filteredUsers.length === 0 && <p className="text-center text-gray-400 py-10">Aucun utilisateur trouvé.</p>}
             </div>
           </div>
         )}
@@ -298,8 +242,7 @@ export default function AdminPage() {
         {activeTab === "communication" && (
           <div className="space-y-6">
             <PageHeader title={t("communication")} onBack={() => setActiveTab("dashboard")} />
-            <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
-              <form onSubmit={handleSendAnnouncement} className="space-y-4">
+            <form onSubmit={handleSendAnnouncement} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
                 <div>
                   <label className="block text-sm font-bold mb-2">Titre de l'annonce</label>
                   <input name="title" required type="text" className="w-full bg-gray-50 border-none rounded-xl p-3 outline-none" placeholder="Ex: Report des examens" />
@@ -308,84 +251,8 @@ export default function AdminPage() {
                   <label className="block text-sm font-bold mb-2">Message</label>
                   <textarea name="message" required className="w-full bg-gray-50 border-none rounded-xl p-3 outline-none min-h-[100px]" placeholder="Saisissez votre message ici..."></textarea>
                 </div>
-                <button
-                  type="submit"
-                  className="w-full bg-orange-500 text-white py-4 rounded-xl font-bold shadow-lg shadow-orange-500/20 active:scale-95 transition-transform"
-                >
-                  Diffuser l'annonce
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "academic" && (
-          <div className="space-y-4">
-            <PageHeader title={t("gestion_academique")} onBack={() => setActiveTab("dashboard")} />
-            <div className="space-y-6">
-               <div className="bg-white p-5 rounded-3xl border border-gray-100">
-                  <h3 className="font-bold mb-4 flex items-center gap-2"><BookOpen size={18} className="text-emerald-500" /> Leçons publiées</h3>
-                  <div className="space-y-2">
-                    {lessons.slice(0, 5).map((l, i) => (
-                      <div key={i} className="flex justify-between items-center text-xs p-2 bg-gray-50 rounded-lg">
-                        <span className="font-medium truncate max-w-[150px]">{l.title}</span>
-                        <span className="text-[10px] text-gray-400 font-bold">{l.subject} • {l.niveau}</span>
-                      </div>
-                    ))}
-                    {lessons.length === 0 && <p className="text-center text-gray-400 py-4 text-xs">Aucune leçon.</p>}
-                  </div>
-               </div>
-               <div className="bg-white p-5 rounded-3xl border border-gray-100">
-                  <h3 className="font-bold mb-4 flex items-center gap-2"><FileText size={18} className="text-orange-500" /> Devoirs en cours</h3>
-                  <div className="space-y-2">
-                    {assignments.slice(0, 5).map((a, i) => (
-                      <div key={i} className="flex justify-between items-center text-xs p-2 bg-gray-50 rounded-lg">
-                        <span className="font-medium truncate max-w-[150px]">{a.title}</span>
-                        <span className="text-[10px] text-red-400 font-bold">{a.deadline}</span>
-                      </div>
-                    ))}
-                    {assignments.length === 0 && <p className="text-center text-gray-400 py-4 text-xs">Aucun devoir.</p>}
-                  </div>
-               </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "stats" && (
-           <div className="space-y-4">
-            <PageHeader title={t("stats_rapports")} onBack={() => setActiveTab("dashboard")} />
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-indigo-600 p-6 rounded-[32px] text-white flex flex-col items-center shadow-lg">
-                 <Users size={32} className="mb-2 opacity-50" />
-                 <span className="text-2xl font-black">{users.length}</span>
-                 <span className="text-[10px] font-bold uppercase opacity-80 text-center">Utilisateurs Totaux</span>
-              </div>
-              <div className="bg-emerald-600 p-6 rounded-[32px] text-white flex flex-col items-center shadow-lg">
-                 <CreditCard size={32} className="mb-2 opacity-50" />
-                 <span className="text-2xl font-black">{payments.length}</span>
-                 <span className="text-[10px] font-bold uppercase opacity-80 text-center">Transactions</span>
-              </div>
-            </div>
-            <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
-               <h3 className="font-bold mb-4">Répartition par Campus</h3>
-               <div className="space-y-4">
-                  {CAMPUSES.map(c => {
-                    const count = users.filter(u => u.campus === c).length;
-                    const percent = users.length > 0 ? (count / users.length) * 100 : 0;
-                    return (
-                      <div key={c}>
-                        <div className="flex justify-between text-xs font-bold mb-1">
-                           <span>{c}</span>
-                           <span>{count} ({Math.round(percent)}%)</span>
-                        </div>
-                        <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                           <div className="bg-indigo-500 h-full" style={{ width: `${percent}%` }}></div>
-                        </div>
-                      </div>
-                    );
-                  })}
-               </div>
-            </div>
+                <button type="submit" className="w-full bg-orange-500 text-white py-4 rounded-xl font-bold active:scale-95 transition-transform">Diffuser</button>
+            </form>
           </div>
         )}
       </div>
@@ -394,54 +261,39 @@ export default function AdminPage() {
       {showConvocationModal && selectedUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative">
-            <button onClick={() => setShowConvocationModal(false)} className="absolute right-6 top-6 text-gray-400">
-              <X size={20} />
-            </button>
+            <button onClick={() => setShowConvocationModal(false)} className="absolute right-6 top-6 text-gray-400"><X size={20} /></button>
             <h2 className="text-xl font-black mb-2">{t("convocation")}</h2>
-            <p className="text-xs text-gray-500 mb-6 font-medium">Envoyer une convocation officielle à <span className="text-indigo-600 font-bold">{selectedUser.fullName}</span>.</p>
-
+            <p className="text-xs text-gray-500 mb-6 font-medium">Convoquer <span className="text-indigo-600 font-bold">{selectedUser.fullName}</span>.</p>
             <form onSubmit={async (e: any) => {
               e.preventDefault();
               const motive = e.target.motive.value;
               const date = e.target.date.value;
-              const toastId = toast.loading("Envoi de la convocation...");
-              try {
-                await GSIStore.addAnnouncement({
-                  id: Math.random().toString(36).substr(2, 9),
-                  title: `CONVOCATION: ${selectedUser.fullName}`,
-                  message: `Vous êtes convoqué(e) à l'administration le ${date} pour le motif suivant : ${motive}.`,
-                  date: new Date().toISOString(),
-                  author: "Administration"
-                });
-                toast.success("Convocation envoyée !", { id: toastId });
-                setShowConvocationModal(false);
-              } catch (err: any) {
-                toast.error("Erreur: " + err.message, { id: toastId });
-              }
+
+              GSIStore.addAnnouncement({
+                id: Math.random().toString(36).substr(2, 9),
+                title: `CONVOCATION OFFICIELLE`,
+                message: `Vous êtes convoqué(e) le ${date} pour : ${motive}.`,
+                date: new Date().toISOString(),
+                author: "Direction GSI",
+                type: 'convocation',
+                targetUserId: selectedUser.id
+              });
+
+              toast.success("Convocation envoyée");
+              setShowConvocationModal(false);
             }} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Motif de la convocation</label>
-                <textarea name="motive" required className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold outline-none min-h-[100px]" placeholder="Ex: Dossier administratif incomplet..."></textarea>
-              </div>
-              <div>
-                <label className="block text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Date du rendez-vous</label>
-                <input name="date" required type="datetime-local" className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold outline-none" />
-              </div>
-              <button type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-indigo-100 active:scale-95 transition-all">
-                Envoyer Convocation
-              </button>
+              <textarea name="motive" required className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold outline-none min-h-[100px]" placeholder="Motif..."></textarea>
+              <input name="date" required type="datetime-local" className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold outline-none" />
+              <button type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest active:scale-95">Envoyer</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* Floating Action Button */}
+      {/* FAB */}
       <button
-        onClick={() => {
-          if (activeTab === "users") router.push("/register");
-          else alert("Fonctionnalité d'ajout rapide bientôt disponible.");
-        }}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-xl shadow-indigo-600/40 flex items-center justify-center hover:scale-110 active:scale-90 transition-all z-50"
+        onClick={() => router.push("/register")}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-all z-50"
       >
         <Plus size={28} />
       </button>
@@ -454,7 +306,7 @@ const StatCard = memo(({ label, value, change, color }: { label: string, value: 
     <div className="bg-white p-5 rounded-[32px] shadow-sm border border-gray-100">
       <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{label}</p>
       <p className={`text-xl font-black ${color}`}>{value}</p>
-      <p className="text-[10px] font-bold text-emerald-500 mt-1">{change} <span className="text-gray-400">vs last month</span></p>
+      <p className="text-[10px] font-bold text-emerald-500 mt-1">{change}</p>
     </div>
   );
 });

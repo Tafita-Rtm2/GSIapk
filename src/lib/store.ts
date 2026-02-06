@@ -1,11 +1,12 @@
 "use client";
 
-import { auth, db } from "./firebase";
-import { doc, getDoc, setDoc, Timestamp, collection, getDocs, query, orderBy, onSnapshot, where, addDoc, deleteDoc, updateDoc } from "firebase/firestore";
+import { auth, db, storage } from "./firebase";
+import {
+  doc, getDoc, setDoc, Timestamp, collection, getDocs,
+  query, orderBy, onSnapshot, where, addDoc, deleteDoc, updateDoc
+} from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { ref, getDownloadURL, uploadBytesResumable } from "firebase/storage";
-import { storage } from "./firebase";
-import * as Realm from "realm-web";
 
 // Types
 export interface User {
@@ -17,7 +18,6 @@ export interface User {
   filiere: string;
   niveau: string;
   photo?: string;
-  createdAt?: any;
 }
 
 export interface Payment { id: string; studentId: string; studentName: string; amount: string; date: string; status: 'paid' | 'pending' | 'overdue'; description: string; campus: string; filiere: string; niveau: string; }
@@ -25,22 +25,9 @@ export interface Lesson { id: string; title: string; description: string; subjec
 export interface Assignment { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; deadline: string; timeLimit: string; maxScore: number; files?: string[]; }
 export interface Submission { id: string; assignmentId: string; studentId: string; studentName: string; date: string; file: string; score?: number; feedback?: string; }
 export interface Grade { id: string; studentId: string; studentName: string; subject: string; score: number; maxScore: number; date: string; niveau: string; filiere: string; }
-export interface Announcement { id: string; title: string; message: string; date: string; author: string; }
+export interface Announcement { id: string; title: string; message: string; date: string; author: string; type?: 'info' | 'convocation'; targetUserId?: string; }
 
-// --- MONGODB ATLAS CONFIGURATION ---
-const MONGODB_APP_ID = process.env.NEXT_PUBLIC_MONGODB_APP_ID || "gsi-insight-data-v1";
-
-let mongoApp: any = null;
-if (typeof window !== 'undefined') {
-  try {
-    mongoApp = new Realm.App({ id: MONGODB_APP_ID });
-  } catch (e) {
-    console.warn("MongoDB Atlas disabled.");
-  }
-}
-
-// --- LOCAL DATA PACK STORE ---
-const MemoryStore: {
+interface State {
   currentUser: User | null;
   users: User[];
   lessons: Lesson[];
@@ -50,7 +37,9 @@ const MemoryStore: {
   announcements: Announcement[];
   payments: Payment[];
   schedules: Record<string, any>;
-} = {
+}
+
+const initialState: State = {
   currentUser: null,
   users: [],
   lessons: [],
@@ -62,315 +51,240 @@ const MemoryStore: {
   schedules: {}
 };
 
-const storeListeners: Record<string, ((data: any) => void)[]> = {
-  auth: [], users: [], lessons: [], assignments: [], submissions: [], grades: [], announcements: [], payments: [], schedules: []
-};
+class GSIStoreClass {
+  private state: State = { ...initialState };
+  private listeners: Record<string, ((data: any) => void)[]> = {};
 
-const notifyStoreListeners = (key: string, data: any) => {
-  if (storeListeners[key]) {
-    storeListeners[key].forEach(callback => {
-      try { callback(data); } catch(e) { console.error(`Listener error for ${key}`, e); }
-    });
-  }
-};
-
-// --- INITIAL LOAD FROM DISK ---
-if (typeof window !== 'undefined') {
-  const keys = ['currentUser', 'users', 'lessons', 'assignments', 'submissions', 'grades', 'announcements', 'payments', 'schedules'];
-  keys.forEach(key => {
-    try {
-      const saved = localStorage.getItem(`gsi_v4_pack_${key}`);
-      if (saved) MemoryStore[key as keyof typeof MemoryStore] = JSON.parse(saved);
-    } catch (e) {}
-  });
-
-  // Mock initial data if completely empty to avoid "rien ne fonctionne"
-  if (MemoryStore.users.length === 0) {
-     console.log("GSI Store: Generating Mock Pack Data...");
-     MemoryStore.users = [
-       { id: 'mock-1', fullName: 'Étudiant Test', email: 'test@gsi.mg', role: 'student', campus: 'Antananarivo', filiere: 'Informatique', niveau: 'L1' },
-       { id: 'mock-2', fullName: 'Professeur Test', email: 'prof@gsi.mg', role: 'professor', campus: 'Antananarivo', filiere: 'Informatique', niveau: 'L1' }
-     ];
-     MemoryStore.lessons = [
-       { id: 'l1', title: 'Introduction GSI', description: 'Bienvenue sur GSI Insight.', subject: 'Général', niveau: 'L1', filiere: [], campus: [], date: new Date().toISOString(), files: [] }
-     ];
-     MemoryStore.payments = [
-       { id: 'p1', studentId: 'mock-1', studentName: 'Étudiant Test', amount: '1.200.000 Ar', date: new Date().toISOString().split('T')[0], status: 'paid', description: 'Frais Inscription', campus: 'Antananarivo', filiere: 'Informatique', niveau: 'L1' }
-     ];
-  }
-}
-
-// --- CLOUD SYNC ---
-if (typeof window !== 'undefined') {
-  if (auth) {
-    onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        if (db) {
-          onSnapshot(doc(db, "users", firebaseUser.uid), (docSnap) => {
-            if (docSnap.exists()) GSIStore.setCurrentUser(docSnap.data() as User);
-          }, (err) => console.error("Firebase Sync User Error", err));
-        }
-      }
-    });
-  }
-
-  // Background MongoDB Sync
-  setTimeout(() => GSIStore.syncWithMongoDB(), 3000);
-}
-
-export const GSIStore = {
-  saveToDisk(key: string, data: any) {
+  constructor() {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(`gsi_v4_pack_${key}`, JSON.stringify(data));
+      this.hydrate();
+      this.setupAuth();
     }
-  },
+  }
 
-  subscribe: (callback: (user: User | null) => void) => {
-    storeListeners.auth.push(callback);
-    callback(MemoryStore.currentUser);
-    return () => { storeListeners.auth = storeListeners.auth.filter(l => l !== callback); };
-  },
-
-  getCurrentUser: () => MemoryStore.currentUser,
-
-  setCurrentUser: (user: User | null) => {
-    MemoryStore.currentUser = user;
-    GSIStore.saveToDisk('currentUser', user);
-    notifyStoreListeners('auth', user);
-  },
-
-  async syncWithMongoDB() {
-    if (!mongoApp) return;
+  private hydrate() {
     try {
-      if (!mongoApp.currentUser) await mongoApp.logIn(Realm.Credentials.anonymous());
-      const mongodb = mongoApp.currentUser.mongoClient("mongodb-atlas");
-      const db_name = "gsi_insight";
-
-      const remoteLessons = await mongodb.db(db_name).collection("lessons").find({});
-      if (remoteLessons.length > 0) {
-        MemoryStore.lessons = remoteLessons.map((l: any) => ({ ...l, id: l._id.toString() }));
-        GSIStore.saveToDisk('lessons', MemoryStore.lessons);
-        notifyStoreListeners('lessons', MemoryStore.lessons);
+      const saved = localStorage.getItem('gsi_v6_master');
+      if (saved) {
+        this.state = { ...initialState, ...JSON.parse(saved) };
       }
-    } catch (e) {
-      console.warn("MongoDB Sync Skip.");
+      if (this.state.users.length === 0) this.generateMockData();
+    } catch (e) {}
+  }
+
+  private generateMockData() {
+    this.state.users = [
+      { id: 'admin-id', fullName: 'Nina GSI', email: 'admin@gsi.mg', role: 'admin', campus: 'Antananarivo', filiere: 'Directeur', niveau: 'N/A' },
+      { id: 'prof-id', fullName: 'Professeur GSI', email: 'prof@gsi.mg', role: 'professor', campus: 'Antananarivo', filiere: 'Informatique', niveau: 'L1' }
+    ];
+    this.state.lessons = [
+      { id: 'l1', title: 'Guide GSI Insight', description: 'Bienvenue.', subject: 'Général', niveau: 'L1', filiere: [], campus: [], date: new Date().toISOString(), files: [] }
+    ];
+    this.save();
+  }
+
+  private save() {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('gsi_v6_master', JSON.stringify(this.state));
     }
-  },
+  }
 
-  subscribeUsers(callback: (users: User[]) => void) {
-    storeListeners.users.push(callback);
-    callback(MemoryStore.users);
+  private notify(key: string, data: any) {
+    if (this.listeners[key]) {
+      this.listeners[key].forEach(cb => { try { cb(data); } catch(e) {} });
+    }
+  }
 
-    if (!db) return () => {};
-    return onSnapshot(collection(db, "users"), (snapshot) => {
-      const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-      MemoryStore.users = users.sort((a,b) => (a.fullName || "").localeCompare(b.fullName || ""));
-      GSIStore.saveToDisk('users', MemoryStore.users);
-      callback(MemoryStore.users);
-      notifyStoreListeners('users', MemoryStore.users);
-    }, (err) => {
-      getDocs(collection(db, "users")).then(snap => {
-         const users = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-         MemoryStore.users = users.sort((a,b) => (a.fullName || "").localeCompare(b.fullName || ""));
-         callback(MemoryStore.users);
-      }).catch(e => console.error("Firebase Critical Error", e));
-    });
-  },
+  private setupAuth() {
+    if (auth) {
+      onAuthStateChanged(auth, async (fbUser) => {
+        if (fbUser) {
+          const user = await this.getUser(fbUser.uid);
+          if (user) this.setCurrentUser(user);
+        }
+      });
+    }
+  }
+
+  // --- STORE ACCESS ---
+
+  getCurrentUser() { return this.state.currentUser; }
+  setCurrentUser(user: User | null) {
+    this.state.currentUser = user;
+    this.save();
+    this.notify('auth', user);
+  }
+
+  // Robust Subscription
+  private baseSubscribe(key: keyof State, cb: (data: any) => void, collectionName?: string, queryConstraint?: any) {
+    if (!this.listeners[key as string]) this.listeners[key as string] = [];
+    this.listeners[key as string].push(cb);
+
+    // Immediate return local
+    cb(this.state[key]);
+
+    if (db && collectionName) {
+      let q = query(collection(db, collectionName));
+      if (queryConstraint) q = queryConstraint;
+
+      return onSnapshot(q, (snap) => {
+        const cloudData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const currentLocal = this.state[key] as any[];
+        const cloudIds = new Set(cloudData.map((d: any) => d.id));
+        const localOnly = currentLocal.filter(item => !cloudIds.has(item.id));
+
+        const merged = [...cloudData, ...localOnly];
+        (this.state[key] as any) = merged;
+        this.save();
+        cb(merged);
+      }, (err) => console.warn(`Sync ${key} offline.`));
+    }
+    return () => { this.listeners[key as string] = this.listeners[key as string]?.filter(l => l !== cb); };
+  }
+
+  subscribe(cb: (u: User | null) => void) { return this.subscribeAuth(cb); }
+
+  subscribeAuth(cb: (u: User | null) => void) {
+    if (!this.listeners['auth']) this.listeners['auth'] = [];
+    this.listeners['auth'].push(cb);
+    cb(this.state.currentUser);
+    return () => { this.listeners['auth'] = this.listeners['auth']?.filter(l => l !== cb); };
+  }
+
+  subscribeUsers(cb: (us: User[]) => void) { return this.baseSubscribe('users', cb, 'users'); }
+
+  subscribeLessons(filter: { niveau?: string }, cb: (ls: Lesson[]) => void) {
+    return this.baseSubscribe('lessons', (data) => {
+      const filtered = filter.niveau ? data.filter((l: any) => l.niveau === filter.niveau) : data;
+      cb(filtered);
+    }, 'lessons');
+  }
+
+  subscribeAssignments(filter: { niveau?: string }, cb: (as: Assignment[]) => void) {
+    return this.baseSubscribe('assignments', (data) => {
+      const filtered = filter.niveau ? data.filter((a: any) => a.niveau === filter.niveau) : data;
+      cb(filtered);
+    }, 'assignments');
+  }
+
+  subscribeAnnouncements(cb: (as: Announcement[]) => void) { return this.baseSubscribe('announcements', cb, 'announcements'); }
+  subscribePayments(cb: (ps: Payment[]) => void) { return this.baseSubscribe('payments', cb, 'payments'); }
+
+  subscribeGrades(studentId: string, cb: (gs: Grade[]) => void) {
+    return this.baseSubscribe('grades', (data) => {
+      cb(data.filter((g: any) => g.studentId === studentId));
+    }, 'grades', query(collection(db, "grades"), where("studentId", "==", studentId)));
+  }
+
+  subscribeLatestSchedule(campus: string, niveau: string, cb: (s: any) => void) {
+    return this.baseSubscribe('schedules', (data) => {
+       const key = `${campus}_${niveau}`;
+       cb(data[key] || null);
+    }, 'schedules', query(collection(db, "schedules"), where("campus", "==", campus), where("niveau", "==", niveau), orderBy("createdAt", "desc")));
+  }
+
+  // --- NON-BLOCKING ACTIONS ---
+
+  private async cloudTask(task: () => Promise<any>) {
+    try { await task(); } catch(e) { console.error("Cloud background task failed", e); }
+  }
 
   async addUser(user: User) {
-    MemoryStore.users = [...MemoryStore.users, user].sort((a,b) => a.fullName.localeCompare(b.fullName));
-    GSIStore.saveToDisk('users', MemoryStore.users);
-    notifyStoreListeners('users', MemoryStore.users);
-    if (db) await setDoc(doc(db, "users", user.id), { ...user, createdAt: Timestamp.now() });
-  },
-
-  subscribeLessons(filter: { niveau?: string }, callback: (lessons: Lesson[]) => void) {
-    storeListeners.lessons.push(callback);
-    const getFiltered = (ls: Lesson[]) => filter.niveau ? ls.filter(l => l.niveau === filter.niveau) : ls;
-    callback(getFiltered(MemoryStore.lessons));
-
-    if (!db) return () => {};
-    return onSnapshot(query(collection(db, "lessons"), orderBy("date", "desc")), (snapshot) => {
-      const lessons = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lesson));
-      MemoryStore.lessons = lessons;
-      GSIStore.saveToDisk('lessons', lessons);
-      callback(getFiltered(lessons));
-    });
-  },
+    this.state.users = [user, ...this.state.users.filter(u => u.id !== user.id)];
+    this.save();
+    this.notify('users', this.state.users);
+    if (db) this.cloudTask(() => setDoc(doc(db, "users", user.id), { ...user, updatedAt: Timestamp.now() }));
+  }
 
   async addLesson(lesson: Lesson) {
-    const newL = { ...lesson, id: Math.random().toString(36).substr(2, 9) };
-    MemoryStore.lessons = [newL, ...MemoryStore.lessons];
-    GSIStore.saveToDisk('lessons', MemoryStore.lessons);
-    notifyStoreListeners('lessons', MemoryStore.lessons);
-    if (db) await addDoc(collection(db, "lessons"), { ...lesson, createdAt: Timestamp.now() });
-  },
-
-  subscribeAssignments(filter: { niveau?: string }, callback: (assignments: Assignment[]) => void) {
-    storeListeners.assignments.push(callback);
-    const getFiltered = (as: Assignment[]) => filter.niveau ? as.filter(a => a.niveau === filter.niveau) : as;
-    callback(getFiltered(MemoryStore.assignments));
-
-    if (!db) return () => {};
-    return onSnapshot(query(collection(db, "assignments"), orderBy("deadline", "asc")), (snapshot) => {
-      const as = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Assignment));
-      MemoryStore.assignments = as;
-      GSIStore.saveToDisk('assignments', as);
-      callback(getFiltered(as));
-    });
-  },
+    this.state.lessons = [lesson, ...this.state.lessons.filter(l => l.id !== lesson.id)];
+    this.save();
+    this.notify('lessons', this.state.lessons);
+    if (db) this.cloudTask(() => setDoc(doc(db, "lessons", lesson.id), { ...lesson, createdAt: Timestamp.now() }));
+  }
 
   async addAssignment(assignment: Assignment) {
-    const newA = { ...assignment, id: Math.random().toString(36).substr(2, 9) };
-    MemoryStore.assignments = [newA, ...MemoryStore.assignments];
-    GSIStore.saveToDisk('assignments', MemoryStore.assignments);
-    notifyStoreListeners('assignments', MemoryStore.assignments);
-    if (db) await addDoc(collection(db, "assignments"), { ...assignment, createdAt: Timestamp.now() });
-  },
-
-  subscribeGrades(studentId: string, callback: (grades: Grade[]) => void) {
-    callback(MemoryStore.grades.filter(g => g.studentId === studentId));
-    if (!db) return () => {};
-    return onSnapshot(query(collection(db, "grades"), where("studentId", "==", studentId)), (snapshot) => {
-      const gs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade));
-      MemoryStore.grades = [...MemoryStore.grades.filter(g => g.studentId !== studentId), ...gs];
-      GSIStore.saveToDisk('grades', MemoryStore.grades);
-      callback(gs);
-    });
-  },
-
-  async addGrade(grade: Grade) {
-    MemoryStore.grades = [grade, ...MemoryStore.grades];
-    GSIStore.saveToDisk('grades', MemoryStore.grades);
-    if (db) await addDoc(collection(db, "grades"), { ...grade, createdAt: Timestamp.now() });
-  },
-
-  subscribePayments(callback: (payments: Payment[]) => void) {
-    callback(MemoryStore.payments);
-    if (!db) return () => {};
-    return onSnapshot(query(collection(db, "payments"), orderBy("date", "desc")), (snapshot) => {
-      const ps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
-      MemoryStore.payments = ps;
-      GSIStore.saveToDisk('payments', ps);
-      callback(ps);
-    });
-  },
-
-  async addPayment(payment: Payment) {
-    MemoryStore.payments = [payment, ...MemoryStore.payments];
-    GSIStore.saveToDisk('payments', MemoryStore.payments);
-    if (db) await addDoc(collection(db, "payments"), { ...payment, createdAt: Timestamp.now() });
-  },
-
-  subscribeAnnouncements(callback: (anns: Announcement[]) => void) {
-    callback(MemoryStore.announcements);
-    if (!db) return () => {};
-    return onSnapshot(query(collection(db, "announcements"), orderBy("date", "desc")), (snapshot) => {
-      const anns = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement));
-      MemoryStore.announcements = anns;
-      GSIStore.saveToDisk('announcements', anns);
-      callback(anns);
-    });
-  },
+    this.state.assignments = [assignment, ...this.state.assignments.filter(a => a.id !== assignment.id)];
+    this.save();
+    this.notify('assignments', this.state.assignments);
+    if (db) this.cloudTask(() => setDoc(doc(db, "assignments", assignment.id), { ...assignment, createdAt: Timestamp.now() }));
+  }
 
   async addAnnouncement(ann: Announcement) {
-    MemoryStore.announcements = [ann, ...MemoryStore.announcements];
-    GSIStore.saveToDisk('announcements', MemoryStore.announcements);
-    if (db) await addDoc(collection(db, "announcements"), { ...ann, createdAt: Timestamp.now() });
-  },
+    this.state.announcements = [ann, ...this.state.announcements];
+    this.save();
+    this.notify('announcements', this.state.announcements);
+    if (db) this.cloudTask(() => addDoc(collection(db, "announcements"), { ...ann, createdAt: Timestamp.now() }));
+  }
 
-  subscribeLatestSchedule(campus: string, niveau: string, callback: (schedule: any) => void) {
-    const key = `${campus}_${niveau}`;
-    callback(MemoryStore.schedules[key] || null);
-    if (!db) return () => {};
-    return onSnapshot(query(collection(db, "schedules"), where("campus", "==", campus), where("niveau", "==", niveau), orderBy("createdAt", "desc")), (snapshot) => {
-      if (!snapshot.empty) {
-        const s = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
-        MemoryStore.schedules[key] = s;
-        GSIStore.saveToDisk('schedules', MemoryStore.schedules);
-        callback(s);
-      }
-    });
-  },
+  async addGrade(grade: Grade) {
+    this.state.grades = [grade, ...this.state.grades];
+    this.save();
+    this.notify('grades', this.state.grades);
+    if (db) this.cloudTask(() => addDoc(collection(db, "grades"), { ...grade, createdAt: Timestamp.now() }));
+  }
+
+  async addPayment(payment: Payment) {
+    this.state.payments = [payment, ...this.state.payments];
+    this.save();
+    this.notify('payments', this.state.payments);
+    if (db) this.cloudTask(() => addDoc(collection(db, "payments"), { ...payment, createdAt: Timestamp.now() }));
+  }
+
+  async updateUser(user: User) {
+    this.state.users = this.state.users.map(u => u.id === user.id ? user : u);
+    this.save();
+    this.notify('users', this.state.users);
+    if (db) this.cloudTask(() => updateDoc(doc(db, "users", user.id), { ...user }));
+  }
+
+  async deleteUser(id: string) {
+    this.state.users = this.state.users.filter(u => u.id !== id);
+    this.save();
+    this.notify('users', this.state.users);
+    if (db) this.cloudTask(() => deleteDoc(doc(db, "users", id)));
+  }
+
+  async addSubmission(s: Submission) {
+    if (db) this.cloudTask(() => addDoc(collection(db, "submissions"), { ...s, createdAt: Timestamp.now() }));
+  }
 
   async addSchedule(schedule: any) {
-    if (db) await addDoc(collection(db, "schedules"), { ...schedule, createdAt: Timestamp.now() });
-  },
+    if (db) this.cloudTask(() => addDoc(collection(db, "schedules"), { ...schedule, createdAt: Timestamp.now() }));
+  }
 
-  async uploadFile(file: File, path: string, onProgress?: (progress: number) => void): Promise<string> {
-    if (!storage) {
-      console.warn("Storage not available, skipping upload.");
-      return "";
-    }
+  async uploadFile(file: File, path: string, onProgress?: (p: number) => void): Promise<string> {
+    if (!storage) throw new Error("Storage offline");
     const storageRef = ref(storage, path);
+    const uploadTask = uploadBytesResumable(storageRef, file);
     return new Promise((resolve, reject) => {
-      const uploadTask = uploadBytesResumable(storageRef, file);
-
-      const timeout = setTimeout(() => {
-        uploadTask.cancel();
-        reject(new Error("Upload timeout (60s)"));
-      }, 60000);
-
       uploadTask.on('state_changed',
-        (snapshot) => {
-          if (onProgress) onProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-        },
-        (error) => {
-          clearTimeout(timeout);
-          reject(error);
-        },
-        () => {
-          clearTimeout(timeout);
-          getDownloadURL(uploadTask.snapshot.ref)
-            .then(url => resolve(url))
-            .catch(err => reject(err));
+        (snap) => { if (onProgress) onProgress((snap.bytesTransferred / snap.totalBytes) * 100); },
+        (err) => reject(err),
+        async () => {
+          const url = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve(url);
         }
       );
     });
-  },
+  }
 
-  getCache: <T>(key: string): T | null => {
-    if (typeof window === 'undefined') return null;
-    const data = localStorage.getItem(`gsi_v4_pack_${key}`);
-    return data ? JSON.parse(data) : null;
-  },
-  setCache: (key: string, data: any) => GSIStore.saveToDisk(key, data),
-  async getUsers() { return MemoryStore.users; },
-  async getLessons() { return MemoryStore.lessons; },
-  async getAssignments() { return MemoryStore.assignments; },
-  async getGrades() { return MemoryStore.grades; },
-  async getPayments() { return MemoryStore.payments; },
-  async getAnnouncements() { return MemoryStore.announcements; },
-  async getUser(id: string) {
+  async getUser(id: string): Promise<User | null> {
+    const local = this.state.users.find(u => u.id === id);
+    if (local) return local;
     if (db) {
       try {
         const snap = await getDoc(doc(db, "users", id));
-        if (snap.exists()) return snap.data() as User;
-      } catch(e) {}
+        if (snap.exists()) return { id: snap.id, ...snap.data() } as User;
+      } catch (e) {}
     }
-    return MemoryStore.users.find(u => u.id === id) || null;
-  },
-  async deleteUser(id: string) {
-    MemoryStore.users = MemoryStore.users.filter(u => u.id !== id);
-    notifyStoreListeners('users', MemoryStore.users);
-    if (db) await deleteDoc(doc(db, "users", id));
-  },
-  async updateUser(user: User) {
-    MemoryStore.users = MemoryStore.users.map(u => u.id === user.id ? user : u);
-    notifyStoreListeners('users', MemoryStore.users);
-    if (db) await updateDoc(doc(db, "users", user.id), { ...user });
-  },
-  saveProgress: (id: string, p: any) => {
-    const all = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
-    all[id] = { ...p, ts: Date.now() };
-    localStorage.setItem('gsi_progress', JSON.stringify(all));
-  },
-  getProgress: (id: string) => JSON.parse(localStorage.getItem('gsi_progress') || '{}')[id] || null,
-  setDownloaded: (id: string, s = true) => {
-    const all = JSON.parse(localStorage.getItem('gsi_downloaded') || '{}');
-    all[id] = s;
-    localStorage.setItem('gsi_downloaded', JSON.stringify(all));
-  },
-  isDownloaded: (id: string) => !!JSON.parse(localStorage.getItem('gsi_downloaded') || '{}')[id],
-  async addSubmission(s: Submission) { if (db) await addDoc(collection(db, "submissions"), { ...s, createdAt: Timestamp.now() }); }
-};
+    return null;
+  }
+
+  async getUsers() { return this.state.users; }
+  async getPayments() { return this.state.payments; }
+  getCache<T>(key: string): T | null { return (this.state as any)[key] || null; }
+  setCache(key: string, data: any) { (this.state as any)[key] = data; this.save(); }
+}
+
+export const GSIStore = new GSIStoreClass();
