@@ -1,6 +1,24 @@
 "use client";
 
-// Mock Data Types
+import { auth, db } from "./firebase";
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  Timestamp
+} from "firebase/firestore";
+import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
+
+// Types
 export interface User {
   id: string;
   fullName: string;
@@ -10,7 +28,7 @@ export interface User {
   filiere: string;
   niveau: string;
   photo?: string;
-  payments?: Payment[];
+  createdAt?: any;
 }
 
 export interface Payment {
@@ -74,67 +92,71 @@ export interface Grade {
   filiere: string;
 }
 
-export interface ScheduleItem {
-  id: string;
-  day: string;
-  time: string;
-  subject: string;
-  instructor: string;
-  location: string;
-  niveau: string;
-  filiere: string;
-  campus: string;
-}
-
 export interface Announcement {
   id: string;
   title: string;
   message: string;
   date: string;
   author: string;
-  targetCampus?: string;
-  targetFiliere?: string;
-  targetNiveau?: string;
 }
 
-// Storage Keys
-const KEYS = {
-  USERS: 'gsi_users_v2',
-  LESSONS: 'gsi_lessons_v2',
-  ASSIGNMENTS: 'gsi_assignments_v2',
-  SUBMISSIONS: 'gsi_submissions_v2',
-  GRADES: 'gsi_grades_v2',
-  SCHEDULE: 'gsi_schedule_v2',
-  CURRENT_USER: 'gsi_current_user_v2',
-  ANNOUNCEMENTS: 'gsi_announcements_v2',
-  PAYMENTS: 'gsi_payments_v2'
-};
+// Global state for current user to avoid too many Firestore calls
+let cachedUser: User | null = null;
+
+// Auth Listener
+if (typeof window !== 'undefined') {
+  onAuthStateChanged(auth, async (firebaseUser) => {
+    if (firebaseUser) {
+      const userData = await GSIStore.getUser(firebaseUser.uid);
+      if (userData) {
+        GSIStore.setCurrentUser(userData);
+      }
+    } else {
+      GSIStore.setCurrentUser(null);
+    }
+  });
+}
 
 export const GSIStore = {
-  // Generic Load/Save
-  save: (key: string, data: any) => {
+  // Auth & User Management
+  getCurrentUser: (): User | null => {
+    // This is synchronous for initial render, will be updated by listener
     if (typeof window !== 'undefined') {
-      localStorage.setItem(key, JSON.stringify(data));
+      const saved = localStorage.getItem('gsi_current_user_v2');
+      return saved ? JSON.parse(saved) : cachedUser;
     }
+    return cachedUser;
   },
-  load: (key: string, defaultValue: any) => {
+
+  setCurrentUser: (user: User | null) => {
+    cachedUser = user;
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(key);
-      return saved ? JSON.parse(saved) : defaultValue;
+      if (user) localStorage.setItem('gsi_current_user_v2', JSON.stringify(user));
+      else localStorage.removeItem('gsi_current_user_v2');
     }
-    return defaultValue;
   },
 
   // Users
-  getUsers: (): User[] => GSIStore.load(KEYS.USERS, []),
-  addUser: (user: User) => {
-    const users = GSIStore.getUsers();
-    users.push(user);
-    GSIStore.save(KEYS.USERS, users);
+  async getUser(id: string): Promise<User | null> {
+    const docRef = doc(db, "users", id);
+    const docSnap = await getDoc(docRef);
+    return docSnap.exists() ? (docSnap.data() as User) : null;
+  },
 
-    // Add default payments for student
+  async getUsers(): Promise<User[]> {
+    const q = query(collection(db, "users"), orderBy("fullName"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+  },
+
+  async addUser(user: User) {
+    await setDoc(doc(db, "users", user.id), {
+      ...user,
+      createdAt: Timestamp.now()
+    });
+
     if (user.role === 'student') {
-      GSIStore.addPayment({
+      await GSIStore.addPayment({
         id: Math.random().toString(36).substr(2, 9),
         studentId: user.id,
         studentName: user.fullName,
@@ -148,91 +170,96 @@ export const GSIStore = {
       });
     }
   },
-  deleteUser: (id: string) => {
-    const users = GSIStore.getUsers().filter(u => u.id !== id);
-    GSIStore.save(KEYS.USERS, users);
+
+  async deleteUser(id: string) {
+    await deleteDoc(doc(db, "users", id));
   },
-  updateUser: (user: User) => {
-    const users = GSIStore.getUsers().map(u => u.id === user.id ? user : u);
-    GSIStore.save(KEYS.USERS, users);
+
+  async updateUser(user: User) {
+    await updateDoc(doc(db, "users", user.id), { ...user });
     if (GSIStore.getCurrentUser()?.id === user.id) {
       GSIStore.setCurrentUser(user);
     }
   },
-  getCurrentUser: (): User | null => GSIStore.load(KEYS.CURRENT_USER, null),
-  setCurrentUser: (user: User | null) => GSIStore.save(KEYS.CURRENT_USER, user),
 
   // Lessons
-  getLessons: (): Lesson[] => GSIStore.load(KEYS.LESSONS, []),
-  addLesson: (lesson: Lesson) => {
-    const lessons = GSIStore.getLessons();
-    lessons.unshift(lesson);
-    GSIStore.save(KEYS.LESSONS, lessons);
+  async getLessons(): Promise<Lesson[]> {
+    const q = query(collection(db, "lessons"), orderBy("date", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lesson));
+  },
+
+  async addLesson(lesson: Lesson) {
+    await addDoc(collection(db, "lessons"), {
+      ...lesson,
+      createdAt: Timestamp.now()
+    });
   },
 
   // Assignments
-  getAssignments: (): Assignment[] => GSIStore.load(KEYS.ASSIGNMENTS, []),
-  addAssignment: (assignment: Assignment) => {
-    const assignments = GSIStore.getAssignments();
-    assignments.unshift(assignment);
-    GSIStore.save(KEYS.ASSIGNMENTS, assignments);
+  async getAssignments(): Promise<Assignment[]> {
+    const q = query(collection(db, "assignments"), orderBy("deadline", "asc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Assignment));
+  },
+
+  async addAssignment(assignment: Assignment) {
+    await addDoc(collection(db, "assignments"), {
+      ...assignment,
+      createdAt: Timestamp.now()
+    });
   },
 
   // Submissions
-  getSubmissions: (): Submission[] => GSIStore.load(KEYS.SUBMISSIONS, []),
-  addSubmission: (submission: Submission) => {
-    const subs = GSIStore.getSubmissions();
-    subs.unshift(submission);
-    GSIStore.save(KEYS.SUBMISSIONS, subs);
+  async getSubmissions(): Promise<Submission[]> {
+    const querySnapshot = await getDocs(collection(db, "submissions"));
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Submission));
   },
-  gradeSubmission: (submissionId: string, score: number, feedback: string) => {
-    const subs = GSIStore.getSubmissions().map(s => {
-      if (s.id === submissionId) {
-        const updated = { ...s, score, feedback };
-        // Also add to grades
-        GSIStore.addGrade({
-           id: Math.random().toString(36).substr(2, 9),
-           studentId: s.studentId,
-           studentName: s.studentName,
-           subject: 'Devoir', // Should ideally come from assignment
-           score,
-           maxScore: 20, // default
-           date: new Date().toISOString().split('T')[0],
-           niveau: '', // Should come from student
-           filiere: ''
-        });
-        return updated;
-      }
-      return s;
+
+  async addSubmission(submission: Submission) {
+    await addDoc(collection(db, "submissions"), {
+      ...submission,
+      createdAt: Timestamp.now()
     });
-    GSIStore.save(KEYS.SUBMISSIONS, subs);
   },
 
   // Grades
-  getGrades: (): Grade[] => GSIStore.load(KEYS.GRADES, []),
-  addGrade: (grade: Grade) => {
-    const grades = GSIStore.getGrades();
-    grades.unshift(grade);
-    GSIStore.save(KEYS.GRADES, grades);
+  async getGrades(): Promise<Grade[]> {
+    const querySnapshot = await getDocs(collection(db, "grades"));
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade));
   },
 
-  // Schedule
-  getSchedule: (): ScheduleItem[] => GSIStore.load(KEYS.SCHEDULE, []),
-  updateSchedule: (items: ScheduleItem[]) => GSIStore.save(KEYS.SCHEDULE, items),
+  async addGrade(grade: Grade) {
+    await addDoc(collection(db, "grades"), {
+      ...grade,
+      createdAt: Timestamp.now()
+    });
+  },
 
   // Announcements
-  getAnnouncements: (): Announcement[] => GSIStore.load(KEYS.ANNOUNCEMENTS, []),
-  addAnnouncement: (ann: Announcement) => {
-    const anns = GSIStore.getAnnouncements();
-    anns.unshift(ann);
-    GSIStore.save(KEYS.ANNOUNCEMENTS, anns);
+  async getAnnouncements(): Promise<Announcement[]> {
+    const q = query(collection(db, "announcements"), orderBy("date", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement));
+  },
+
+  async addAnnouncement(ann: Announcement) {
+    await addDoc(collection(db, "announcements"), {
+      ...ann,
+      createdAt: Timestamp.now()
+    });
   },
 
   // Payments
-  getPayments: (): Payment[] => GSIStore.load(KEYS.PAYMENTS, []),
-  addPayment: (payment: Payment) => {
-    const payments = GSIStore.getPayments();
-    payments.unshift(payment);
-    GSIStore.save(KEYS.PAYMENTS, payments);
+  async getPayments(): Promise<Payment[]> {
+    const querySnapshot = await getDocs(collection(db, "payments"));
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+  },
+
+  async addPayment(payment: Payment) {
+    await addDoc(collection(db, "payments"), {
+      ...payment,
+      createdAt: Timestamp.now()
+    });
   }
 };

@@ -20,38 +20,42 @@ export default function Home() {
   const [showInfo, setShowInfo] = useState(false);
 
   useEffect(() => {
-    const currentUser = GSIStore.getCurrentUser();
-    if (!currentUser) {
-      router.push("/login");
-      return;
-    }
+    const init = async () => {
+      const currentUser = GSIStore.getCurrentUser();
+      if (!currentUser) {
+        router.push("/login");
+        return;
+      }
 
-    if (currentUser.role === 'admin') {
-      router.push("/admin");
-    } else if (currentUser.role === 'professor') {
-      router.push("/professor");
-    } else {
-      setUser(currentUser);
+      if (currentUser.role === 'admin') {
+        router.push("/admin");
+      } else if (currentUser.role === 'professor') {
+        router.push("/professor");
+      } else {
+        setUser(currentUser);
 
-      // Filter content for student
-      const allLessons = GSIStore.getLessons();
-      const studentLessons = allLessons.filter(l =>
-        (l.campus.includes(currentUser.campus) || l.campus.length === 0) &&
-        (l.filiere.includes(currentUser.filiere) || l.filiere.length === 0) &&
-        (l.niveau === currentUser.niveau)
-      );
-      setLessons(studentLessons);
+        // Filter content for student
+        const allLessons = await GSIStore.getLessons();
+        const studentLessons = allLessons.filter(l =>
+          (l.campus.includes(currentUser.campus) || l.campus.length === 0) &&
+          (l.filiere.includes(currentUser.filiere) || l.filiere.length === 0) &&
+          (l.niveau === currentUser.niveau)
+        );
+        setLessons(studentLessons);
 
-      const allAssignments = GSIStore.getAssignments();
-      const studentAssignments = allAssignments.filter(a =>
-        (a.campus.includes(currentUser.campus) || a.campus.length === 0) &&
-        (a.filiere.includes(currentUser.filiere) || a.filiere.length === 0) &&
-        (a.niveau === currentUser.niveau)
-      );
-      setAssignments(studentAssignments);
+        const allAssignments = await GSIStore.getAssignments();
+        const studentAssignments = allAssignments.filter(a =>
+          (a.campus.includes(currentUser.campus) || a.campus.length === 0) &&
+          (a.filiere.includes(currentUser.filiere) || a.filiere.length === 0) &&
+          (a.niveau === currentUser.niveau)
+        );
+        setAssignments(studentAssignments);
 
-      setAnnouncements(GSIStore.getAnnouncements());
-    }
+        const allAnnouncements = await GSIStore.getAnnouncements();
+        setAnnouncements(allAnnouncements);
+      }
+    };
+    init();
   }, [router]);
 
   if (!user) return null;
@@ -283,12 +287,12 @@ function TaskCard({ title, subject, date, id }: any) {
         </div>
       ) : (
         <button
-          onClick={() => {
+          onClick={async () => {
             const ok = confirm("Confirmer la soumission de ce travail ?");
             if(ok) {
               const user = GSIStore.getCurrentUser();
               if(user) {
-                GSIStore.addSubmission({
+                await GSIStore.addSubmission({
                    id: Math.random().toString(36).substr(2, 9),
                    assignmentId: id,
                    studentId: user.id,

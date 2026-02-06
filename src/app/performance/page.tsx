@@ -14,14 +14,17 @@ export default function PerformancePage() {
   const [grades, setGrades] = useState<Grade[]>([]);
 
   useEffect(() => {
-    const currentUser = GSIStore.getCurrentUser();
-    if (!currentUser) {
-      router.push("/login");
-      return;
-    }
-    setUser(currentUser);
-    const allGrades = GSIStore.getGrades();
-    setGrades(allGrades.filter(g => g.studentId === currentUser.id));
+    const init = async () => {
+      const currentUser = GSIStore.getCurrentUser();
+      if (!currentUser) {
+        router.push("/login");
+        return;
+      }
+      setUser(currentUser);
+      const allGrades = await GSIStore.getGrades();
+      setGrades(allGrades.filter(g => g.studentId === currentUser.id));
+    };
+    init();
   }, [router]);
 
   if (!user) return null;

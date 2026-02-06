@@ -77,9 +77,9 @@ export default function ProfilePage() {
               <input
                 type="text"
                 defaultValue={user.fullName}
-                onBlur={(e) => {
+                onBlur={async (e) => {
                   const updated = {...user, fullName: e.target.value};
-                  GSIStore.updateUser(updated);
+                  await GSIStore.updateUser(updated);
                   setUser(updated);
                 }}
                 className="bg-white/20 border-none rounded-xl px-4 py-1 text-center font-bold text-white outline-none focus:ring-1 ring-white/50"

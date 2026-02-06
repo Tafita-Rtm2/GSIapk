@@ -14,14 +14,17 @@ export default function ServicesPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
 
   useEffect(() => {
-    const currentUser = GSIStore.getCurrentUser();
-    if (!currentUser) {
-      router.push("/login");
-      return;
-    }
-    setUser(currentUser);
-    const allPayments = GSIStore.getPayments();
-    setPayments(allPayments.filter(p => p.studentId === currentUser.id));
+    const init = async () => {
+      const currentUser = GSIStore.getCurrentUser();
+      if (!currentUser) {
+        router.push("/login");
+        return;
+      }
+      setUser(currentUser);
+      const allPayments = await GSIStore.getPayments();
+      setPayments(allPayments.filter(p => p.studentId === currentUser.id));
+    };
+    init();
   }, [router]);
 
   const requests = [

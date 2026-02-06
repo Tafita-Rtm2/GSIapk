@@ -33,20 +33,24 @@ export default function ProfessorPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
 
   useEffect(() => {
-    const user = GSIStore.getCurrentUser();
-    if (!user || user.role !== 'professor') {
-      router.push("/login");
-      return;
-    }
-    setStudents(GSIStore.getUsers().filter(u => u.role === 'student'));
-    setLessons(GSIStore.getLessons());
-    setAssignments(GSIStore.getAssignments());
+    const init = async () => {
+      const user = GSIStore.getCurrentUser();
+      if (!user || user.role !== 'professor') {
+        router.push("/login");
+        return;
+      }
+      const allUsers = await GSIStore.getUsers();
+      setStudents(allUsers.filter(u => u.role === 'student'));
+      setLessons(await GSIStore.getLessons());
+      setAssignments(await GSIStore.getAssignments());
+    };
+    init();
   }, [router]);
 
   const [selectedFilieres, setSelectedFilieres] = useState<string[]>([]);
   const [selectedCampuses, setSelectedCampuses] = useState<string[]>([]);
 
-  const handlePublishLesson = (e: any) => {
+  const handlePublishLesson = async (e: any) => {
     e.preventDefault();
     if (selectedFilieres.length === 0 || selectedCampuses.length === 0) {
       alert("Veuillez sélectionner au moins une filière et un campus.");
@@ -63,15 +67,15 @@ export default function ProfessorPage() {
       date: new Date().toISOString(),
       files: []
     };
-    GSIStore.addLesson(lesson);
-    setLessons(GSIStore.getLessons());
+    await GSIStore.addLesson(lesson);
+    setLessons(await GSIStore.getLessons());
     alert("Leçon publiée !");
     setSelectedFilieres([]);
     setSelectedCampuses([]);
     setActiveTab("dashboard");
   };
 
-  const handlePublishAssignment = (e: any) => {
+  const handlePublishAssignment = async (e: any) => {
     e.preventDefault();
     if (selectedFilieres.length === 0 || selectedCampuses.length === 0) {
       alert("Veuillez sélectionner au moins une filière et un campus.");
@@ -89,8 +93,8 @@ export default function ProfessorPage() {
       timeLimit: "23:59",
       maxScore: 20
     };
-    GSIStore.addAssignment(assignment);
-    setAssignments(GSIStore.getAssignments());
+    await GSIStore.addAssignment(assignment);
+    setAssignments(await GSIStore.getAssignments());
     alert("Devoir publié !");
     setActiveTab("dashboard");
   };
@@ -314,14 +318,14 @@ export default function ProfessorPage() {
                   </tbody>
                </table>
                <button
-                onClick={() => {
+                onClick={async () => {
                   const subject = (document.getElementById('grade-subject') as HTMLInputElement).value;
                   if(!subject) return alert("Veuillez saisir une matière");
 
-                  students.forEach(s => {
+                  for (const s of students) {
                     const score = (document.getElementById(`grade-${s.id}`) as HTMLInputElement).value;
                     if(score) {
-                      GSIStore.addGrade({
+                      await GSIStore.addGrade({
                         id: Math.random().toString(36).substr(2, 9),
                         studentId: s.id,
                         studentName: s.fullName,
@@ -333,7 +337,7 @@ export default function ProfessorPage() {
                         filiere: s.filiere
                       });
                     }
-                  });
+                  }
                   alert("Notes enregistrées !");
                   setActiveTab("dashboard");
                 }}

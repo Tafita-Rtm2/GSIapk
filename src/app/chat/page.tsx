@@ -31,7 +31,7 @@ export default function ChatPage() {
     const userQuery = input.toLowerCase();
     setInput("");
 
-    // AI Logic (Client-side for offline usage)
+    // AI Logic (Connected to Firebase Store)
     let responseText = "";
 
     if (userQuery.includes("bonjour") || userQuery.includes("salut")) {
@@ -39,21 +39,24 @@ export default function ChatPage() {
     } else if (userQuery.includes("prochain") && userQuery.includes("cours")) {
       responseText = "Votre prochain cours est prévu aujourd'hui à 14h00. Vous pouvez consulter votre emploi du temps complet dans l'onglet 'Planning'.";
     } else if (userQuery.includes("cours") || userQuery.includes("leçon") || userQuery.includes("matière")) {
-      const lessons = GSIStore.getLessons().filter(l => l.niveau === user?.niveau);
+      const allLessons = await GSIStore.getLessons();
+      const lessons = allLessons.filter(l => l.niveau === user?.niveau);
       if (lessons.length > 0) {
         responseText = `Vous avez ${lessons.length} leçons disponibles. La plus récente est "${lessons[0].title}" en ${lessons[0].subject}.`;
       } else {
         responseText = `Aucun support de cours n'est encore publié pour votre niveau (${user?.niveau}).`;
       }
     } else if (userQuery.includes("devoir") || userQuery.includes("tâche") || userQuery.includes("rendre")) {
-      const assignments = GSIStore.getAssignments().filter(a => a.niveau === user?.niveau);
+      const allAssignments = await GSIStore.getAssignments();
+      const assignments = allAssignments.filter(a => a.niveau === user?.niveau);
       if (assignments.length > 0) {
         responseText = `Vous avez ${assignments.length} devoirs à rendre. Le plus urgent est "${assignments[0].title}" pour le ${assignments[0].deadline}.`;
       } else {
         responseText = "Bonne nouvelle ! Aucun devoir n'est en attente pour le moment.";
       }
     } else if (userQuery.includes("note") || userQuery.includes("moyenne") || userQuery.includes("performance")) {
-      const grades = GSIStore.getGrades().filter(g => g.studentId === user?.id);
+      const allGrades = await GSIStore.getGrades();
+      const grades = allGrades.filter(g => g.studentId === user?.id);
       if (grades.length > 0) {
         const avg = (grades.reduce((acc, g) => acc + g.score, 0) / grades.length).toFixed(2);
         responseText = `Votre moyenne actuelle est de ${avg}/20. Votre meilleure note est ${Math.max(...grades.map(g => g.score))}/20.`;

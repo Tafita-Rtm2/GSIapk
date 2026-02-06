@@ -6,6 +6,8 @@ import { Sparkles, ShieldCheck, GraduationCap, Languages, X } from "lucide-react
 import { useLanguage } from "@/lib/i18n";
 import Link from "next/link";
 import { GSIStore } from "@/lib/store";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -17,31 +19,29 @@ export default function LoginPage() {
   const { t, language, setLanguage } = useLanguage();
   const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const users = GSIStore.getUsers();
-    const user = users.find((u: any) => u.email === email);
+  const [loading, setLoading] = useState(false);
 
-    if (user) {
-      GSIStore.setCurrentUser(user);
-      router.push("/");
-    } else {
-      // For demo purposes, if not found, create a default one
-      const newUser = {
-        id: 'demo-user',
-        fullName: 'Liana Rakoto',
-        email: email,
-        role: 'student' as const,
-        campus: 'Antananarivo',
-        filiere: 'Informatique',
-        niveau: 'L1'
-      };
-      GSIStore.setCurrentUser(newUser);
-      router.push("/");
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userData = await GSIStore.getUser(userCredential.user.uid);
+
+      if (userData) {
+        GSIStore.setCurrentUser(userData);
+        router.push("/");
+      } else {
+        alert("Profil non trouvé dans la base de données.");
+      }
+    } catch (error: any) {
+      alert("Erreur de connexion: " + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (adminCode === "Nina GSI") {
       GSIStore.setCurrentUser({
@@ -59,10 +59,10 @@ export default function LoginPage() {
     }
   };
 
-  const handleProfLogin = (e: React.FormEvent) => {
+  const handleProfLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (profPass === "prof-gsi-mg") {
-      GSIStore.setCurrentUser({
+      const profUser: any = {
         id: 'prof-id',
         fullName: 'Professeur GSI',
         email: 'prof@gsi.mg',
@@ -70,7 +70,8 @@ export default function LoginPage() {
         campus: 'Antananarivo',
         filiere: 'Multiple',
         niveau: 'Multiple'
-      });
+      };
+      GSIStore.setCurrentUser(profUser);
       router.push("/professor");
     } else {
       alert("Mot de passe incorrect");

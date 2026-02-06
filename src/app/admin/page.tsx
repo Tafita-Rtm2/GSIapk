@@ -29,27 +29,30 @@ export default function AdminPage() {
   const [filterCampus, setFilterCampus] = useState("");
 
   useEffect(() => {
-    const user = GSIStore.getCurrentUser();
-    if (!user || user.role !== 'admin') {
-      router.push("/login");
-      return;
-    }
-    setUsers(GSIStore.getUsers());
-    setPayments(GSIStore.getPayments());
+    const init = async () => {
+      const user = GSIStore.getCurrentUser();
+      if (!user || user.role !== 'admin') {
+        router.push("/login");
+        return;
+      }
+      setUsers(await GSIStore.getUsers());
+      setPayments(await GSIStore.getPayments());
+    };
+    init();
   }, [router]);
 
-  const handleDeleteUser = (id: string) => {
+  const handleDeleteUser = async (id: string) => {
     if (confirm("Supprimer cet utilisateur ?")) {
-      GSIStore.deleteUser(id);
-      setUsers(GSIStore.getUsers());
+      await GSIStore.deleteUser(id);
+      setUsers(await GSIStore.getUsers());
     }
   };
 
-  const handleSendAnnouncement = (e: any) => {
+  const handleSendAnnouncement = async (e: any) => {
     e.preventDefault();
     const title = e.target.title.value;
     const message = e.target.message.value;
-    GSIStore.addAnnouncement({
+    await GSIStore.addAnnouncement({
       id: Math.random().toString(36).substr(2, 9),
       title,
       message,
@@ -211,11 +214,11 @@ export default function AdminPage() {
                   </div>
                   <div className="flex gap-1">
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         const newName = prompt("Nouveau nom :", u.fullName);
                         if(newName) {
-                          GSIStore.updateUser({...u, fullName: newName});
-                          setUsers(GSIStore.getUsers());
+                          await GSIStore.updateUser({...u, fullName: newName});
+                          setUsers(await GSIStore.getUsers());
                         }
                       }}
                       className="text-blue-500 p-2 hover:bg-blue-50 rounded-xl"
