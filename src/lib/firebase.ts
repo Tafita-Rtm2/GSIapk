@@ -2,10 +2,12 @@ import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBaDtbTyIdVDFd48gqOUX9xslguDR-otQs",
   authDomain: "gsi-madagg.firebaseapp.com",
+  databaseURL: "https://gsi-madagg-default-rtdb.firebaseio.com/",
   projectId: "gsi-madagg",
   storageBucket: "gsi-madagg.firebasestorage.app",
   messagingSenderId: "320735531348",
@@ -17,6 +19,7 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const db = getFirestore(app);
+export const rtdb = getDatabase(app);
 
 if (typeof window !== "undefined") {
   enableIndexedDbPersistence(db).catch((err) => {

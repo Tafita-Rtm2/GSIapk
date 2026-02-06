@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Final safety timeout to prevent stuck loading
-    const timer = setTimeout(() => setLoading(false), 3000);
+    const timer = setTimeout(() => setLoading(false), 1500);
 
     return () => {
       unsubscribeAuth();

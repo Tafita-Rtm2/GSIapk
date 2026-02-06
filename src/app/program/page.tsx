@@ -20,11 +20,27 @@ export default function ProgramPage() {
   const router = useRouter();
   const [items, setItems] = useState<ProgramItem[]>([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [notifPermission, setNotifPermission] = useState<string>("default");
 
   useEffect(() => {
     const saved = localStorage.getItem('gsi_study_program');
     if (saved) setItems(JSON.parse(saved));
+    if (typeof window !== "undefined") {
+      setNotifPermission(Notification.permission);
+    }
   }, []);
+
+  const requestPermission = async () => {
+    if (typeof window !== "undefined") {
+      const permission = await Notification.requestPermission();
+      setNotifPermission(permission);
+      if (permission === "granted") {
+        toast.success("Notifications activées !");
+      } else {
+        toast.error("Notifications bloquées.");
+      }
+    }
+  };
 
   const save = (newItems: ProgramItem[]) => {
     setItems(newItems);
@@ -58,12 +74,23 @@ export default function ProgramPage() {
            <div className="relative z-10">
               <h2 className="font-bold text-lg mb-2">Planification Intelligente</h2>
               <p className="text-xs opacity-80 mb-4">L'IA de GSI Insight vous alertera automatiquement pour vos sessions d'étude.</p>
-              <button
-                onClick={() => setShowAdd(true)}
-                className="bg-white text-indigo-600 px-6 py-2 rounded-xl text-xs font-bold active:scale-95 transition-transform"
-              >
-                + Ajouter une session
-              </button>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowAdd(true)}
+                  className="bg-white text-indigo-600 px-6 py-2 rounded-xl text-xs font-bold active:scale-95 transition-transform"
+                >
+                  + Ajouter une session
+                </button>
+                {notifPermission !== "granted" && (
+                  <button
+                    onClick={requestPermission}
+                    className="bg-indigo-400 text-white px-6 py-2 rounded-xl text-xs font-bold active:scale-95 transition-transform border border-indigo-300"
+                  >
+                    Activer Alertes
+                  </button>
+                )}
+              </div>
            </div>
            <Bell className="absolute right-[-10px] top-[-10px] w-24 h-24 opacity-10 rotate-12" />
         </div>

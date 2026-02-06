@@ -6,7 +6,7 @@ import { Sparkles, ShieldCheck, GraduationCap, Languages, X } from "lucide-react
 import { useLanguage } from "@/lib/i18n";
 import Link from "next/link";
 import { GSIStore } from "@/lib/store";
-import { signInWithEmailAndPassword, signInWithRedirect, getRedirectResult } from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithRedirect, getRedirectResult, signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { toast } from "sonner";
 import { useEffect } from "react";
@@ -93,11 +93,40 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      // Use redirect for better mobile compatibility
-      await signInWithRedirect(auth, googleProvider);
+      // Try popup first (faster for web)
+      await signInWithPopup(auth, googleProvider).then(async (result: any) => {
+        if (result) {
+          const userData = await GSIStore.getUser(result.user.uid);
+          if (userData) {
+            GSIStore.setCurrentUser(userData);
+            toast.success("Bienvenue, " + userData.fullName);
+            router.push("/");
+          } else {
+             const newUser: any = {
+              id: result.user.uid,
+              fullName: result.user.displayName || "Étudiant GSI",
+              email: result.user.email || "",
+              role: 'student',
+              campus: 'Antananarivo',
+              filiere: 'Informatique',
+              niveau: 'L1',
+              photo: result.user.photoURL || ""
+            };
+            await GSIStore.addUser(newUser);
+            GSIStore.setCurrentUser(newUser);
+            toast.success("Compte Google créé !");
+            router.push("/");
+          }
+        }
+      });
     } catch (error: any) {
-      toast.error("Erreur Google: " + error.message);
-      setLoading(false);
+      if (error.code === 'auth/popup-blocked') {
+        toast.info("L'onglet de connexion est bloqué, utilisation de la redirection...");
+        await signInWithRedirect(auth, googleProvider);
+      } else {
+        toast.error("Erreur Google: " + error.message);
+        setLoading(false);
+      }
     }
   };
 

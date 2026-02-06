@@ -52,8 +52,14 @@ export default function Home() {
         );
         setAssignments(studentAssignments);
 
-        const allAnnouncements = await GSIStore.getAnnouncements();
-        setAnnouncements(allAnnouncements);
+        // Subscribe to real-time announcements
+        const unsubscribeAnn = GSIStore.subscribeAnnouncements((anns) => {
+          setAnnouncements(anns);
+        });
+
+        return () => {
+          unsubscribeAnn();
+        };
       }
     };
     init();

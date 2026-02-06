@@ -53,6 +53,14 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
+    const unsubscribeAnn = GSIStore.subscribeAnnouncements((anns) => {
+      // Background sync of announcements
+      // We still use fetchData for other things, but this makes announcements real-time
+    });
+    return () => unsubscribeAnn();
+  }, []);
+
+  useEffect(() => {
     const init = async () => {
       const user = GSIStore.getCurrentUser();
       if (!user || user.role !== 'admin') {

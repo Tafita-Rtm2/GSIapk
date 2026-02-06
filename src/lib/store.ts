@@ -18,7 +18,8 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from "firebase/storage";
-import { storage } from "./firebase";
+import { ref as dbRef, push, set, onValue, off, get } from "firebase/database";
+import { storage, rtdb } from "./firebase";
 
 // Types
 export interface User {
@@ -115,10 +116,13 @@ const notifyListeners = (user: User | null) => {
 if (typeof window !== 'undefined') {
   onAuthStateChanged(auth, async (firebaseUser) => {
     if (firebaseUser) {
-      const userData = await GSIStore.getUser(firebaseUser.uid);
-      if (userData) {
-        GSIStore.setCurrentUser(userData);
-      }
+      // Use onSnapshot for real-time profile updates
+      const docRef = doc(db, "users", firebaseUser.uid);
+      onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+          GSIStore.setCurrentUser(docSnap.data() as User);
+        }
+      });
     } else {
       // Only clear if it's a firebase role (not bypass)
       const current = GSIStore.getCurrentUser();
@@ -163,9 +167,14 @@ export const GSIStore = {
 
   // Users
   async getUser(id: string): Promise<User | null> {
+    // Check cache first for extreme speed
+    if (cachedUser && cachedUser.id === id) return cachedUser;
+
     const docRef = doc(db, "users", id);
     const docSnap = await getDoc(docRef);
-    return docSnap.exists() ? (docSnap.data() as User) : null;
+    const user = docSnap.exists() ? (docSnap.data() as User) : null;
+    if (user) GSIStore.setCurrentUser(user);
+    return user;
   },
 
   async getUsers(): Promise<User[]> {
@@ -282,18 +291,44 @@ export const GSIStore = {
     });
   },
 
-  // Announcements
+  // Announcements (Realtime Database for Speed)
   async getAnnouncements(): Promise<Announcement[]> {
-    const q = query(collection(db, "announcements"), orderBy("date", "desc"));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement));
+    const announcementsRef = dbRef(rtdb, 'announcements');
+    const snapshot = await get(announcementsRef);
+    if (snapshot.exists()) {
+      const data = snapshot.val();
+      return Object.keys(data).map(key => ({
+        id: key,
+        ...data[key]
+      })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }
+    return [];
   },
 
   async addAnnouncement(ann: Announcement) {
-    await addDoc(collection(db, "announcements"), {
+    const announcementsRef = dbRef(rtdb, 'announcements');
+    const newAnnRef = push(announcementsRef);
+    await set(newAnnRef, {
       ...ann,
-      createdAt: Timestamp.now()
+      createdAt: Date.now()
     });
+  },
+
+  subscribeAnnouncements(callback: (anns: Announcement[]) => void) {
+    const announcementsRef = dbRef(rtdb, 'announcements');
+    onValue(announcementsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const anns = Object.keys(data).map(key => ({
+          id: key,
+          ...data[key]
+        })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        callback(anns);
+      } else {
+        callback([]);
+      }
+    });
+    return () => off(announcementsRef);
   },
 
   // Payments
