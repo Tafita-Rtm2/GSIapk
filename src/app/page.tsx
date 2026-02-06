@@ -1,7 +1,7 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
-import { Bell, Search, Sparkles, BookOpen, FileText, Calendar as CalendarIcon, X, Info, Download } from "lucide-react";
+import { Bell, Search, Sparkles, BookOpen, FileText, Calendar as CalendarIcon, X, Info, Download, Clock } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -157,19 +157,24 @@ export default function Home() {
           </div>
         )}
 
-        {/* Ask Insight Call to Action */}
-        <Link href="/chat" className="block mb-8 bg-gradient-to-r from-primary to-accent p-6 rounded-[32px] text-white shadow-lg shadow-primary/20 relative overflow-hidden group active:scale-[0.98] transition-all">
-           <div className="absolute right-[-10px] top-[-10px] w-24 h-24 bg-white/10 rounded-full group-hover:scale-110 transition-transform"></div>
-           <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-2">
-                 <div className="p-2 bg-white/20 rounded-xl">
-                    <Sparkles size={20} className="text-white" />
-                 </div>
-                 <h3 className="font-bold text-lg">{t("ask_insight")}</h3>
+        {/* Quick Actions Row */}
+        <div className="grid grid-cols-2 gap-4 mb-8">
+           <Link href="/chat" className="bg-gradient-to-br from-primary to-accent p-6 rounded-[32px] text-white shadow-lg shadow-primary/20 relative overflow-hidden group active:scale-[0.98] transition-all">
+              <div className="relative z-10">
+                 <Sparkles size={24} className="mb-2" />
+                 <h3 className="font-bold text-sm leading-tight">{t("ask_insight")}</h3>
               </div>
-              <p className="text-sm text-white/80 italic font-medium">“Where data meets your future.”</p>
-           </div>
-        </Link>
+              <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-white/10 rounded-full"></div>
+           </Link>
+           <Link href="/program" className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden group active:scale-[0.98] transition-all">
+              <div className="relative z-10 text-gray-800">
+                 <Clock size={24} className="mb-2 text-indigo-600" />
+                 <h3 className="font-bold text-sm leading-tight">Mon Programme</h3>
+              </div>
+              <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-indigo-50 rounded-full"></div>
+           </Link>
+        </div>
+
 
         {/* Courses Section */}
         <div className="mb-8">

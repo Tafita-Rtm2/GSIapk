@@ -2,27 +2,67 @@
 
 import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
-import { Search, Filter, Download, Star, FileText, Bookmark, Clock, ArrowRight } from "lucide-react";
+import { Search, Filter, Download, Star, FileText, Bookmark, Clock, ArrowRight, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { GSIStore, Lesson } from "@/lib/store";
 
 export default function LibraryPage() {
   const { t } = useLanguage();
   const [filter, setFilter] = useState("all");
+  const [books, setBooks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [books, setBooks] = useState([
-    { id: 1, title: "Algèbre Moderne", author: "Pr. Bernard", type: "PDF", size: "4.2 MB", favorite: true, downloaded: false },
-    { id: 2, title: "Mécanique des Fluides", author: "Dr. Liana", type: "PDF", size: "12.8 MB", favorite: false, downloaded: false },
-    { id: 3, title: "Génie Logiciel V2", author: "GSI Internationale", type: "EPUB", size: "2.1 MB", favorite: true, downloaded: false },
-    { id: 4, title: "Base de Données SQL", author: "Lab GSI", type: "PDF", size: "8.5 MB", favorite: false, downloaded: false },
-  ]);
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const user = GSIStore.getCurrentUser();
+        const [lessons, assignments] = await Promise.all([
+          GSIStore.getLessons(),
+          GSIStore.getAssignments()
+        ]);
 
-  const handleDownload = (id: number) => {
+        const lessonItems = lessons.filter(l =>
+          !user || (l.niveau === user.niveau && (l.filiere.includes(user.filiere) || l.filiere.length === 0))
+        ).map(l => ({
+          id: l.id,
+          title: l.title,
+          author: `Cours: ${l.subject}`,
+          type: "Leçon",
+          url: l.files?.[0] || "",
+          favorite: false,
+          downloaded: false
+        }));
+
+        const assignmentItems = assignments.filter(a =>
+          !user || (a.niveau === user.niveau && (a.filiere.includes(user.filiere) || a.filiere.length === 0))
+        ).map(a => ({
+          id: a.id,
+          title: a.title,
+          author: `Devoir: ${a.subject}`,
+          type: "Devoir",
+          url: a.files?.[0] || "",
+          favorite: false,
+          downloaded: false
+        }));
+
+        setBooks([...lessonItems, ...assignmentItems]);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
+  }, []);
+
+  const handleDownload = (url: string, id: string) => {
+    if (!url) return alert("Pas de fichier joint.");
+    window.open(url, '_blank');
     setBooks(books.map(b => b.id === id ? { ...b, downloaded: true } : b));
-    alert("Document disponible hors-ligne !");
   };
 
-  const handleToggleFavorite = (id: number) => {
+  const handleToggleFavorite = (id: string) => {
     setBooks(books.map(b => b.id === id ? { ...b, favorite: !b.favorite } : b));
   };
 
@@ -71,17 +111,29 @@ export default function LibraryPage() {
         <h3 className="text-lg font-bold mb-4">Mes documents</h3>
         <div className="space-y-4">
           {books.map((book) => (
-            <div key={book.id} className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 hover:border-primary/20 transition-all group">
+            <div
+              key={book.id}
+              onClick={() => {
+                if(book.url) {
+                  GSIStore.saveProgress(book.id, { lastOpened: Date.now() });
+                  window.open(book.url, '_blank');
+                }
+              }}
+              className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 hover:border-primary/20 transition-all group cursor-pointer"
+            >
               <div className="w-12 h-16 bg-gray-50 rounded-xl flex items-center justify-center border border-gray-100 group-hover:bg-primary/5 transition-colors">
                 <FileText className="text-primary opacity-40" size={24} />
               </div>
               <div className="flex-1">
                 <h4 className="font-bold text-gray-800 text-sm">{book.title}</h4>
-                <p className="text-[10px] text-gray-400 font-medium">{book.author} • {book.size}</p>
+                <p className="text-[10px] text-gray-400 font-medium">{book.author}</p>
+                {GSIStore.getProgress(book.id) && (
+                   <span className="text-[8px] text-indigo-500 font-bold uppercase tracking-tighter">Déjà lu</span>
+                )}
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => handleToggleFavorite(book.id)}
+                  onClick={(e) => { e.stopPropagation(); handleToggleFavorite(book.id); }}
                   className={cn(
                     "p-2 rounded-xl transition-colors",
                     book.favorite ? "text-accent bg-accent/10" : "text-gray-300 bg-gray-50"
@@ -89,7 +141,7 @@ export default function LibraryPage() {
                   <Star size={16} fill={book.favorite ? "currentColor" : "none"} />
                 </button>
                 <button
-                  onClick={() => handleDownload(book.id)}
+                  onClick={(e) => { e.stopPropagation(); handleDownload(book.url, book.id); }}
                   className={cn(
                     "p-2 rounded-xl transition-colors",
                     book.downloaded ? "bg-green-100 text-green-600" : "bg-gray-50 text-primary hover:bg-primary/10"
@@ -99,6 +151,12 @@ export default function LibraryPage() {
               </div>
             </div>
           ))}
+          {books.length === 0 && !loading && (
+             <div className="text-center py-10 text-gray-400">
+                <BookOpen size={40} className="mx-auto mb-3 opacity-20" />
+                <p className="text-sm">Aucun document publié pour votre niveau.</p>
+             </div>
+          )}
         </div>
       </div>
     </AppLayout>

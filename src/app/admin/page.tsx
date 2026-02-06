@@ -13,7 +13,8 @@ import {
   ChevronRight,
   Plus,
   Trash2,
-  Edit2
+  Edit2,
+  RefreshCcw
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
@@ -94,6 +95,15 @@ export default function AdminPage() {
               <h1 className="text-xl font-bold">Admin Portal</h1>
               <p className="text-xs text-gray-500 font-medium italic">Nina GSI — Principal</p>
             </div>
+            <button
+              onClick={async () => {
+                setUsers(await GSIStore.getUsers());
+                setPayments(await GSIStore.getPayments());
+              }}
+              className="ml-auto p-2 text-indigo-600 hover:rotate-180 transition-transform duration-500"
+            >
+              <RefreshCcw size={20} />
+            </button>
           </div>
           <button
             onClick={() => {

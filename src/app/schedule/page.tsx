@@ -12,6 +12,7 @@ export default function SchedulePage() {
   const [view, setView] = useState<"week" | "month">("week");
   const [selectedDay, setSelectedDay] = useState(2);
   const [latestSchedule, setLatestSchedule] = useState<any>(null);
+  const [customData, setCustomData] = useState<any>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -19,6 +20,15 @@ export default function SchedulePage() {
       if (user) {
         const schedule = await GSIStore.getLatestSchedule(user.campus, user.niveau);
         setLatestSchedule(schedule);
+
+        // If it's a JSON file, try to fetch and parse it for interactive view
+        if (schedule?.url && schedule.url.includes('.json')) {
+           try {
+              const res = await fetch(schedule.url);
+              const data = await res.json();
+              setCustomData(data);
+           } catch (e) { console.error("JSON parsing failed", e); }
+        }
       }
     };
     init();
@@ -26,7 +36,7 @@ export default function SchedulePage() {
 
   const days = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
-  const scheduleData: any = {
+  const defaultData: any = {
     0: [
       { time: "08:00", duration: "120 min", title: "Mathématiques", room: "Salle 101", instructor: "Dr. Rakoto", color: "border-l-blue-500" },
       { time: "10:30", duration: "90 min", title: "Gestion", room: "Salle 204", instructor: "Mme. Perle", color: "border-l-emerald-500" }
@@ -132,13 +142,13 @@ export default function SchedulePage() {
 
         {/* Schedule Items */}
         <div className="space-y-6">
-          {scheduleData[selectedDay]?.map((item: any, i: number) => (
+          {(customData || defaultData)[selectedDay]?.map((item: any, i: number) => (
             <ScheduleCard
               key={i}
               {...item}
             />
           ))}
-          {(!scheduleData[selectedDay] || scheduleData[selectedDay].length === 0) && (
+          {(!(customData || defaultData)[selectedDay] || (customData || defaultData)[selectedDay].length === 0) && (
             <p className="text-center text-gray-400 italic">Aucun cours prévu pour ce jour.</p>
           )}
         </div>

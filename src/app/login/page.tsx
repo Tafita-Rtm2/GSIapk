@@ -6,8 +6,8 @@ import { Sparkles, ShieldCheck, GraduationCap, Languages, X } from "lucide-react
 import { useLanguage } from "@/lib/i18n";
 import Link from "next/link";
 import { GSIStore } from "@/lib/store";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "@/lib/firebase";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -40,6 +40,39 @@ export default function LoginPage() {
       } else {
         alert("Erreur de connexion: " + error.message);
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const userData = await GSIStore.getUser(result.user.uid);
+
+      if (userData) {
+        GSIStore.setCurrentUser(userData);
+        router.push("/");
+      } else {
+        // If first time Google login, we need to register them or ask for info
+        // For simplicity, let's create a default student profile
+        const newUser: any = {
+          id: result.user.uid,
+          fullName: result.user.displayName || "Étudiant GSI",
+          email: result.user.email || "",
+          role: 'student',
+          campus: 'Antananarivo',
+          filiere: 'Informatique',
+          niveau: 'L1',
+          photo: result.user.photoURL || ""
+        };
+        await GSIStore.addUser(newUser);
+        GSIStore.setCurrentUser(newUser);
+        router.push("/");
+      }
+    } catch (error: any) {
+      alert("Erreur Google: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -143,11 +176,27 @@ export default function LoginPage() {
           </div>
           <button
             type="submit"
-            className="w-full bg-primary text-white py-5 rounded-2xl font-bold shadow-lg shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
+            disabled={loading}
+            className="w-full bg-primary text-white py-5 rounded-2xl font-bold shadow-lg shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
           >
-            {t("se_connecter")}
+            {loading ? "Connexion..." : t("se_connecter")}
           </button>
         </form>
+
+        <div className="mt-4 flex items-center gap-4">
+          <div className="flex-1 h-[1px] bg-gray-100"></div>
+          <span className="text-[10px] text-gray-400 font-bold uppercase">Ou continuer avec</span>
+          <div className="flex-1 h-[1px] bg-gray-100"></div>
+        </div>
+
+        <button
+          onClick={handleGoogleLogin}
+          disabled={loading}
+          className="mt-6 w-full bg-white border border-gray-200 text-gray-700 py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-gray-50 active:scale-[0.98] transition-all disabled:opacity-50"
+        >
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+          Google
+        </button>
 
         <div className="mt-8 text-center">
           <p className="text-gray-500 text-sm">

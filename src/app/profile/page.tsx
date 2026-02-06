@@ -15,6 +15,7 @@ export default function ProfilePage() {
   const [showQr, setShowQr] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     const currentUser = GSIStore.getCurrentUser();
@@ -63,12 +64,38 @@ export default function ProfilePage() {
               />
             </div>
             {isEditing && (
-              <button
-                onClick={() => alert("Simulation: Sélection de photo...")}
-                className="absolute bottom-0 right-0 bg-accent text-white p-2 rounded-full shadow-lg"
-              >
-                <QrCode size={14} className="rotate-45" />
-              </button>
+              <>
+                <input
+                  id="photo-upload"
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file && user) {
+                      try {
+                        setIsUploading(true);
+                        const url = await GSIStore.uploadFile(file, `profiles/${user.id}_${Date.now()}`);
+                        const updated = { ...user, photo: url };
+                        await GSIStore.updateUser(updated);
+                        setUser(updated);
+                        alert("Photo mise à jour !");
+                      } catch (err: any) {
+                        alert("Erreur: " + err.message);
+                      } finally {
+                        setIsUploading(false);
+                      }
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => document.getElementById('photo-upload')?.click()}
+                  disabled={isUploading}
+                  className="absolute bottom-0 right-0 bg-accent text-white p-2 rounded-full shadow-lg active:scale-95 transition-transform disabled:opacity-50"
+                >
+                  <QrCode size={14} className="rotate-45" />
+                </button>
+              </>
             )}
           </div>
 

@@ -147,9 +147,10 @@ export const GSIStore = {
   },
 
   async getUsers(): Promise<User[]> {
-    const q = query(collection(db, "users"), orderBy("fullName"));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+    const querySnapshot = await getDocs(collection(db, "users"));
+    const users = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+    // Sort client-side to be more resilient to missing fields
+    return users.sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""));
   },
 
   async addUser(user: User) {
@@ -208,15 +209,13 @@ export const GSIStore = {
   },
 
   async getLatestSchedule(campus: string, niveau: string): Promise<any> {
-    const q = query(
-      collection(db, "schedules"),
-      where("campus", "==", campus),
-      where("niveau", "==", niveau),
-      orderBy("createdAt", "desc")
-    );
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
+    const querySnapshot = await getDocs(collection(db, "schedules"));
+    const schedules = querySnapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as any))
+      .filter(s => s.campus === campus && s.niveau === niveau);
+
+    if (schedules.length > 0) {
+      return schedules.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))[0];
     }
     return null;
   },
@@ -290,8 +289,34 @@ export const GSIStore = {
 
   // File Upload
   async uploadFile(file: File, path: string): Promise<string> {
+    console.log(`Starting upload to ${path}...`);
     const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, file);
-    return getDownloadURL(storageRef);
+    try {
+      const snapshot = await uploadBytes(storageRef, file);
+      console.log("Upload successful, getting URL...");
+      const url = await getDownloadURL(snapshot.ref);
+      console.log("URL obtained:", url);
+      return url;
+    } catch (err: any) {
+      console.error("Upload error details:", err);
+      throw new Error(`Erreur Firebase Storage: ${err.message || 'Inconnue'}`);
+    }
+  },
+
+  // Progress Tracking
+  saveProgress(itemId: string, progress: any) {
+    if (typeof window !== 'undefined') {
+      const allProgress = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
+      allProgress[itemId] = { ...progress, timestamp: Date.now() };
+      localStorage.setItem('gsi_progress', JSON.stringify(allProgress));
+    }
+  },
+
+  getProgress(itemId: string) {
+    if (typeof window !== 'undefined') {
+      const allProgress = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
+      return allProgress[itemId] || null;
+    }
+    return null;
   }
 };
