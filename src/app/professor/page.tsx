@@ -120,6 +120,40 @@ export default function ProfessorPage() {
     })();
   };
 
+  const handlePublishAssignment = async (e: any) => {
+    e.preventDefault();
+    const form = e.target;
+    const title = form.title.value;
+    const tempId = Math.random().toString(36).substr(2, 9);
+
+    setIsUploading(true);
+    setActiveTab("dashboard");
+    const toastId = toast.loading("Publication du devoir...");
+
+    (async () => {
+       try {
+          await GSIStore.addAssignment({
+            id: tempId,
+            title,
+            description: form.description.value,
+            subject: form.subject.value,
+            niveau: form.niveau.value,
+            filiere: selectedFilieres,
+            campus: selectedCampuses,
+            deadline: form.deadline.value,
+            timeLimit: "23:59",
+            maxScore: 20,
+            files: []
+          });
+          toast.success(`Devoir "${title}" disponible.`, { id: toastId });
+       } catch (err: any) {
+          toast.error(err.message, { id: toastId });
+       } finally {
+          setIsUploading(false);
+       }
+    })();
+  };
+
   return (
     <div className="flex flex-col min-h-screen max-w-md mx-auto bg-[#F8FAFC] pb-20">
       {/* Sync Status Banner */}
@@ -178,17 +212,20 @@ export default function ProfessorPage() {
         {(activeTab === "lessons" || activeTab === "assignments") && (
           <div className="space-y-6">
             <PageHeader title={activeTab === 'lessons' ? "Publier Leçon" : "Publier Devoir"} onBack={() => setActiveTab("dashboard")} />
-            <form onSubmit={handlePublishLesson} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
-                <input name="subject" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold" placeholder="Matière" />
-                <input name="title" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold" placeholder="Titre" />
-                <textarea name="description" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold min-h-[100px]" placeholder="Description"></textarea>
+            <form onSubmit={activeTab === 'lessons' ? handlePublishLesson : handlePublishAssignment} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+                <input name="subject" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none" placeholder="Matière" />
+                <input name="title" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none" placeholder="Titre" />
+                <textarea name="description" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none min-h-[100px]" placeholder="Description"></textarea>
 
-                <div className="grid grid-cols-2 gap-2 p-4 bg-gray-50 rounded-2xl">
-                   {FILIERES.slice(0, 4).map(f => (
-                     <label key={f} className="flex items-center gap-2 text-[10px] font-bold">
-                       <input type="checkbox" checked={selectedFilieres.includes(f)} onChange={e => e.target.checked ? setSelectedFilieres([...selectedFilieres, f]) : setSelectedFilieres(selectedFilieres.filter(x => x !== f))} /> {f}
-                     </label>
-                   ))}
+                <div className="p-4 bg-gray-50 rounded-2xl space-y-3">
+                   <p className="text-[10px] font-black uppercase text-gray-400">Ciblage</p>
+                   <div className="grid grid-cols-2 gap-2">
+                     {FILIERES.slice(0, 6).map(f => (
+                       <label key={f} className="flex items-center gap-2 text-[10px] font-bold">
+                         <input type="checkbox" checked={selectedFilieres.includes(f)} onChange={e => e.target.checked ? setSelectedFilieres([...selectedFilieres, f]) : setSelectedFilieres(selectedFilieres.filter(x => x !== f))} /> {f}
+                       </label>
+                     ))}
+                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -197,13 +234,64 @@ export default function ProfessorPage() {
                    ))}
                 </div>
 
-                <input name="files" type="file" multiple className="w-full p-2 text-[10px]" />
-                <select name="niveau" className="w-full p-4 bg-gray-50 rounded-2xl font-bold">
-                   {NIVEAUX.map(n => <option key={n}>{n}</option>)}
-                </select>
+                <div className="flex gap-2">
+                   <select name="niveau" className="flex-1 p-4 bg-gray-50 rounded-2xl font-bold text-xs">
+                      {NIVEAUX.map(n => <option key={n}>{n}</option>)}
+                   </select>
+                   {activeTab === 'assignments' && (
+                     <input name="deadline" type="date" required className="flex-1 p-4 bg-gray-50 rounded-2xl font-bold text-xs" />
+                   )}
+                </div>
 
-                <button type="submit" disabled={isUploading} className="w-full bg-violet-600 text-white py-5 rounded-2xl font-black uppercase shadow-lg active:scale-95">Publier</button>
+                <input name="files" type="file" multiple className="w-full p-2 text-[10px]" />
+
+                <button type="submit" disabled={isUploading} className="w-full bg-violet-600 text-white py-5 rounded-2xl font-black uppercase shadow-lg active:scale-95">Publier Maintenant</button>
             </form>
+          </div>
+        )}
+
+        {activeTab === "grades" && (
+          <div className="space-y-4">
+             <PageHeader title="Saisie des Notes" onBack={() => setActiveTab("dashboard")} />
+             <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+                <input id="grade-subject" className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold" placeholder="Matière de l'examen" />
+                <div className="max-h-60 overflow-y-auto space-y-2">
+                   {students.map(s => (
+                     <div key={s.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                        <span className="text-xs font-bold">{s.fullName}</span>
+                        <input id={`grade-${s.id}`} type="number" className="w-12 p-2 rounded-lg text-center font-bold" placeholder="-" max="20" />
+                     </div>
+                   ))}
+                </div>
+                <button
+                  onClick={async () => {
+                    const subject = (document.getElementById('grade-subject') as HTMLInputElement).value;
+                    if(!subject) return toast.error("Matière requise");
+                    const toastId = toast.loading("Enregistrement...");
+                    for(const s of students) {
+                      const score = (document.getElementById(`grade-${s.id}`) as HTMLInputElement).value;
+                      if(score) {
+                        await GSIStore.addGrade({
+                          id: Math.random().toString(36).substr(2,9),
+                          studentId: s.id,
+                          studentName: s.fullName,
+                          subject,
+                          score: parseFloat(score),
+                          maxScore: 20,
+                          date: new Date().toISOString().split('T')[0],
+                          niveau: s.niveau,
+                          filiere: s.filiere
+                        });
+                      }
+                    }
+                    toast.success("Notes publiées !", { id: toastId });
+                    setActiveTab("dashboard");
+                  }}
+                  className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold active:scale-95"
+                >
+                  Valider la classe
+                </button>
+             </div>
           </div>
         )}
 

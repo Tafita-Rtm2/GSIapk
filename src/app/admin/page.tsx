@@ -21,7 +21,8 @@ import {
   X,
   Wifi,
   WifiOff,
-  CheckCircle2
+  CheckCircle2,
+  TrendingUp
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
@@ -78,7 +79,7 @@ export default function AdminPage() {
   const handleDeleteUser = async (id: string) => {
     if (confirm("Supprimer cet utilisateur ?")) {
       await GSIStore.deleteUser(id);
-      toast.success("Demande de suppression envoyée au cloud.");
+      toast.success("Demande de suppression envoyée.");
     }
   };
 
@@ -86,7 +87,6 @@ export default function AdminPage() {
     e.preventDefault();
     const title = e.target.title.value;
     const message = e.target.message.value;
-
     GSIStore.addAnnouncement({
       id: Math.random().toString(36).substr(2, 9),
       title,
@@ -94,7 +94,6 @@ export default function AdminPage() {
       date: new Date().toISOString(),
       author: "Administration"
     });
-
     toast.success("Annonce diffusée !");
     e.target.reset();
     setActiveTab("dashboard");
@@ -127,7 +126,6 @@ export default function AdminPage() {
             syncStatus === 'offline' ? <WifiOff size={12} /> : <RefreshCcw size={12} className="animate-spin" />}
            <span>{syncStatus === 'ready' ? "GSI Cloud : Connecté" : syncStatus === 'offline' ? "Mode Hors-ligne" : "Synchronisation..."}</span>
         </div>
-        <span className="opacity-70">v5.0.1</span>
       </div>
 
       {/* Header */}
@@ -149,7 +147,7 @@ export default function AdminPage() {
               toast.success("Déconnexion");
               router.push("/login");
             }}
-            className="p-3 bg-gray-100 rounded-xl text-gray-400 hover:text-red-500 transition-colors active:scale-90"
+            className="p-3 bg-gray-50 rounded-xl text-gray-400 hover:text-red-500 transition-colors active:scale-90"
           >
             <LogOut size={20} />
           </button>
@@ -184,7 +182,7 @@ export default function AdminPage() {
                     onClick={() => setActiveTab(item.id)}
                     className="bg-white p-5 rounded-[32px] shadow-sm border border-gray-100 flex flex-col items-center text-center gap-3 hover:shadow-md transition-all active:scale-95"
                   >
-                    <div className={`${item.color} w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-${item.color.split('-')[1]}-500/20`}>
+                    <div className={`${item.color} w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg`}>
                       <item.icon size={24} />
                     </div>
                     <span className="text-sm font-bold text-gray-700 leading-tight">{item.label}</span>
@@ -199,7 +197,7 @@ export default function AdminPage() {
           <div className="space-y-4">
             <PageHeader title={t("gestion_paiements")} onBack={() => setActiveTab("dashboard")} />
             <div className="space-y-3">
-              {payments.filter(p => !filterCampus || p.campus.includes(filterCampus)).map((p, i) => (
+              {payments.map((p, i) => (
                 <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center shadow-sm">
                   <div>
                     <h4 className="font-bold text-sm">{p.studentName}</h4>
@@ -222,8 +220,8 @@ export default function AdminPage() {
             <div className="space-y-3">
               {filteredUsers.map((u, i) => (
                 <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-sm">
-                  <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center overflow-hidden">
-                    {u.photo ? <img src={u.photo} alt={u.fullName} className="w-full h-full object-cover" /> : <Users size={20} />}
+                  <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center overflow-hidden font-bold">
+                    {u.fullName.charAt(0)}
                   </div>
                   <div className="flex-1">
                     <h4 className="font-bold text-sm">{u.fullName}</h4>
@@ -243,16 +241,49 @@ export default function AdminPage() {
           <div className="space-y-6">
             <PageHeader title={t("communication")} onBack={() => setActiveTab("dashboard")} />
             <form onSubmit={handleSendAnnouncement} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
-                <div>
-                  <label className="block text-sm font-bold mb-2">Titre de l'annonce</label>
-                  <input name="title" required type="text" className="w-full bg-gray-50 border-none rounded-xl p-3 outline-none" placeholder="Ex: Report des examens" />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold mb-2">Message</label>
-                  <textarea name="message" required className="w-full bg-gray-50 border-none rounded-xl p-3 outline-none min-h-[100px]" placeholder="Saisissez votre message ici..."></textarea>
-                </div>
-                <button type="submit" className="w-full bg-orange-500 text-white py-4 rounded-xl font-bold active:scale-95 transition-transform">Diffuser</button>
+                <input name="title" required className="w-full bg-gray-50 rounded-xl p-3 outline-none" placeholder="Titre" />
+                <textarea name="message" required className="w-full bg-gray-50 rounded-xl p-3 outline-none min-h-[100px]" placeholder="Message"></textarea>
+                <button type="submit" className="w-full bg-orange-500 text-white py-4 rounded-xl font-bold">Diffuser</button>
             </form>
+          </div>
+        )}
+
+        {activeTab === "academic" && (
+          <div className="space-y-4">
+            <PageHeader title="Gestion Académique" onBack={() => setActiveTab("dashboard")} />
+            <div className="grid grid-cols-1 gap-4">
+               <div className="bg-white p-5 rounded-3xl border border-gray-100">
+                  <h3 className="font-bold mb-4 flex items-center gap-2"><BookOpen size={18} className="text-emerald-500" /> Leçons ({lessons.length})</h3>
+                  <div className="space-y-2">
+                    {lessons.slice(0, 5).map((l, i) => (
+                      <div key={i} className="text-xs p-2 bg-gray-50 rounded-lg flex justify-between">{l.title} <span>{l.niveau}</span></div>
+                    ))}
+                  </div>
+               </div>
+               <div className="bg-white p-5 rounded-3xl border border-gray-100">
+                  <h3 className="font-bold mb-4 flex items-center gap-2"><FileText size={18} className="text-orange-500" /> Devoirs ({assignments.length})</h3>
+                  <div className="space-y-2">
+                    {assignments.slice(0, 5).map((a, i) => (
+                      <div key={i} className="text-xs p-2 bg-gray-50 rounded-lg flex justify-between">{a.title} <span>{a.deadline}</span></div>
+                    ))}
+                  </div>
+               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "stats" && (
+           <div className="space-y-4">
+            <PageHeader title="Stats & Rapports" onBack={() => setActiveTab("dashboard")} />
+            <div className="bg-indigo-600 p-8 rounded-[40px] text-white shadow-xl relative overflow-hidden">
+               <TrendingUp className="absolute right-[-10px] top-[-10px] w-32 h-32 opacity-10" />
+               <p className="text-xs font-bold uppercase opacity-60 mb-1">Croissance Annuelle</p>
+               <h2 className="text-3xl font-black mb-4">+24.5%</h2>
+               <div className="flex gap-2">
+                  <button onClick={() => toast.success("Export PDF lancé")} className="px-4 py-2 bg-white/20 rounded-xl text-[10px] font-bold">PDF REPORT</button>
+                  <button onClick={() => toast.success("Export Excel lancé")} className="px-4 py-2 bg-white/20 rounded-xl text-[10px] font-bold">EXCEL DATA</button>
+               </div>
+            </div>
           </div>
         )}
       </div>
@@ -266,19 +297,15 @@ export default function AdminPage() {
             <p className="text-xs text-gray-500 mb-6 font-medium">Convoquer <span className="text-indigo-600 font-bold">{selectedUser.fullName}</span>.</p>
             <form onSubmit={async (e: any) => {
               e.preventDefault();
-              const motive = e.target.motive.value;
-              const date = e.target.date.value;
-
               GSIStore.addAnnouncement({
                 id: Math.random().toString(36).substr(2, 9),
                 title: `CONVOCATION OFFICIELLE`,
-                message: `Vous êtes convoqué(e) le ${date} pour : ${motive}.`,
+                message: `Vous êtes convoqué(e) le ${e.target.date.value} pour : ${e.target.motive.value}.`,
                 date: new Date().toISOString(),
                 author: "Direction GSI",
                 type: 'convocation',
                 targetUserId: selectedUser.id
               });
-
               toast.success("Convocation envoyée");
               setShowConvocationModal(false);
             }} className="space-y-4">

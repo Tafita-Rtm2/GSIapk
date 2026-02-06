@@ -129,11 +129,26 @@ class GSIStoreClass {
 
       return onSnapshot(q, (snap) => {
         const cloudData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const currentLocal = this.state[key] as any[];
-        const cloudIds = new Set(cloudData.map((d: any) => d.id));
-        const localOnly = currentLocal.filter(item => !cloudIds.has(item.id));
+        const currentLocal = this.state[key];
 
-        const merged = [...cloudData, ...localOnly];
+        let merged: any;
+        if (Array.isArray(currentLocal)) {
+           const cloudIds = new Set(cloudData.map((d: any) => d.id));
+           const localOnly = currentLocal.filter(item => !cloudIds.has(item.id));
+           merged = [...cloudData, ...localOnly];
+        } else {
+           // For objects (like schedules), we just merge or use cloud data
+           merged = { ...currentLocal };
+           cloudData.forEach((d: any) => {
+              if (key === 'schedules') {
+                 const schedKey = `${d.campus}_${d.niveau}`;
+                 merged[schedKey] = d;
+              } else {
+                 merged[d.id] = d;
+              }
+           });
+        }
+
         (this.state[key] as any) = merged;
         this.save();
         cb(merged);
@@ -283,8 +298,25 @@ class GSIStoreClass {
 
   async getUsers() { return this.state.users; }
   async getPayments() { return this.state.payments; }
+  async getLessons() { return this.state.lessons; }
+  async getAssignments() { return this.state.assignments; }
+  async getGrades() { return this.state.grades; }
+  async getAnnouncements() { return this.state.announcements; }
   getCache<T>(key: string): T | null { return (this.state as any)[key] || null; }
   setCache(key: string, data: any) { (this.state as any)[key] = data; this.save(); }
+
+  saveProgress(id: string, p: any) {
+    const all = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
+    all[id] = { ...p, ts: Date.now() };
+    localStorage.setItem('gsi_progress', JSON.stringify(all));
+  }
+  getProgress(id: string) { return JSON.parse(localStorage.getItem('gsi_progress') || '{}')[id] || null; }
+  setDownloaded(id: string, s = true) {
+    const all = JSON.parse(localStorage.getItem('gsi_downloaded') || '{}');
+    all[id] = s;
+    localStorage.setItem('gsi_downloaded', JSON.stringify(all));
+  }
+  isDownloaded(id: string) { return !!JSON.parse(localStorage.getItem('gsi_downloaded') || '{}')[id]; }
 }
 
 export const GSIStore = new GSIStoreClass();
