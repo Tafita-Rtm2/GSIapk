@@ -65,7 +65,11 @@ export default function RegisterPage() {
 
       router.push("/");
     } catch (error: any) {
-      alert("Erreur de création: " + error.message);
+      if (error.code === 'auth/configuration-not-found') {
+        alert("Erreur de configuration Firebase : L'authentification par email/mot de passe n'est pas activée dans la console Firebase. Veuillez l'activer dans Authentication > Sign-in method.");
+      } else {
+        alert("Erreur de création: " + error.message);
+      }
     } finally {
       setLoading(false);
     }

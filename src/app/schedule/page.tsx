@@ -2,14 +2,27 @@
 
 import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
-import { useState } from "react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Download, FileText } from "lucide-react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { GSIStore } from "@/lib/store";
 
 export default function SchedulePage() {
   const { t } = useLanguage();
   const [view, setView] = useState<"week" | "month">("week");
   const [selectedDay, setSelectedDay] = useState(2);
+  const [latestSchedule, setLatestSchedule] = useState<any>(null);
+
+  useEffect(() => {
+    const init = async () => {
+      const user = GSIStore.getCurrentUser();
+      if (user) {
+        const schedule = await GSIStore.getLatestSchedule(user.campus, user.niveau);
+        setLatestSchedule(schedule);
+      }
+    };
+    init();
+  }, []);
 
   const days = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
@@ -77,6 +90,29 @@ export default function SchedulePage() {
             <ChevronRight size={20} className="text-primary" />
           </button>
         </div>
+
+        {/* Latest Uploaded Schedule */}
+        {latestSchedule && (
+          <div className="mb-8 bg-emerald-50 p-6 rounded-[32px] border border-emerald-100 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="bg-emerald-100 p-3 rounded-2xl text-emerald-600">
+                <FileText size={24} />
+              </div>
+              <div>
+                <h4 className="font-bold text-emerald-900 text-sm">Nouvel emploi du temps</h4>
+                <p className="text-[10px] text-emerald-600 font-medium">Mis à jour le {new Date(latestSchedule.date).toLocaleDateString()}</p>
+              </div>
+            </div>
+            <a
+              href={latestSchedule.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-white text-emerald-600 p-3 rounded-2xl shadow-sm hover:scale-110 transition-transform active:scale-95"
+            >
+              <Download size={20} />
+            </a>
+          </div>
+        )}
 
         {/* Days Row */}
         <div className="flex justify-between mb-8">

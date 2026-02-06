@@ -35,7 +35,11 @@ export default function LoginPage() {
         alert("Profil non trouvé dans la base de données.");
       }
     } catch (error: any) {
-      alert("Erreur de connexion: " + error.message);
+      if (error.code === 'auth/configuration-not-found') {
+        alert("Erreur de configuration Firebase : L'authentification par email/mot de passe n'est pas activée dans la console Firebase. Veuillez l'activer dans Authentication > Sign-in method.");
+      } else {
+        alert("Erreur de connexion: " + error.message);
+      }
     } finally {
       setLoading(false);
     }

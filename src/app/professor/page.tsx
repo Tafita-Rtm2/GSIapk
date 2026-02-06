@@ -49,6 +49,7 @@ export default function ProfessorPage() {
 
   const [selectedFilieres, setSelectedFilieres] = useState<string[]>([]);
   const [selectedCampuses, setSelectedCampuses] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handlePublishLesson = async (e: any) => {
     e.preventDefault();
@@ -56,6 +57,25 @@ export default function ProfessorPage() {
       alert("Veuillez sélectionner au moins une filière et un campus.");
       return;
     }
+
+    setIsUploading(true);
+    let fileUrls: string[] = [];
+    const filesInput = e.target.elements.namedItem('files') as HTMLInputElement;
+    const files = filesInput?.files;
+
+    if (files && files.length > 0) {
+      try {
+        for (let i = 0; i < files.length; i++) {
+          const url = await GSIStore.uploadFile(files[i], `lessons/${Date.now()}_${files[i].name}`);
+          fileUrls.push(url);
+        }
+      } catch (err: any) {
+        alert("Erreur d'upload : " + err.message);
+        setIsUploading(false);
+        return;
+      }
+    }
+
     const lesson: Lesson = {
       id: Math.random().toString(36).substr(2, 9),
       title: e.target.title.value,
@@ -65,13 +85,14 @@ export default function ProfessorPage() {
       filiere: selectedFilieres,
       campus: selectedCampuses,
       date: new Date().toISOString(),
-      files: []
+      files: fileUrls
     };
     await GSIStore.addLesson(lesson);
     setLessons(await GSIStore.getLessons());
     alert("Leçon publiée !");
     setSelectedFilieres([]);
     setSelectedCampuses([]);
+    setIsUploading(false);
     setActiveTab("dashboard");
   };
 
@@ -81,6 +102,25 @@ export default function ProfessorPage() {
       alert("Veuillez sélectionner au moins une filière et un campus.");
       return;
     }
+
+    setIsUploading(true);
+    let fileUrls: string[] = [];
+    const filesInput = e.target.elements.namedItem('files') as HTMLInputElement;
+    const files = filesInput?.files;
+
+    if (files && files.length > 0) {
+      try {
+        for (let i = 0; i < files.length; i++) {
+          const url = await GSIStore.uploadFile(files[i], `assignments/${Date.now()}_${files[i].name}`);
+          fileUrls.push(url);
+        }
+      } catch (err: any) {
+        alert("Erreur d'upload : " + err.message);
+        setIsUploading(false);
+        return;
+      }
+    }
+
     const assignment: Assignment = {
       id: Math.random().toString(36).substr(2, 9),
       title: e.target.title.value,
@@ -96,6 +136,7 @@ export default function ProfessorPage() {
     await GSIStore.addAssignment(assignment);
     setAssignments(await GSIStore.getAssignments());
     alert("Devoir publié !");
+    setIsUploading(false);
     setActiveTab("dashboard");
   };
 
@@ -262,6 +303,20 @@ export default function ProfessorPage() {
                           {c}
                         </label>
                       ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold mb-2">Fichiers joints</label>
+                  <div className="flex items-center justify-center w-full">
+                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100">
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <Upload className="w-8 h-8 mb-4 text-gray-500" />
+                        <p className="mb-2 text-sm text-gray-500"><span className="font-semibold">Cliquez pour uploader</span> ou glissez-déposez</p>
+                        <p className="text-xs text-gray-500">PDF, DOC, PPT, Vidéos...</p>
+                      </div>
+                      <input name="files" type="file" multiple className="hidden" />
+                    </label>
                     </div>
                   </div>
                 </div>
@@ -273,8 +328,9 @@ export default function ProfessorPage() {
                 )}
                 <button
                   type="submit"
-                  className={`w-full text-white py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-transform ${activeTab === 'lessons' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-orange-500 shadow-orange-500/20'}`}>
-                  {activeTab === 'lessons' ? t("publier_lecon") : t("publier_devoir")}
+                disabled={isUploading}
+                className={`w-full text-white py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-transform disabled:opacity-50 ${activeTab === 'lessons' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-orange-500 shadow-orange-500/20'}`}>
+                {isUploading ? "Upload en cours..." : (activeTab === 'lessons' ? t("publier_lecon") : t("publier_devoir"))}
                 </button>
               </form>
             </div>
@@ -398,10 +454,61 @@ export default function ProfessorPage() {
                   </select>
                </div>
 
+               <div className="mb-8">
+                  <form id="schedule-form" className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <select name="campus" className="bg-gray-50 border-none rounded-xl p-3 text-xs font-bold outline-none">
+                        {CAMPUSES.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                      <select name="niveau" className="bg-gray-50 border-none rounded-xl p-3 text-xs font-bold outline-none">
+                        {NIVEAUX.map(n => <option key={n}>{n}</option>)}
+                      </select>
+                    </div>
+                    <input
+                      id="schedule-upload"
+                      type="file"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        const form = document.getElementById('schedule-form') as HTMLFormElement;
+                        const campus = (form.elements.namedItem('campus') as HTMLSelectElement).value;
+                        const niveau = (form.elements.namedItem('niveau') as HTMLSelectElement).value;
+
+                        if (file) {
+                          try {
+                            setIsUploading(true);
+                            const url = await GSIStore.uploadFile(file, `schedules/${Date.now()}_${file.name}`);
+                            await GSIStore.addSchedule({
+                              url,
+                              campus,
+                              niveau,
+                              professorName: GSIStore.getCurrentUser()?.fullName,
+                              date: new Date().toISOString()
+                            });
+                            alert("Emploi du temps uploadé et enregistré avec succès !");
+                          } catch (err: any) {
+                            alert("Erreur upload: " + err.message);
+                          } finally {
+                            setIsUploading(false);
+                          }
+                        }
+                      }}
+                    />
+                  </form>
+                  <button
+                    onClick={() => document.getElementById('schedule-upload')?.click()}
+                    disabled={isUploading}
+                    className="w-full bg-blue-50 text-blue-600 border-2 border-dashed border-blue-200 py-10 rounded-3xl flex flex-col items-center gap-3 active:scale-95 transition-transform disabled:opacity-50"
+                  >
+                    <Upload size={32} />
+                    <span className="font-bold">{isUploading ? "Chargement..." : "Choisir un fichier"}</span>
+                  </button>
+               </div>
+
                <button
-                onClick={() => alert("Fichier envoyé pour traitement. L'emploi du temps sera mis à jour après validation administrative.")}
+                onClick={() => alert("Les modifications ont été transmises à l'administration.")}
                 className="w-full bg-blue-500 text-white py-4 rounded-xl font-bold shadow-lg shadow-blue-500/20 active:scale-95 transition-transform flex items-center justify-center gap-2">
-                  <CheckCircle size={20} /> Soumettre pour validation
+                  <CheckCircle size={20} /> Confirmer la mise à jour
                </button>
             </div>
           </div>

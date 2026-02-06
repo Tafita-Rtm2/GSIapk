@@ -17,6 +17,8 @@ import {
   Timestamp
 } from "firebase/firestore";
 import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "./firebase";
 
 // Types
 export interface User {
@@ -67,6 +69,7 @@ export interface Assignment {
   deadline: string;
   timeLimit: string;
   maxScore: number;
+  files?: string[];
 }
 
 export interface Submission {
@@ -196,6 +199,28 @@ export const GSIStore = {
     });
   },
 
+  // Schedules
+  async addSchedule(schedule: any) {
+    await addDoc(collection(db, "schedules"), {
+      ...schedule,
+      createdAt: Timestamp.now()
+    });
+  },
+
+  async getLatestSchedule(campus: string, niveau: string): Promise<any> {
+    const q = query(
+      collection(db, "schedules"),
+      where("campus", "==", campus),
+      where("niveau", "==", niveau),
+      orderBy("createdAt", "desc")
+    );
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
+    }
+    return null;
+  },
+
   // Assignments
   async getAssignments(): Promise<Assignment[]> {
     const q = query(collection(db, "assignments"), orderBy("deadline", "asc"));
@@ -261,5 +286,12 @@ export const GSIStore = {
       ...payment,
       createdAt: Timestamp.now()
     });
+  },
+
+  // File Upload
+  async uploadFile(file: File, path: string): Promise<string> {
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file);
+    return getDownloadURL(storageRef);
   }
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
-import { Bell, Search, Sparkles, BookOpen, FileText, Calendar as CalendarIcon, X, Info } from "lucide-react";
+import { Bell, Search, Sparkles, BookOpen, FileText, Calendar as CalendarIcon, X, Info, Download } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -183,6 +183,7 @@ export default function Home() {
                 key={i}
                 title={l.title}
                 subject={l.subject}
+                files={l.files}
                 icon={<BookOpen size={20} />}
                 color={i % 2 === 0 ? "bg-rose-500" : "bg-indigo-500"}
                />
@@ -210,6 +211,7 @@ export default function Home() {
                 subject={a.subject}
                 date={a.deadline}
                 id={a.id}
+                files={a.files}
                />
             ))}
             {assignments.length === 0 && (
@@ -244,12 +246,19 @@ export default function Home() {
   );
 }
 
-function CourseCard({ title, subject, icon, color }: any) {
+function CourseCard({ title, subject, icon, color, files }: any) {
   return (
     <div className={`${color} min-w-[160px] p-5 rounded-[32px] text-white shadow-lg shadow-black/10 relative overflow-hidden group hover:scale-[1.02] transition-transform`}>
       <div className="absolute right-[-10px] top-[-10px] w-16 h-16 bg-white/10 rounded-full"></div>
-      <div className="bg-white/20 w-10 h-10 rounded-2xl flex items-center justify-center mb-4">
-        {icon}
+      <div className="flex justify-between items-start mb-4">
+        <div className="bg-white/20 w-10 h-10 rounded-2xl flex items-center justify-center">
+          {icon}
+        </div>
+        {files && files.length > 0 && (
+          <a href={files[0]} target="_blank" rel="noopener noreferrer" className="bg-white/20 p-2 rounded-xl hover:bg-white/40 transition-colors">
+            <Download size={14} />
+          </a>
+        )}
       </div>
       <h3 className="font-bold text-sm leading-tight mb-1 truncate">{title}</h3>
       <p className="text-[10px] opacity-80 font-bold uppercase tracking-wider">{subject}</p>
@@ -257,7 +266,7 @@ function CourseCard({ title, subject, icon, color }: any) {
   );
 }
 
-function TaskCard({ title, subject, date, id }: any) {
+function TaskCard({ title, subject, date, id, files }: any) {
   const [submitted, setSubmitted] = useState(false);
 
   return (
@@ -275,6 +284,11 @@ function TaskCard({ title, subject, date, id }: any) {
          <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1">
            <CalendarIcon size={12} /> {date}
          </span>
+         {files && files.length > 0 && (
+           <a href={files[0]} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-primary flex items-center gap-1">
+             <Download size={12} /> Support
+           </a>
+         )}
          <span className="text-[10px] font-bold text-gray-400">GSI Insight • 100%</span>
       </div>
 
