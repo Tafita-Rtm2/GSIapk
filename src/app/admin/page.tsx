@@ -14,13 +14,17 @@ import {
   Plus,
   Trash2,
   Edit2,
-  RefreshCcw
+  RefreshCcw,
+  BookOpen,
+  FileText
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
 import { GSIStore, User, Payment, Lesson, Assignment } from "@/lib/store";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
+
+const CAMPUSES = ["Antananarivo", "Antsirabe", "Bypass", "Tamatave"];
 
 export default function AdminPage() {
   const { t } = useLanguage();

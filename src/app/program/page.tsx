@@ -4,6 +4,7 @@ import { AppLayout } from "@/components/app-layout";
 import { useState, useEffect } from "react";
 import { Clock, Plus, Trash2, Bell, ChevronLeft } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -16,6 +17,7 @@ interface ProgramItem {
 }
 
 export default function ProgramPage() {
+  const router = useRouter();
   const [items, setItems] = useState<ProgramItem[]>([]);
   const [showAdd, setShowAdd] = useState(false);
 
