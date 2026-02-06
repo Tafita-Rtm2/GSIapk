@@ -41,7 +41,7 @@ export default function ChatPage() {
       responseText = "Votre prochain cours est prévu aujourd'hui à 14h00. Vous pouvez consulter votre emploi du temps complet dans l'onglet 'Planning'.";
     } else if (userQuery.includes("cours") || userQuery.includes("leçon") || userQuery.includes("matière")) {
       const allLessons = await GSIStore.getLessons();
-      const lessons = allLessons.filter(l => l.niveau === user?.niveau);
+      const lessons = allLessons.filter((l: any) => l.niveau === user?.niveau);
       if (lessons.length > 0) {
         responseText = `Vous avez ${lessons.length} leçons disponibles. La plus récente est "${lessons[0].title}" en ${lessons[0].subject}.`;
       } else {
@@ -49,7 +49,7 @@ export default function ChatPage() {
       }
     } else if (userQuery.includes("devoir") || userQuery.includes("tâche") || userQuery.includes("rendre")) {
       const allAssignments = await GSIStore.getAssignments();
-      const assignments = allAssignments.filter(a => a.niveau === user?.niveau);
+      const assignments = allAssignments.filter((a: any) => a.niveau === user?.niveau);
       if (assignments.length > 0) {
         responseText = `Vous avez ${assignments.length} devoirs à rendre. Le plus urgent est "${assignments[0].title}" pour le ${assignments[0].deadline}.`;
       } else {
@@ -57,10 +57,10 @@ export default function ChatPage() {
       }
     } else if (userQuery.includes("note") || userQuery.includes("moyenne") || userQuery.includes("performance")) {
       const allGrades = await GSIStore.getGrades();
-      const grades = allGrades.filter(g => g.studentId === user?.id);
+      const grades = allGrades.filter((g: any) => g.studentId === user?.id);
       if (grades.length > 0) {
-        const avg = (grades.reduce((acc, g) => acc + g.score, 0) / grades.length).toFixed(2);
-        responseText = `Votre moyenne actuelle est de ${avg}/20. Votre meilleure note est ${Math.max(...grades.map(g => g.score))}/20.`;
+        const avg = (grades.reduce((acc: number, g: any) => acc + g.score, 0) / grades.length).toFixed(2);
+        responseText = `Votre moyenne actuelle est de ${avg}/20. Votre meilleure note est ${Math.max(...grades.map((g: any) => g.score))}/20.`;
       } else {
         responseText = "Aucune note n'a encore été enregistrée dans votre dossier.";
       }

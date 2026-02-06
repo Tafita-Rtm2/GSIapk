@@ -37,18 +37,28 @@ export default function ProfessorPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
 
   useEffect(() => {
-    const init = async () => {
-      const user = GSIStore.getCurrentUser();
-      if (!user || user.role !== 'professor') {
-        router.push("/login");
-        return;
-      }
-      const allUsers = await GSIStore.getUsers();
-      setStudents(allUsers.filter(u => u.role === 'student'));
-      setLessons(await GSIStore.getLessons());
-      setAssignments(await GSIStore.getAssignments());
-    };
-    init();
+    const user = GSIStore.getCurrentUser();
+    if (!user || user.role !== 'professor') {
+      router.push("/login");
+      return;
+    }
+
+    // Cache
+    setStudents(GSIStore.getCache<User[]>("prof_students") || []);
+    setLessons(GSIStore.getCache<Lesson[]>("prof_lessons") || []);
+    setAssignments(GSIStore.getCache<Assignment[]>("prof_assignments") || []);
+
+    const unsubs = [
+      GSIStore.subscribeUsers((us) => {
+        const ss = us.filter(u => u.role === 'student');
+        setStudents(ss);
+        GSIStore.setCache("prof_students", ss);
+      }),
+      GSIStore.subscribeLessons({}, (ls) => { setLessons(ls); GSIStore.setCache("prof_lessons", ls); }),
+      GSIStore.subscribeAssignments({}, (as) => { setAssignments(as); GSIStore.setCache("prof_assignments", as); })
+    ];
+
+    return () => unsubs.forEach(u => u());
   }, [router]);
 
   const [selectedFilieres, setSelectedFilieres] = useState<string[]>([]);
@@ -73,13 +83,13 @@ export default function ProfessorPage() {
 
     if (files && files.length > 0) {
       try {
-        for (let i = 0; i < files.length; i++) {
-          toast.loading(`Upload du fichier ${i+1}/${files.length}...`, { id: toastId });
-          const url = await GSIStore.uploadFile(files[i], `lessons/${Date.now()}_${files[i].name}`, (p) => {
-            setUploadProgress(Math.round(((i / files.length) * 100) + (p / files.length)));
-          });
-          fileUrls.push(url);
-        }
+        const uploadPromises = Array.from(files).map((file, i) =>
+          GSIStore.uploadFile(file, `lessons/${Date.now()}_${file.name}`, (p) => {
+             // We just take the average for simplicity
+             setUploadProgress(p);
+          })
+        );
+        fileUrls = await Promise.all(uploadPromises);
       } catch (err: any) {
         toast.error("Erreur d'upload : " + err.message, { id: toastId });
         setIsUploading(false);
@@ -124,13 +134,12 @@ export default function ProfessorPage() {
 
     if (files && files.length > 0) {
       try {
-        for (let i = 0; i < files.length; i++) {
-          toast.loading(`Upload du fichier ${i+1}/${files.length}...`, { id: toastId });
-          const url = await GSIStore.uploadFile(files[i], `assignments/${Date.now()}_${files[i].name}`, (p) => {
-            setUploadProgress(Math.round(((i / files.length) * 100) + (p / files.length)));
-          });
-          fileUrls.push(url);
-        }
+        const uploadPromises = Array.from(files).map((file, i) =>
+          GSIStore.uploadFile(file, `assignments/${Date.now()}_${file.name}`, (p) => {
+             setUploadProgress(p);
+          })
+        );
+        fileUrls = await Promise.all(uploadPromises);
       } catch (err: any) {
         toast.error("Erreur d'upload : " + err.message, { id: toastId });
         setIsUploading(false);

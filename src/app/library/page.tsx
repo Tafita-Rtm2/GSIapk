@@ -4,8 +4,8 @@ import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
 import { Search, Filter, Download, Star, FileText, Bookmark, Clock, ArrowRight, BookOpen, RefreshCw, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
-import { GSIStore, Lesson } from "@/lib/store";
+import { useState, useEffect, memo } from "react";
+import { GSIStore, Lesson, Assignment } from "@/lib/store";
 import { toast } from "sonner";
 
 export default function LibraryPage() {
@@ -15,17 +15,17 @@ export default function LibraryPage() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const fetchContent = async (silent = false) => {
-    if(!silent) setLoading(true);
-    else setIsRefreshing(true);
+  useEffect(() => {
+    const user = GSIStore.getCurrentUser();
 
-    try {
-      const user = GSIStore.getCurrentUser();
-      const [lessons, assignments] = await Promise.all([
-        GSIStore.getLessons(),
-        GSIStore.getAssignments()
-      ]);
+    // Instant Load from Cache
+    const cached = GSIStore.getCache<any[]>("library_books");
+    if (cached) {
+      setBooks(cached);
+      setLoading(false);
+    }
 
+    const updateLibrary = (lessons: Lesson[], assignments: Assignment[]) => {
       const lessonItems = lessons.filter(l =>
         !user || (l.niveau === user.niveau && (l.filiere.includes(user.filiere) || l.filiere.length === 0))
       ).map(l => ({
@@ -50,19 +50,29 @@ export default function LibraryPage() {
         downloaded: GSIStore.isDownloaded(a.id)
       }));
 
-      setBooks([...lessonItems, ...assignmentItems]);
-      if(silent) toast.success("Bibliothèque mise à jour !");
-    } catch (err) {
-      console.error(err);
-      toast.error("Erreur de synchronisation.");
-    } finally {
+      const all = [...lessonItems, ...assignmentItems];
+      setBooks(all);
+      GSIStore.setCache("library_books", all);
       setLoading(false);
-      setIsRefreshing(false);
-    }
-  };
+    };
 
-  useEffect(() => {
-    fetchContent();
+    let currentLessons: Lesson[] = [];
+    let currentAssignments: Assignment[] = [];
+
+    const unsubLessons = GSIStore.subscribeLessons({ niveau: user?.niveau }, (ls) => {
+      currentLessons = ls;
+      updateLibrary(currentLessons, currentAssignments);
+    });
+
+    const unsubAssignments = GSIStore.subscribeAssignments({ niveau: user?.niveau }, (as) => {
+      currentAssignments = as;
+      updateLibrary(currentLessons, currentAssignments);
+    });
+
+    return () => {
+      unsubLessons();
+      unsubAssignments();
+    };
   }, []);
 
   const handleDownload = (url: string, id: string) => {
@@ -100,12 +110,6 @@ export default function LibraryPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={() => fetchContent(true)}
-              className={cn("bg-gray-100 p-2 rounded-xl text-gray-500 transition-all", isRefreshing && "animate-spin")}
-            >
-              <RefreshCw size={20} />
-            </button>
             <button className="bg-gray-100 p-2 rounded-xl text-gray-500">
               <Filter size={20} />
             </button>
@@ -199,7 +203,7 @@ export default function LibraryPage() {
   );
 }
 
-function CategoryBadge({ label, icon: Icon, active, onClick }: any) {
+const CategoryBadge = memo(({ label, icon: Icon, active, onClick }: any) => {
   return (
     <button
       onClick={onClick}
@@ -212,4 +216,4 @@ function CategoryBadge({ label, icon: Icon, active, onClick }: any) {
       {label}
     </button>
   );
-}
+});

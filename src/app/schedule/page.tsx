@@ -17,23 +17,27 @@ export default function SchedulePage() {
   const [customData, setCustomData] = useState<any>(null);
 
   useEffect(() => {
-    const init = async () => {
-      const user = GSIStore.getCurrentUser();
-      if (user) {
-        const schedule = await GSIStore.getLatestSchedule(user.campus, user.niveau);
-        setLatestSchedule(schedule);
+    const user = GSIStore.getCurrentUser();
+    if (!user) return;
 
-        // If it's a JSON file, try to fetch and parse it for interactive view
-        if (schedule?.url && schedule.url.includes('.json')) {
-           try {
-              const res = await fetch(schedule.url);
-              const data = await res.json();
-              setCustomData(data);
-           } catch (e) { console.error("JSON parsing failed", e); }
-        }
+    // Cache
+    const cached = GSIStore.getCache<any>("latest_schedule");
+    if (cached) setLatestSchedule(cached);
+
+    const unsub = GSIStore.subscribeLatestSchedule(user.campus, user.niveau, async (schedule) => {
+      setLatestSchedule(schedule);
+      GSIStore.setCache("latest_schedule", schedule);
+
+      if (schedule?.url && schedule.url.includes('.json')) {
+        try {
+          const res = await fetch(schedule.url);
+          const data = await res.json();
+          setCustomData(data);
+        } catch (e) { console.error("JSON parsing failed", e); }
       }
-    };
-    init();
+    });
+
+    return () => unsub();
   }, []);
 
   const days = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];

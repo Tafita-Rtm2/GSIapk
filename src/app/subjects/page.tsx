@@ -5,7 +5,7 @@ import { useLanguage } from "@/lib/i18n";
 import { Search, BookOpen, FileText, Video, Award, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { GSIStore, Lesson, Assignment } from "@/lib/store";
 
 export default function SubjectsPage() {
@@ -13,18 +13,16 @@ export default function SubjectsPage() {
   const [subjects, setSubjects] = useState<any[]>([]);
 
   useEffect(() => {
-    const init = async () => {
-      const user = GSIStore.getCurrentUser();
-      const [lessons, assignments] = await Promise.all([
-        GSIStore.getLessons(),
-        GSIStore.getAssignments()
-      ]);
+    const user = GSIStore.getCurrentUser();
 
+    const cached = GSIStore.getCache<any[]>("subjects_list");
+    if (cached) setSubjects(cached);
+
+    const unsub = GSIStore.subscribeLessons({ niveau: user?.niveau }, (lessons) => {
       const studentLessons = lessons.filter(l =>
-        !user || (l.niveau === user.niveau && (l.filiere.includes(user.filiere) || l.filiere.length === 0))
+        !user || (l.filiere.includes(user.filiere) || l.filiere.length === 0)
       );
 
-      // Extract unique subjects
       const subjectNames = Array.from(new Set(studentLessons.map(l => l.subject)));
       const mappedSubjects = subjectNames.map((name, i) => {
         const count = studentLessons.filter(l => l.subject === name).length;
@@ -33,15 +31,17 @@ export default function SubjectsPage() {
         return {
           id: i,
           title: name,
-          progress: Math.floor(Math.random() * 40) + 60, // Simulate progress
+          progress: Math.floor(Math.random() * 40) + 60,
           icon: icons[i % icons.length],
           color: colors[i % colors.length],
           items: count
         };
       });
       setSubjects(mappedSubjects);
-    };
-    init();
+      GSIStore.setCache("subjects_list", mappedSubjects);
+    });
+
+    return () => unsub();
   }, []);
 
   return (
@@ -77,7 +77,7 @@ export default function SubjectsPage() {
   );
 }
 
-function SubjectCard({ title, progress, icon, color, items }: any) {
+const SubjectCard = memo(({ title, progress, icon, color, items }: any) => {
   return (
     <div className="bg-white p-4 rounded-[28px] shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-all cursor-pointer">
       <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-2xl text-white shadow-inner", color)}>
@@ -96,9 +96,9 @@ function SubjectCard({ title, progress, icon, color, items }: any) {
       <ChevronRight size={20} className="text-gray-300" />
     </div>
   );
-}
+});
 
-function ResourceCategory({ icon: Icon, label, color, bg }: any) {
+const ResourceCategory = memo(({ icon: Icon, label, color, bg }: any) => {
   return (
     <div className={cn("p-6 rounded-[32px] flex flex-col items-center gap-2 cursor-pointer transition-transform hover:scale-105", bg)}>
       <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center bg-white shadow-sm mb-1", color)}>
@@ -107,4 +107,4 @@ function ResourceCategory({ icon: Icon, label, color, bg }: any) {
       <span className="text-xs font-bold text-gray-700">{label}</span>
     </div>
   );
-}
+});

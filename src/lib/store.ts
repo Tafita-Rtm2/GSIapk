@@ -177,10 +177,21 @@ export const GSIStore = {
     return user;
   },
 
+  subscribeUsers(callback: (users: User[]) => void) {
+    const q = query(collection(db, "users"), orderBy("fullName", "asc"));
+    return onSnapshot(q, (snapshot) => {
+      callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+    }, (err) => {
+      // Fallback if index missing or error
+      getDocs(collection(db, "users")).then(snap => {
+         callback(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+      });
+    });
+  },
+
   async getUsers(): Promise<User[]> {
     const querySnapshot = await getDocs(collection(db, "users"));
     const users = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-    // Sort client-side to be more resilient to missing fields
     return users.sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""));
   },
 
@@ -217,7 +228,17 @@ export const GSIStore = {
     }
   },
 
-  // Lessons
+  // Optimized Subscriptions & Real-time CRUD
+  subscribeLessons(filter: { niveau?: string }, callback: (lessons: Lesson[]) => void) {
+    let q = query(collection(db, "lessons"), orderBy("date", "desc"));
+    if (filter.niveau) q = query(q, where("niveau", "==", filter.niveau));
+
+    return onSnapshot(q, (snapshot) => {
+      const lessons = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lesson));
+      callback(lessons);
+    }, (err) => console.error("Lesson sync error:", err));
+  },
+
   async getLessons(): Promise<Lesson[]> {
     const q = query(collection(db, "lessons"), orderBy("date", "desc"));
     const querySnapshot = await getDocs(q);
@@ -239,19 +260,34 @@ export const GSIStore = {
     });
   },
 
-  async getLatestSchedule(campus: string, niveau: string): Promise<any> {
-    const querySnapshot = await getDocs(collection(db, "schedules"));
-    const schedules = querySnapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() } as any))
-      .filter(s => s.campus === campus && s.niveau === niveau);
+  subscribeLatestSchedule(campus: string, niveau: string, callback: (schedule: any) => void) {
+    const q = query(
+      collection(db, "schedules"),
+      where("campus", "==", campus),
+      where("niveau", "==", niveau),
+      orderBy("createdAt", "desc")
+    );
 
-    if (schedules.length > 0) {
-      return schedules.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))[0];
-    }
-    return null;
+    return onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        callback({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
+      } else {
+        callback(null);
+      }
+    }, (err) => console.error("Schedule sync error:", err));
   },
 
   // Assignments
+  subscribeAssignments(filter: { niveau?: string }, callback: (assignments: Assignment[]) => void) {
+    let q = query(collection(db, "assignments"), orderBy("deadline", "asc"));
+    if (filter.niveau) q = query(q, where("niveau", "==", filter.niveau));
+
+    return onSnapshot(q, (snapshot) => {
+      const assignments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Assignment));
+      callback(assignments);
+    }, (err) => console.error("Assignment sync error:", err));
+  },
+
   async getAssignments(): Promise<Assignment[]> {
     const q = query(collection(db, "assignments"), orderBy("deadline", "asc"));
     const querySnapshot = await getDocs(q);
@@ -266,9 +302,11 @@ export const GSIStore = {
   },
 
   // Submissions
-  async getSubmissions(): Promise<Submission[]> {
-    const querySnapshot = await getDocs(collection(db, "submissions"));
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Submission));
+  subscribeSubmissions(callback: (submissions: Submission[]) => void) {
+    const q = collection(db, "submissions");
+    return onSnapshot(q, (snapshot) => {
+      callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Submission)));
+    });
   },
 
   async addSubmission(submission: Submission) {
@@ -279,6 +317,13 @@ export const GSIStore = {
   },
 
   // Grades
+  subscribeGrades(studentId: string, callback: (grades: Grade[]) => void) {
+    const q = query(collection(db, "grades"), where("studentId", "==", studentId));
+    return onSnapshot(q, (snapshot) => {
+      callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade)));
+    }, (err) => console.error("Grades sync error:", err));
+  },
+
   async getGrades(): Promise<Grade[]> {
     const querySnapshot = await getDocs(collection(db, "grades"));
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade));
@@ -332,6 +377,17 @@ export const GSIStore = {
   },
 
   // Payments
+  subscribePayments(callback: (payments: Payment[]) => void) {
+    const q = query(collection(db, "payments"), orderBy("date", "desc"));
+    return onSnapshot(q, (snapshot) => {
+      callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment)));
+    }, (err) => {
+      getDocs(collection(db, "payments")).then(snap => {
+        callback(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment)));
+      });
+    });
+  },
+
   async getPayments(): Promise<Payment[]> {
     const querySnapshot = await getDocs(collection(db, "payments"));
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
@@ -403,5 +459,20 @@ export const GSIStore = {
       return !!downloaded[itemId];
     }
     return false;
+  },
+
+  // Instant Hydration Support
+  getCache<T>(key: string): T | null {
+    if (typeof window !== 'undefined') {
+      const data = localStorage.getItem(`gsi_cache_${key}`);
+      return data ? JSON.parse(data) : null;
+    }
+    return null;
+  },
+
+  setCache(key: string, data: any) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`gsi_cache_${key}`, JSON.stringify(data));
+    }
   }
 };

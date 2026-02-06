@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import {
   ShieldCheck,
   CreditCard,
@@ -39,37 +39,28 @@ export default function AdminPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCampus, setFilterCampus] = useState("");
 
-  const fetchData = async () => {
-    const [u, p, l, a] = await Promise.all([
-      GSIStore.getUsers(),
-      GSIStore.getPayments(),
-      GSIStore.getLessons(),
-      GSIStore.getAssignments()
-    ]);
-    setUsers(u);
-    setPayments(p);
-    setLessons(l);
-    setAssignments(a);
-  };
-
   useEffect(() => {
-    const unsubscribeAnn = GSIStore.subscribeAnnouncements((anns) => {
-      // Background sync of announcements
-      // We still use fetchData for other things, but this makes announcements real-time
-    });
-    return () => unsubscribeAnn();
-  }, []);
+    const user = GSIStore.getCurrentUser();
+    if (!user || user.role !== 'admin') {
+      router.push("/login");
+      return;
+    }
 
-  useEffect(() => {
-    const init = async () => {
-      const user = GSIStore.getCurrentUser();
-      if (!user || user.role !== 'admin') {
-        router.push("/login");
-        return;
-      }
-      await fetchData();
-    };
-    init();
+    // Cache
+    setUsers(GSIStore.getCache<User[]>("admin_users") || []);
+    setPayments(GSIStore.getCache<Payment[]>("admin_payments") || []);
+    setLessons(GSIStore.getCache<Lesson[]>("admin_lessons") || []);
+    setAssignments(GSIStore.getCache<Assignment[]>("admin_assignments") || []);
+
+    const unsubs = [
+      GSIStore.subscribeUsers((us) => { setUsers(us); GSIStore.setCache("admin_users", us); }),
+      GSIStore.subscribePayments((ps) => { setPayments(ps); GSIStore.setCache("admin_payments", ps); }),
+      GSIStore.subscribeLessons({}, (ls) => { setLessons(ls); GSIStore.setCache("admin_lessons", ls); }),
+      GSIStore.subscribeAssignments({}, (as) => { setAssignments(as); GSIStore.setCache("admin_assignments", as); }),
+      GSIStore.subscribeAnnouncements(() => {}) // Trigger RTDB listener
+    ];
+
+    return () => unsubs.forEach(u => u());
   }, [router]);
 
   const handleDeleteUser = async (id: string) => {
@@ -77,7 +68,7 @@ export default function AdminPage() {
       const toastId = toast.loading("Suppression...");
       try {
         await GSIStore.deleteUser(id);
-        await fetchData();
+        // fetchData removed, but subscriptions will handle UI update
         toast.success("Utilisateur supprimé", { id: toastId });
       } catch (err: any) {
         toast.error("Erreur: " + err.message, { id: toastId });
@@ -399,7 +390,7 @@ export default function AdminPage() {
   );
 }
 
-function StatCard({ label, value, change, color }: { label: string, value: string, change: string, color: string }) {
+const StatCard = memo(({ label, value, change, color }: { label: string, value: string, change: string, color: string }) => {
   return (
     <div className="bg-white p-5 rounded-[32px] shadow-sm border border-gray-100">
       <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{label}</p>
@@ -407,4 +398,4 @@ function StatCard({ label, value, change, color }: { label: string, value: strin
       <p className="text-[10px] font-bold text-emerald-500 mt-1">{change} <span className="text-gray-400">vs last month</span></p>
     </div>
   );
-}
+});

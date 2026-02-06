@@ -65,17 +65,20 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const toastId = toast.loading("Connexion en cours...");
+    const toastId = toast.loading("Vérification...");
     try {
+      // Direct Firebase Login
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+      // Get user from cache if possible, or fetch
       const userData = await GSIStore.getUser(userCredential.user.uid);
 
       if (userData) {
         GSIStore.setCurrentUser(userData);
-        toast.success("Connexion réussie !", { id: toastId });
-        router.push("/");
+        toast.success("Ravi de vous revoir !", { id: toastId });
+        // Redirection will be handled by AuthProvider automatically
       } else {
-        toast.error("Profil non trouvé dans la base de données.", { id: toastId });
+        toast.error("Profil introuvable.", { id: toastId });
       }
     } catch (error: any) {
       if (error.code === 'auth/configuration-not-found') {

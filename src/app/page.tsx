@@ -5,7 +5,7 @@ import { Bell, Search, Sparkles, BookOpen, FileText, Calendar as CalendarIcon, X
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { useRouter } from "next/navigation";
 import { GSIStore, User, Lesson, Assignment, Announcement } from "@/lib/store";
 import { toast } from "sonner";
@@ -21,48 +21,56 @@ export default function Home() {
   const [showInfo, setShowInfo] = useState(false);
 
   useEffect(() => {
-    const init = async () => {
-      const currentUser = GSIStore.getCurrentUser();
-      if (!currentUser) {
-        router.push("/login");
-        return;
-      }
+    const currentUser = GSIStore.getCurrentUser();
+    if (!currentUser) {
+      router.push("/login");
+      return;
+    }
 
-      if (currentUser.role === 'admin') {
-        router.push("/admin");
-      } else if (currentUser.role === 'professor') {
-        router.push("/professor");
-      } else {
-        setUser(currentUser);
+    if (currentUser.role === 'admin') {
+      router.push("/admin");
+      return;
+    } else if (currentUser.role === 'professor') {
+      router.push("/professor");
+      return;
+    }
 
-        // Filter content for student
-        const allLessons = await GSIStore.getLessons();
-        const studentLessons = allLessons.filter(l =>
-          (l.campus.includes(currentUser.campus) || l.campus.length === 0) &&
-          (l.filiere.includes(currentUser.filiere) || l.filiere.length === 0) &&
-          (l.niveau === currentUser.niveau)
-        );
-        setLessons(studentLessons);
+    setUser(currentUser);
 
-        const allAssignments = await GSIStore.getAssignments();
-        const studentAssignments = allAssignments.filter(a =>
-          (a.campus.includes(currentUser.campus) || a.campus.length === 0) &&
-          (a.filiere.includes(currentUser.filiere) || a.filiere.length === 0) &&
-          (a.niveau === currentUser.niveau)
-        );
-        setAssignments(studentAssignments);
+    // Instant Hydration from Cache
+    setLessons(GSIStore.getCache<Lesson[]>("home_lessons") || []);
+    setAssignments(GSIStore.getCache<Assignment[]>("home_assignments") || []);
+    setAnnouncements(GSIStore.getCache<Announcement[]>("home_announcements") || []);
 
-        // Subscribe to real-time announcements
-        const unsubscribeAnn = GSIStore.subscribeAnnouncements((anns) => {
-          setAnnouncements(anns);
-        });
+    // Real-time Subscriptions
+    const unsubscribeLessons = GSIStore.subscribeLessons({ niveau: currentUser.niveau }, (all) => {
+      const filtered = all.filter(l =>
+        (l.campus.includes(currentUser.campus) || l.campus.length === 0) &&
+        (l.filiere.includes(currentUser.filiere) || l.filiere.length === 0)
+      );
+      setLessons(filtered);
+      GSIStore.setCache("home_lessons", filtered);
+    });
 
-        return () => {
-          unsubscribeAnn();
-        };
-      }
+    const unsubscribeAssignments = GSIStore.subscribeAssignments({ niveau: currentUser.niveau }, (all) => {
+      const filtered = all.filter(a =>
+        (a.campus.includes(currentUser.campus) || a.campus.length === 0) &&
+        (a.filiere.includes(currentUser.filiere) || a.filiere.length === 0)
+      );
+      setAssignments(filtered);
+      GSIStore.setCache("home_assignments", filtered);
+    });
+
+    const unsubscribeAnn = GSIStore.subscribeAnnouncements((anns) => {
+      setAnnouncements(anns);
+      GSIStore.setCache("home_announcements", anns);
+    });
+
+    return () => {
+      unsubscribeLessons();
+      unsubscribeAssignments();
+      unsubscribeAnn();
     };
-    init();
   }, [router]);
 
   if (!user) return null;
@@ -258,7 +266,7 @@ export default function Home() {
   );
 }
 
-function CourseCard({ title, subject, icon, color, files }: any) {
+const CourseCard = memo(({ title, subject, icon, color, files }: any) => {
   return (
     <div className={`${color} min-w-[160px] p-5 rounded-[32px] text-white shadow-lg shadow-black/10 relative overflow-hidden group hover:scale-[1.02] transition-transform`}>
       <div className="absolute right-[-10px] top-[-10px] w-16 h-16 bg-white/10 rounded-full"></div>
@@ -276,9 +284,9 @@ function CourseCard({ title, subject, icon, color, files }: any) {
       <p className="text-[10px] opacity-80 font-bold uppercase tracking-wider">{subject}</p>
     </div>
   );
-}
+});
 
-function TaskCard({ title, subject, date, id, files }: any) {
+const TaskCard = memo(({ title, subject, date, id, files }: any) => {
   const [submitted, setSubmitted] = useState(false);
 
   return (
@@ -341,7 +349,7 @@ function TaskCard({ title, subject, date, id, files }: any) {
       )}
     </div>
   );
-}
+});
 
 function CheckCircle({ size }: { size: number }) {
   return (
@@ -352,7 +360,7 @@ function CheckCircle({ size }: { size: number }) {
   );
 }
 
-function ScheduleItem({ time, title, subtitle, instructor, location, color }: any) {
+const ScheduleItem = memo(({ time, title, subtitle, instructor, location, color }: any) => {
   return (
     <div className={`${color} p-5 rounded-3xl text-white shadow-md relative overflow-hidden active:scale-[0.98] transition-transform`}>
       <div className="absolute right-[-20px] top-[-20px] w-24 h-24 bg-white/10 rounded-full"></div>
@@ -377,4 +385,4 @@ function ScheduleItem({ time, title, subtitle, instructor, location, color }: an
       </div>
     </div>
   );
-}
+});
