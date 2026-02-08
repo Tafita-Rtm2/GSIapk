@@ -2,29 +2,118 @@
 
 import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
-import { Search, Filter, Download, Star, FileText, Bookmark, Clock, ArrowRight } from "lucide-react";
+import { Search, Filter, Download, Star, FileText, Bookmark, Clock, ArrowRight, BookOpen, RefreshCw, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect, memo } from "react";
+import { GSIStore, Lesson, Assignment } from "@/lib/store";
+import { toast } from "sonner";
 
 export default function LibraryPage() {
   const { t } = useLanguage();
   const [filter, setFilter] = useState("all");
+  const [books, setBooks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const books = [
-    { id: 1, title: "Algèbre Moderne", author: "Pr. Bernard", type: "PDF", size: "4.2 MB", favorite: true },
-    { id: 2, title: "Mécanique des Fluides", author: "Dr. Liana", type: "PDF", size: "12.8 MB", favorite: false },
-    { id: 3, title: "Génie Logiciel V2", author: "GSI Internationale", type: "EPUB", size: "2.1 MB", favorite: true },
-    { id: 4, title: "Base de Données SQL", author: "Lab GSI", type: "PDF", size: "8.5 MB", favorite: false },
-  ];
+  useEffect(() => {
+    const user = GSIStore.getCurrentUser();
+
+    // Instant Load from Cache
+    const cached = GSIStore.getCache<any[]>("library_books");
+    if (cached) {
+      setBooks(cached);
+      setLoading(false);
+    }
+
+    const updateLibrary = (lessons: Lesson[], assignments: Assignment[]) => {
+      const lessonItems = lessons.filter(l =>
+        !user || (l.niveau === user.niveau && (l.filiere.includes(user.filiere) || l.filiere.length === 0))
+      ).map(l => ({
+        id: l.id,
+        title: l.title,
+        author: `Cours: ${l.subject}`,
+        type: "Leçon",
+        url: l.files?.[0] || "",
+        favorite: false,
+        downloaded: GSIStore.isDownloaded(l.id)
+      }));
+
+      const assignmentItems = assignments.filter(a =>
+        !user || (a.niveau === user.niveau && (a.filiere.includes(user.filiere) || a.filiere.length === 0))
+      ).map(a => ({
+        id: a.id,
+        title: a.title,
+        author: `Devoir: ${a.subject}`,
+        type: "Devoir",
+        url: a.files?.[0] || "",
+        favorite: false,
+        downloaded: GSIStore.isDownloaded(a.id)
+      }));
+
+      const all = [...lessonItems, ...assignmentItems];
+      setBooks(all);
+      GSIStore.setCache("library_books", all);
+      setLoading(false);
+    };
+
+    let currentLessons: Lesson[] = [];
+    let currentAssignments: Assignment[] = [];
+
+    const unsubLessons = GSIStore.subscribeLessons({ niveau: user?.niveau }, (ls) => {
+      currentLessons = ls;
+      updateLibrary(currentLessons, currentAssignments);
+    });
+
+    const unsubAssignments = GSIStore.subscribeAssignments({ niveau: user?.niveau }, (as) => {
+      currentAssignments = as;
+      updateLibrary(currentLessons, currentAssignments);
+    });
+
+    return () => {
+      unsubLessons();
+      unsubAssignments();
+    };
+  }, []);
+
+  const handleDownload = (url: string, id: string) => {
+    if (!url) return toast.error("Pas de fichier joint.");
+
+    toast.promise(
+      new Promise((resolve) => {
+        window.open(url, '_blank');
+        GSIStore.setDownloaded(id);
+        setTimeout(() => {
+          setBooks(prev => prev.map(b => b.id === id ? { ...b, downloaded: true } : b));
+          resolve(true);
+        }, 1000);
+      }),
+      {
+        loading: 'Préparation du document...',
+        success: 'Document prêt pour consultation hors-ligne !',
+        error: 'Erreur lors du téléchargement.',
+      }
+    );
+  };
+
+  const handleToggleFavorite = (id: string) => {
+    setBooks(books.map(b => b.id === id ? { ...b, favorite: !b.favorite } : b));
+  };
 
   return (
     <AppLayout>
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">{t("biblio")}</h1>
-          <button className="bg-gray-100 p-2 rounded-xl text-gray-500">
-            <Filter size={20} />
-          </button>
+          <div>
+            <h1 className="text-2xl font-bold">{t("biblio")}</h1>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest flex items-center gap-1">
+               <CheckCircle2 size={10} className="text-green-500" /> Mode Hors-Ligne Actif
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button className="bg-gray-100 p-2 rounded-xl text-gray-500">
+              <Filter size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="relative mb-8">
@@ -62,34 +151,59 @@ export default function LibraryPage() {
         <h3 className="text-lg font-bold mb-4">Mes documents</h3>
         <div className="space-y-4">
           {books.map((book) => (
-            <div key={book.id} className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 hover:border-primary/20 transition-all group">
+            <div
+              key={book.id}
+              onClick={() => {
+                if(book.url) {
+                  GSIStore.saveProgress(book.id, { lastOpened: Date.now() });
+                  window.open(book.url, '_blank');
+                }
+              }}
+              className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 hover:border-primary/20 transition-all group cursor-pointer"
+            >
               <div className="w-12 h-16 bg-gray-50 rounded-xl flex items-center justify-center border border-gray-100 group-hover:bg-primary/5 transition-colors">
                 <FileText className="text-primary opacity-40" size={24} />
               </div>
               <div className="flex-1">
                 <h4 className="font-bold text-gray-800 text-sm">{book.title}</h4>
-                <p className="text-[10px] text-gray-400 font-medium">{book.author} • {book.size}</p>
+                <p className="text-[10px] text-gray-400 font-medium">{book.author}</p>
+                {GSIStore.getProgress(book.id) && (
+                   <span className="text-[8px] text-indigo-500 font-bold uppercase tracking-tighter">Déjà lu</span>
+                )}
               </div>
               <div className="flex gap-2">
-                <button className={cn(
-                  "p-2 rounded-xl transition-colors",
-                  book.favorite ? "text-accent bg-accent/10" : "text-gray-300 bg-gray-50"
-                )}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleToggleFavorite(book.id); }}
+                  className={cn(
+                    "p-2 rounded-xl transition-colors",
+                    book.favorite ? "text-accent bg-accent/10" : "text-gray-300 bg-gray-50"
+                  )}>
                   <Star size={16} fill={book.favorite ? "currentColor" : "none"} />
                 </button>
-                <button className="p-2 bg-gray-50 text-primary rounded-xl hover:bg-primary/10 transition-colors">
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDownload(book.url, book.id); }}
+                  className={cn(
+                    "p-2 rounded-xl transition-colors",
+                    book.downloaded ? "bg-green-100 text-green-600" : "bg-gray-50 text-primary hover:bg-primary/10"
+                  )}>
                   <Download size={16} />
                 </button>
               </div>
             </div>
           ))}
+          {books.length === 0 && !loading && (
+             <div className="text-center py-10 text-gray-400">
+                <BookOpen size={40} className="mx-auto mb-3 opacity-20" />
+                <p className="text-sm">Aucun document publié pour votre niveau.</p>
+             </div>
+          )}
         </div>
       </div>
     </AppLayout>
   );
 }
 
-function CategoryBadge({ label, icon: Icon, active, onClick }: any) {
+const CategoryBadge = memo(({ label, icon: Icon, active, onClick }: any) => {
   return (
     <button
       onClick={onClick}
@@ -102,4 +216,4 @@ function CategoryBadge({ label, icon: Icon, active, onClick }: any) {
       {label}
     </button>
   );
-}
+});

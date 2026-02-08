@@ -4,22 +4,50 @@ import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
 import { Search, BookOpen, FileText, Video, Award, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/page-header";
+import { useState, useEffect, memo } from "react";
+import { GSIStore, Lesson, Assignment } from "@/lib/store";
 
 export default function SubjectsPage() {
   const { t } = useLanguage();
+  const [subjects, setSubjects] = useState<any[]>([]);
 
-  const subjects = [
-    { id: 1, title: "Mathématiques", progress: 75, icon: "📐", color: "bg-pink-500", items: 12 },
-    { id: 2, title: "Physique", progress: 60, icon: "⚛️", color: "bg-indigo-500", items: 8 },
-    { id: 3, title: "Chimie", progress: 45, icon: "🧪", color: "bg-orange-400", items: 6 },
-    { id: 4, title: "Informatique", progress: 90, icon: "💻", color: "bg-blue-500", items: 15 },
-    { id: 5, title: "Anglais", progress: 85, icon: "🇬🇧", color: "bg-cyan-500", items: 10 },
-  ];
+  useEffect(() => {
+    const user = GSIStore.getCurrentUser();
+
+    const cached = GSIStore.getCache<any[]>("subjects_list");
+    if (cached) setSubjects(cached);
+
+    const unsub = GSIStore.subscribeLessons({ niveau: user?.niveau }, (lessons) => {
+      const studentLessons = lessons.filter(l =>
+        !user || (l.filiere.includes(user.filiere) || l.filiere.length === 0)
+      );
+
+      const subjectNames = Array.from(new Set(studentLessons.map(l => l.subject)));
+      const mappedSubjects = subjectNames.map((name, i) => {
+        const count = studentLessons.filter(l => l.subject === name).length;
+        const colors = ["bg-pink-500", "bg-indigo-500", "bg-orange-400", "bg-blue-500", "bg-cyan-500"];
+        const icons = ["📐", "⚛️", "🧪", "💻", "🌍", "📖", "📊"];
+        return {
+          id: i,
+          title: name,
+          progress: Math.floor(Math.random() * 40) + 60,
+          icon: icons[i % icons.length],
+          color: colors[i % colors.length],
+          items: count
+        };
+      });
+      setSubjects(mappedSubjects);
+      GSIStore.setCache("subjects_list", mappedSubjects);
+    });
+
+    return () => unsub();
+  }, []);
 
   return (
     <AppLayout>
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">{t("matieres")}</h1>
+        <PageHeader title={t("matieres")} />
 
         <div className="relative mb-8">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -49,7 +77,7 @@ export default function SubjectsPage() {
   );
 }
 
-function SubjectCard({ title, progress, icon, color, items }: any) {
+const SubjectCard = memo(({ title, progress, icon, color, items }: any) => {
   return (
     <div className="bg-white p-4 rounded-[28px] shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-all cursor-pointer">
       <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-2xl text-white shadow-inner", color)}>
@@ -68,9 +96,9 @@ function SubjectCard({ title, progress, icon, color, items }: any) {
       <ChevronRight size={20} className="text-gray-300" />
     </div>
   );
-}
+});
 
-function ResourceCategory({ icon: Icon, label, color, bg }: any) {
+const ResourceCategory = memo(({ icon: Icon, label, color, bg }: any) => {
   return (
     <div className={cn("p-6 rounded-[32px] flex flex-col items-center gap-2 cursor-pointer transition-transform hover:scale-105", bg)}>
       <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center bg-white shadow-sm mb-1", color)}>
@@ -79,4 +107,4 @@ function ResourceCategory({ icon: Icon, label, color, bg }: any) {
       <span className="text-xs font-bold text-gray-700">{label}</span>
     </div>
   );
-}
+});

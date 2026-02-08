@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { Sparkles, ArrowLeft, Camera } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import Link from "next/link";
+import { GSIStore } from "@/lib/store";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { toast } from "sonner";
 
 const CAMPUSES = [
   "Campus Antananarivo",
@@ -34,14 +38,46 @@ export default function RegisterPage() {
     niveau: NIVEAUX[0]
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
-      alert("Les mots de passe ne correspondent pas");
+      toast.error("Les mots de passe ne correspondent pas");
       return;
     }
-    // Mock registration
-    router.push("/");
+
+    setLoading(true);
+    const toastId = toast.loading("Création de votre compte...");
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+
+      const newUser: any = {
+        id: userCredential.user.uid,
+        fullName: formData.fullName,
+        email: formData.email,
+        role: 'student' as const,
+        campus: formData.campus,
+        filiere: formData.filiere,
+        niveau: formData.niveau
+      };
+
+      await GSIStore.addUser(newUser);
+      GSIStore.setCurrentUser(newUser);
+
+      toast.success("Bienvenue chez GSI Insight !", { id: toastId });
+      router.push("/");
+    } catch (error: any) {
+      if (error.code === 'auth/configuration-not-found') {
+        toast.error("Veuillez activer l'email/mot de passe dans Firebase.", { id: toastId });
+      } else if (error.code === 'auth/email-already-in-use') {
+        toast.error("Cet email est déjà utilisé.", { id: toastId });
+      } else {
+        toast.error("Erreur: " + error.message, { id: toastId });
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -162,9 +198,10 @@ export default function RegisterPage() {
 
         <button
           type="submit"
-          className="w-full bg-primary text-white py-5 rounded-2xl font-bold shadow-lg shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all mt-6"
+          disabled={loading}
+          className="w-full bg-primary text-white py-5 rounded-2xl font-bold shadow-lg shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all mt-6 disabled:opacity-50"
         >
-          {t("creer_mon_compte")}
+          {loading ? "Création..." : t("creer_mon_compte")}
         </button>
 
         <p className="text-center text-gray-500 text-sm mt-4">

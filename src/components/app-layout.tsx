@@ -6,10 +6,19 @@ import { usePathname } from "next/navigation";
 import { Home, Calendar, BookOpen, Library, User, MessageCircle, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n";
+import { useState, useEffect } from "react";
+import { GSIStore, User as GSIUser } from "@/lib/store";
+import { toast } from "sonner";
+import { BellRing } from "lucide-react";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();
   const pathname = usePathname();
+  const [user, setUser] = useState<GSIUser | null>(null);
+
+  useEffect(() => {
+    setUser(GSIStore.getCurrentUser());
+  }, []);
 
   const navItems = [
     { icon: Home, label: t("accueil"), href: "/" },
@@ -34,8 +43,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center p-2 rounded-lg transition-colors",
-                isActive ? "text-primary" : "text-gray-500"
+                "flex flex-col items-center p-2 rounded-lg transition-all active:scale-90",
+                isActive ? "text-primary scale-110" : "text-gray-500"
               )}
             >
               <item.icon size={24} />
@@ -46,12 +55,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Floating Action Button for Ask Insight */}
-      <Link
-        href="/chat"
-        className="absolute bottom-24 right-4 bg-accent text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform z-20"
-      >
-        <MessageCircle size={24} />
-      </Link>
+      {!pathname.includes('chat') && (
+        <Link
+          href="/chat"
+          className="absolute bottom-24 right-4 bg-accent text-white p-4 rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all z-20"
+        >
+          <MessageCircle size={24} />
+        </Link>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, memo } from "react";
 import {
   ShieldCheck,
   CreditCard,
@@ -11,15 +11,98 @@ import {
   Search,
   LogOut,
   ChevronRight,
-  Plus
+  Plus,
+  Trash2,
+  Edit2,
+  RefreshCcw,
+  BookOpen,
+  FileText,
+  Mail,
+  X,
+  Wifi,
+  WifiOff,
+  CheckCircle2,
+  TrendingUp
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
+import { GSIStore, User, Payment, Lesson, Assignment } from "@/lib/store";
+import { toast } from "sonner";
+import { PageHeader } from "@/components/page-header";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { cn } from "@/lib/utils";
+
+const CAMPUSES = ["Antananarivo", "Antsirabe", "Bypass", "Tamatave"];
 
 export default function AdminPage() {
   const { t } = useLanguage();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [showConvocationModal, setShowConvocationModal] = useState(false);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterCampus, setFilterCampus] = useState("");
+  const [syncStatus, setSyncStatus] = useState<'syncing' | 'ready' | 'offline'>('syncing');
+
+  useEffect(() => {
+    const user = GSIStore.getCurrentUser();
+    if (!user || user.role !== 'admin') {
+      router.push("/login");
+      return;
+    }
+
+    const unsubs = [
+      GSIStore.subscribeUsers((us) => { setUsers(us); setSyncStatus('ready'); }),
+      GSIStore.subscribePayments((ps) => setPayments(ps)),
+      GSIStore.subscribeLessons({}, (ls) => setLessons(ls)),
+      GSIStore.subscribeAssignments({}, (as) => setAssignments(as)),
+      GSIStore.subscribeAnnouncements(() => {})
+    ];
+
+    const handleOffline = () => setSyncStatus('offline');
+    const handleOnline = () => setSyncStatus('syncing');
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      unsubs.forEach(u => u());
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [router]);
+
+  const handleDeleteUser = async (id: string) => {
+    if (confirm("Supprimer cet utilisateur ?")) {
+      await GSIStore.deleteUser(id);
+      toast.success("Demande de suppression envoyée.");
+    }
+  };
+
+  const handleSendAnnouncement = async (e: any) => {
+    e.preventDefault();
+    const title = e.target.title.value;
+    const message = e.target.message.value;
+    GSIStore.addAnnouncement({
+      id: Math.random().toString(36).substr(2, 9),
+      title,
+      message,
+      date: new Date().toISOString(),
+      author: "Administration"
+    });
+    toast.success("Annonce diffusée !");
+    e.target.reset();
+    setActiveTab("dashboard");
+  };
+
+  const filteredUsers = users.filter(u =>
+    (u.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (u.email || "").toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const menuItems = [
     { id: "dashboard", icon: ShieldCheck, label: t("dashboard"), color: "bg-indigo-500" },
@@ -32,6 +115,19 @@ export default function AdminPage() {
 
   return (
     <div className="flex flex-col min-h-screen max-w-md mx-auto bg-gray-50 pb-20">
+      {/* Sync Status Banner */}
+      <div className={cn(
+        "px-6 py-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest transition-all",
+        syncStatus === 'ready' ? "bg-emerald-500 text-white" :
+        syncStatus === 'offline' ? "bg-orange-500 text-white" : "bg-indigo-600 text-white animate-pulse"
+      )}>
+        <div className="flex items-center gap-2">
+           {syncStatus === 'ready' ? <CheckCircle2 size={12} /> :
+            syncStatus === 'offline' ? <WifiOff size={12} /> : <RefreshCcw size={12} className="animate-spin" />}
+           <span>{syncStatus === 'ready' ? "GSI Cloud : Connecté" : syncStatus === 'offline' ? "Mode Hors-ligne" : "Synchronisation..."}</span>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="bg-white p-6 rounded-b-[40px] shadow-sm mb-6">
         <div className="flex justify-between items-center mb-6">
@@ -45,8 +141,13 @@ export default function AdminPage() {
             </div>
           </div>
           <button
-            onClick={() => router.push("/login")}
-            className="p-3 bg-gray-100 rounded-xl text-gray-400 hover:text-red-500 transition-colors"
+            onClick={async () => {
+              await signOut(auth);
+              GSIStore.setCurrentUser(null);
+              toast.success("Déconnexion");
+              router.push("/login");
+            }}
+            className="p-3 bg-gray-50 rounded-xl text-gray-400 hover:text-red-500 transition-colors active:scale-90"
           >
             <LogOut size={20} />
           </button>
@@ -57,21 +158,21 @@ export default function AdminPage() {
           <input
             type="text"
             placeholder={t("rechercher") + "..."}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-gray-50 border-none rounded-2xl py-4 pl-12 pr-4 outline-none focus:ring-2 ring-indigo-500/20"
           />
         </div>
       </div>
 
-      <div className="px-6 space-y-8 flex-1">
+      <div className="px-6 space-y-8 flex-1 pb-10">
         {activeTab === "dashboard" && (
           <>
-            {/* Stats Grid */}
             <div className="grid grid-cols-2 gap-4">
-              <StatCard label="Étudiants" value="1,284" change="+12%" color="text-blue-600" />
+              <StatCard label="Étudiants" value={users.filter(u => u.role === 'student').length.toString()} change="+12%" color="text-blue-600" />
               <StatCard label="Recettes" value="45.2M Ar" change="+5%" color="text-emerald-600" />
             </div>
 
-            {/* Menu Grid */}
             <div>
               <h2 className="text-lg font-bold mb-4">{t("tous")}</h2>
               <div className="grid grid-cols-2 gap-4">
@@ -81,7 +182,7 @@ export default function AdminPage() {
                     onClick={() => setActiveTab(item.id)}
                     className="bg-white p-5 rounded-[32px] shadow-sm border border-gray-100 flex flex-col items-center text-center gap-3 hover:shadow-md transition-all active:scale-95"
                   >
-                    <div className={`${item.color} w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-${item.color.split('-')[1]}-500/20`}>
+                    <div className={`${item.color} w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg`}>
                       <item.icon size={24} />
                     </div>
                     <span className="text-sm font-bold text-gray-700 leading-tight">{item.label}</span>
@@ -89,98 +190,150 @@ export default function AdminPage() {
                 ))}
               </div>
             </div>
-
-            {/* Recent Activity */}
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-bold">Activités Récentes</h2>
-                <button className="text-indigo-600 text-xs font-bold">Voir tout</button>
-              </div>
-              <div className="space-y-3 pb-8">
-                <ActivityItem
-                  title="Paiement reçu"
-                  desc="Rakoto Jean - L1 Informatique"
-                  time="2 min ago"
-                  icon={CreditCard}
-                  color="bg-emerald-100 text-emerald-600"
-                />
-                <ActivityItem
-                  title="Nouvel étudiant"
-                  desc="Andria Marie - M1 Gestion"
-                  time="15 min ago"
-                  icon={Users}
-                  color="bg-blue-100 text-blue-600"
-                />
-                <ActivityItem
-                  title="Convocation envoyée"
-                  desc="Rabe Eric - L2 Droit"
-                  time="1h ago"
-                  icon={Megaphone}
-                  color="bg-orange-100 text-orange-600"
-                />
-              </div>
-            </div>
           </>
         )}
 
-        {activeTab !== "dashboard" && (
-          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm min-h-[400px] flex flex-col items-center justify-center text-center">
-             <button
-              onClick={() => setActiveTab("dashboard")}
-              className="absolute left-6 top-32 bg-gray-100 p-2 rounded-full text-gray-400"
-             >
-                <ChevronRight className="rotate-180" size={20} />
-             </button>
-             <div className={`w-20 h-20 rounded-[30%] flex items-center justify-center text-white mb-6 shadow-xl ${menuItems.find(i => i.id === activeTab)?.color}`}>
-                {(() => {
-                  const Icon = menuItems.find(i => i.id === activeTab)?.icon || ShieldCheck;
-                  return <Icon size={40} />;
-                })()}
-             </div>
-             <h2 className="text-2xl font-black mb-2">{menuItems.find(i => i.id === activeTab)?.label}</h2>
-             <p className="text-gray-500 max-w-[200px]">Cette section est en cours de synchronisation avec la base de données GSI.</p>
-             <button
-              onClick={() => setActiveTab("dashboard")}
-              className="mt-8 bg-gray-100 text-gray-600 px-6 py-3 rounded-2xl font-bold"
-             >
-                Retour au dashboard
-             </button>
+        {activeTab === "payments" && (
+          <div className="space-y-4">
+            <PageHeader title={t("gestion_paiements")} onBack={() => setActiveTab("dashboard")} />
+            <div className="space-y-3">
+              {payments.map((p, i) => (
+                <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center shadow-sm">
+                  <div>
+                    <h4 className="font-bold text-sm">{p.studentName}</h4>
+                    <p className="text-[10px] text-gray-500">{p.filiere} • {p.niveau}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-sm text-indigo-600">{p.amount}</p>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.status === 'paid' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>{p.status.toUpperCase()}</span>
+                  </div>
+                </div>
+              ))}
+              {payments.length === 0 && <p className="text-center text-gray-400 py-10 italic text-xs">Aucun paiement en cache.</p>}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "users" && (
+          <div className="space-y-4">
+            <PageHeader title={t("gestion_utilisateurs")} onBack={() => setActiveTab("dashboard")} />
+            <div className="space-y-3">
+              {filteredUsers.map((u, i) => (
+                <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-sm">
+                  <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center overflow-hidden font-bold">
+                    {u.fullName.charAt(0)}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-sm">{u.fullName}</h4>
+                    <p className="text-[10px] text-gray-500">{u.role.toUpperCase()} • {u.filiere}</p>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => { setSelectedUser(u); setShowConvocationModal(true); }} className="text-orange-500 p-2 hover:bg-orange-50 rounded-xl"><Mail size={16} /></button>
+                    <button onClick={() => handleDeleteUser(u.id)} className="text-red-500 p-2 hover:bg-red-50 rounded-xl"><Trash2 size={16} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "communication" && (
+          <div className="space-y-6">
+            <PageHeader title={t("communication")} onBack={() => setActiveTab("dashboard")} />
+            <form onSubmit={handleSendAnnouncement} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
+                <input name="title" required className="w-full bg-gray-50 rounded-xl p-3 outline-none" placeholder="Titre" />
+                <textarea name="message" required className="w-full bg-gray-50 rounded-xl p-3 outline-none min-h-[100px]" placeholder="Message"></textarea>
+                <button type="submit" className="w-full bg-orange-500 text-white py-4 rounded-xl font-bold">Diffuser</button>
+            </form>
+          </div>
+        )}
+
+        {activeTab === "academic" && (
+          <div className="space-y-4">
+            <PageHeader title="Gestion Académique" onBack={() => setActiveTab("dashboard")} />
+            <div className="grid grid-cols-1 gap-4">
+               <div className="bg-white p-5 rounded-3xl border border-gray-100">
+                  <h3 className="font-bold mb-4 flex items-center gap-2"><BookOpen size={18} className="text-emerald-500" /> Leçons ({lessons.length})</h3>
+                  <div className="space-y-2">
+                    {lessons.slice(0, 5).map((l, i) => (
+                      <div key={i} className="text-xs p-2 bg-gray-50 rounded-lg flex justify-between">{l.title} <span>{l.niveau}</span></div>
+                    ))}
+                  </div>
+               </div>
+               <div className="bg-white p-5 rounded-3xl border border-gray-100">
+                  <h3 className="font-bold mb-4 flex items-center gap-2"><FileText size={18} className="text-orange-500" /> Devoirs ({assignments.length})</h3>
+                  <div className="space-y-2">
+                    {assignments.slice(0, 5).map((a, i) => (
+                      <div key={i} className="text-xs p-2 bg-gray-50 rounded-lg flex justify-between">{a.title} <span>{a.deadline}</span></div>
+                    ))}
+                  </div>
+               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "stats" && (
+           <div className="space-y-4">
+            <PageHeader title="Stats & Rapports" onBack={() => setActiveTab("dashboard")} />
+            <div className="bg-indigo-600 p-8 rounded-[40px] text-white shadow-xl relative overflow-hidden">
+               <TrendingUp className="absolute right-[-10px] top-[-10px] w-32 h-32 opacity-10" />
+               <p className="text-xs font-bold uppercase opacity-60 mb-1">Croissance Annuelle</p>
+               <h2 className="text-3xl font-black mb-4">+24.5%</h2>
+               <div className="flex gap-2">
+                  <button onClick={() => toast.success("Export PDF lancé")} className="px-4 py-2 bg-white/20 rounded-xl text-[10px] font-bold">PDF REPORT</button>
+                  <button onClick={() => toast.success("Export Excel lancé")} className="px-4 py-2 bg-white/20 rounded-xl text-[10px] font-bold">EXCEL DATA</button>
+               </div>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Floating Action Button */}
-      <button className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-xl shadow-indigo-600/40 flex items-center justify-center hover:scale-110 active:scale-90 transition-all z-50">
+      {/* Convocation Modal */}
+      {showConvocationModal && selectedUser && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative">
+            <button onClick={() => setShowConvocationModal(false)} className="absolute right-6 top-6 text-gray-400"><X size={20} /></button>
+            <h2 className="text-xl font-black mb-2">{t("convocation")}</h2>
+            <p className="text-xs text-gray-500 mb-6 font-medium">Convoquer <span className="text-indigo-600 font-bold">{selectedUser.fullName}</span>.</p>
+            <form onSubmit={async (e: any) => {
+              e.preventDefault();
+              GSIStore.addAnnouncement({
+                id: Math.random().toString(36).substr(2, 9),
+                title: `CONVOCATION OFFICIELLE`,
+                message: `Vous êtes convoqué(e) le ${e.target.date.value} pour : ${e.target.motive.value}.`,
+                date: new Date().toISOString(),
+                author: "Direction GSI",
+                type: 'convocation',
+                targetUserId: selectedUser.id
+              });
+              toast.success("Convocation envoyée");
+              setShowConvocationModal(false);
+            }} className="space-y-4">
+              <textarea name="motive" required className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold outline-none min-h-[100px]" placeholder="Motif..."></textarea>
+              <input name="date" required type="datetime-local" className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold outline-none" />
+              <button type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest active:scale-95">Envoyer</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* FAB */}
+      <button
+        onClick={() => router.push("/register")}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-all z-50"
+      >
         <Plus size={28} />
       </button>
     </div>
   );
 }
 
-function StatCard({ label, value, change, color }: { label: string, value: string, change: string, color: string }) {
+const StatCard = memo(({ label, value, change, color }: { label: string, value: string, change: string, color: string }) => {
   return (
     <div className="bg-white p-5 rounded-[32px] shadow-sm border border-gray-100">
       <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{label}</p>
       <p className={`text-xl font-black ${color}`}>{value}</p>
-      <p className="text-[10px] font-bold text-emerald-500 mt-1">{change} <span className="text-gray-400">vs last month</span></p>
+      <p className="text-[10px] font-bold text-emerald-500 mt-1">{change}</p>
     </div>
   );
-}
-
-function ActivityItem({ title, desc, time, icon: Icon, color }: { title: string, desc: string, time: string, icon: any, color: string }) {
-  return (
-    <div className="bg-white p-4 rounded-2xl flex items-center gap-4 border border-gray-100 shadow-sm">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
-        <Icon size={18} />
-      </div>
-      <div className="flex-1">
-        <h4 className="text-sm font-bold text-gray-800">{title}</h4>
-        <p className="text-xs text-gray-500 truncate">{desc}</p>
-      </div>
-      <div className="text-right">
-        <p className="text-[10px] font-bold text-gray-400">{time}</p>
-        <ChevronRight size={14} className="text-gray-300 ml-auto mt-1" />
-      </div>
-    </div>
-  );
-}
+});

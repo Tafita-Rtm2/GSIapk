@@ -1,195 +1,206 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
-import { Bell, Search, Sparkles } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
+import { Bell, Search, Sparkles, BookOpen, FileText, Calendar as CalendarIcon, X, Info, Download, Clock, Wifi, WifiOff, CheckCircle2, RefreshCcw, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { useState, useEffect, memo } from "react";
+import { useRouter } from "next/navigation";
+import { GSIStore, User, Lesson, Assignment, Announcement } from "@/lib/store";
+import { toast } from "sonner";
 
 export default function Home() {
   const { t } = useLanguage();
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [showInfo, setShowInfo] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'syncing' | 'offline' | 'ready'>('syncing');
+
+  useEffect(() => {
+    const currentUser = GSIStore.getCurrentUser();
+    if (!currentUser) {
+      router.replace("/login");
+      return;
+    }
+
+    if (currentUser.role === 'admin') {
+      router.replace("/admin");
+      return;
+    } else if (currentUser.role === 'professor') {
+      router.replace("/professor");
+      return;
+    }
+
+    setUser(currentUser);
+
+    const unsubs = [
+      GSIStore.subscribeLessons({ niveau: currentUser.niveau }, (all) => {
+        const filtered = all.filter(l =>
+          (l.campus.includes(currentUser.campus) || l.campus.length === 0) &&
+          (l.filiere.includes(currentUser.filiere) || l.filiere.length === 0)
+        );
+        setLessons(filtered);
+        setSyncStatus('ready');
+      }),
+      GSIStore.subscribeAssignments({ niveau: currentUser.niveau }, (all) => {
+        const filtered = all.filter(a =>
+          (a.campus.includes(currentUser.campus) || a.campus.length === 0) &&
+          (a.filiere.includes(currentUser.filiere) || a.filiere.length === 0)
+        );
+        setAssignments(filtered);
+      }),
+      GSIStore.subscribeAnnouncements((anns) => {
+        // Filter for global or targeted to this user
+        setAnnouncements(anns.filter(a => !a.targetUserId || a.targetUserId === currentUser.id));
+      })
+    ];
+
+    const handleOffline = () => setSyncStatus('offline');
+    const handleOnline = () => setSyncStatus('syncing');
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      unsubs.forEach(u => u());
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [router]);
+
+  if (!user) return null;
+
+  const firstName = user.fullName.split(' ')[0];
+  const convocations = announcements.filter(a => a.type === 'convocation');
 
   return (
     <AppLayout>
-      <div className="p-6">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <p className="text-gray-500 text-sm">{t("bonjour")} Liana</p>
-            <h1 className="text-2xl font-bold">Vous avez <span className="text-green-500">4 {t("tasks_today")}</span></h1>
-          </div>
-          <Link href="/profile" className="relative">
-            <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border-2 border-primary/20">
-              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Liana" alt="Avatar" />
-            </div>
-            <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full animate-pulse"></div>
-          </Link>
+      <div className="p-6 pb-24 max-w-md mx-auto bg-[#F8FAFC] min-h-screen">
+        {/* Sync Indicator */}
+        <div className="flex justify-center mb-4">
+           <div className={cn(
+             "px-4 py-1.5 rounded-full flex items-center gap-2 text-[10px] font-bold uppercase transition-all",
+             syncStatus === 'ready' ? "bg-emerald-100 text-emerald-600" :
+             syncStatus === 'offline' ? "bg-orange-100 text-orange-600" : "bg-indigo-100 text-indigo-600 animate-pulse"
+           )}>
+              {syncStatus === 'ready' ? <CheckCircle2 size={12} /> :
+               syncStatus === 'offline' ? <WifiOff size={12} /> : <RefreshCcw size={12} className="animate-spin" />}
+              {syncStatus === 'ready' ? "Cloud Connecté" : syncStatus === 'offline' ? "Mode Local" : "Sync GSI Cloud..."}
+           </div>
         </div>
 
-        {/* Ask Insight Call to Action */}
-        <Link href="/chat" className="block mb-8 bg-gradient-to-r from-primary to-accent p-5 rounded-[32px] text-white shadow-lg shadow-primary/20 relative overflow-hidden group">
-           <div className="absolute right-[-10px] top-[-10px] w-24 h-24 bg-white/10 rounded-full group-hover:scale-110 transition-transform"></div>
-           <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-2">
-                 <div className="p-2 bg-white/20 rounded-xl">
-                    <Sparkles size={20} className="text-white" />
+        {/* Convocations Alert */}
+        {convocations.length > 0 && (
+          <div className="mb-6 bg-rose-50 border-2 border-rose-100 p-5 rounded-[32px] animate-in slide-in-from-top duration-500">
+             <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 bg-rose-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-rose-200">
+                   <AlertCircle size={20} />
+                </div>
+                <h3 className="text-rose-600 font-black text-xs uppercase tracking-widest">Convocation Administrative</h3>
+             </div>
+             <p className="text-[11px] text-rose-500 font-bold leading-relaxed mb-4">{convocations[0].message}</p>
+             <button onClick={() => toast.success("Confirmation envoyée à l'administration.")} className="w-full py-3 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md active:scale-95 transition-all">Confirmer Réception</button>
+          </div>
+        )}
+
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6 pt-4">
+          <div>
+            <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Bonjour {firstName}</p>
+            <h1 className="text-2xl font-black text-gray-900 tracking-tight leading-tight">
+               Prêt pour <span className="text-primary">{t("success_today")}</span> ?
+            </h1>
+          </div>
+          <div className="flex items-center gap-3">
+             <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-3 bg-white shadow-sm border border-gray-100 rounded-2xl text-gray-400">
+                <Bell size={20} />
+                {announcements.length > 0 && <div className="absolute top-3 right-3 w-2 h-2 bg-rose-500 border-2 border-white rounded-full"></div>}
+             </button>
+             <Link href="/profile" className="w-11 h-11 rounded-2xl bg-indigo-50 overflow-hidden border-2 border-white shadow-md">
+                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`} alt="Avatar" />
+             </Link>
+          </div>
+        </div>
+
+        {/* AI Card */}
+        <Link href="/chat" className="block mb-8 group active:scale-[0.98] transition-all">
+           <div className="bg-gradient-to-r from-violet-600 to-indigo-800 p-6 rounded-[40px] text-white shadow-2xl relative overflow-hidden">
+              <div className="relative z-10">
+                 <div className="flex items-center gap-2 mb-2">
+                    <Sparkles size={18} className="text-violet-200" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-violet-200">Ask Insight AI</span>
                  </div>
-                 <h3 className="font-bold text-lg">{t("ask_insight")}</h3>
+                 <h2 className="text-xl font-black mb-1 leading-tight">Des questions ?</h2>
+                 <p className="text-[11px] text-violet-200/80 font-medium mb-4">Emplois du temps, devoirs, notes...</p>
+                 <div className="inline-flex bg-white/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/10">Lancer Assistant</div>
               </div>
-              <p className="text-sm text-white/80 italic font-medium">“Where data meets your future.”</p>
+              <div className="absolute right-[-20px] bottom-[-20px] w-32 h-32 bg-white/5 rounded-full blur-3xl"></div>
            </div>
         </Link>
 
-        {/* Courses Section */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-bold">{t("cours_en_cours")}</h2>
-            <button className="text-primary text-xs font-bold hover:underline">{t("tous")}</button>
+        {/* Lessons */}
+        <div className="mb-10">
+          <div className="flex justify-between items-end mb-5">
+            <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter">Cours du jour</h2>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{lessons.length} PUBLIÉS</p>
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide px-1">
-            <CourseCard
-              title="Mathématiques"
-              icon="📐"
-              color="bg-rose-500"
-              count="12"
-            />
-            <CourseCard
-              title="Gestion"
-              icon="📊"
-              color="bg-amber-500"
-              count="8"
-            />
-            <CourseCard
-              title="Marketing"
-              icon="🎯"
-              color="bg-indigo-500"
-              count="5"
-            />
+          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+            {lessons.map((l, i) => (
+              <div key={i} className="min-w-[200px] p-5 bg-white rounded-[32px] border border-gray-100 shadow-sm">
+                <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center mb-4">
+                  <BookOpen size={20} />
+                </div>
+                <h3 className="font-black text-xs text-gray-800 mb-1 line-clamp-1 uppercase">{l.title}</h3>
+                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{l.subject}</p>
+              </div>
+            ))}
+            {lessons.length === 0 && <p className="text-gray-300 text-[10px] font-black uppercase py-10 px-4 border-2 border-dashed border-gray-100 rounded-[32px] text-center w-full">Aucun contenu pédagogique</p>}
           </div>
         </div>
 
-        {/* Tasks Section (from Prototype) */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-bold">Mes Tâches</h2>
-            <button className="text-primary text-xs font-bold hover:underline">Voir tout</button>
-          </div>
+        {/* Deadlines */}
+        <div className="mb-10">
+          <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter mb-5">Devoirs à rendre</h2>
           <div className="space-y-4">
-            <TaskCard
-              title="Lire le poème & répondre aux questions"
-              subject="Littérature Anglaise"
-              date="28 Mai 2025"
-              progress={40}
-              status="En cours"
-              statusColor="bg-amber-100 text-amber-600"
-            />
-            <TaskCard
-              title="Créer une bande dessinée"
-              subject="Sciences Sociales"
-              date="30 Mai 2025"
-              status="À faire"
-              statusColor="bg-indigo-100 text-indigo-600"
-            />
+            {assignments.map((a, i) => (
+               <div key={i} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="bg-orange-50 text-orange-600 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">En attente</span>
+                    <span className="text-[9px] font-black text-gray-300 uppercase">{a.deadline}</span>
+                  </div>
+                  <h4 className="font-black text-sm uppercase tracking-tight mb-1">{a.title}</h4>
+                  <p className="text-[10px] font-bold text-gray-400 mb-6">{a.subject}</p>
+                  <button onClick={() => toast.success("Interface de dépôt activée.")} className="w-full py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest">Déposer mon travail</button>
+               </div>
+            ))}
+            {assignments.length === 0 && <div className="p-10 border-2 border-dashed border-gray-100 rounded-[32px] text-center"><p className="text-[10px] font-black text-gray-300 uppercase">Aucune deadline</p></div>}
           </div>
         </div>
 
-        {/* Schedule Section */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-bold">{t("votre_emploi_du_temps")}</h2>
-            <Link href="/schedule" className="text-primary text-xs font-bold hover:underline">Ouvrir</Link>
+        {/* Notifications Modal */}
+        {showNotifications && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6 backdrop-blur-sm animate-in fade-in">
+             <div className="bg-white rounded-[40px] w-full max-w-sm p-8 animate-in zoom-in-95">
+                <div className="flex justify-between items-center mb-6">
+                   <h3 className="font-black text-xs uppercase tracking-widest">Centre de Notifications</h3>
+                   <button onClick={() => setShowNotifications(false)}><X size={20} /></button>
+                </div>
+                <div className="space-y-4 max-h-[400px] overflow-y-auto">
+                   {announcements.map((a, i) => (
+                     <div key={i} className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <h4 className="text-[10px] font-black uppercase mb-1">{a.title}</h4>
+                        <p className="text-[11px] text-gray-500 font-medium">{a.message}</p>
+                     </div>
+                   ))}
+                </div>
+             </div>
           </div>
-
-          <div className="space-y-4">
-            <ScheduleItem
-              time="09:30 - 10:20"
-              title="Physique"
-              subtitle="Chapitre 3: Force"
-              instructor="Alex Jesus"
-              location="Google Meet"
-              color="bg-indigo-500"
-            />
-             <ScheduleItem
-              time="11:00 - 11:50"
-              title="Géographie"
-              subtitle="Chapitre 12: Profil du sol"
-              instructor="Jenifer Clark"
-              location="Zoom"
-              color="bg-cyan-500"
-            />
-          </div>
-        </div>
+        )}
       </div>
     </AppLayout>
-  );
-}
-
-function CourseCard({ title, icon, color, count }: { title: string, icon: string, color: string, count: string }) {
-  return (
-    <div className={`${color} min-w-[140px] p-5 rounded-[32px] text-white shadow-lg shadow-${color.split('-')[1]}-500/20 relative overflow-hidden group hover:scale-[1.02] transition-transform`}>
-      <div className="absolute right-[-10px] top-[-10px] w-16 h-16 bg-white/10 rounded-full"></div>
-      <div className="bg-white/20 w-10 h-10 rounded-2xl flex items-center justify-center text-xl mb-4">
-        {icon}
-      </div>
-      <h3 className="font-bold text-base leading-tight mb-1">{title}</h3>
-      <p className="text-[10px] opacity-80 font-bold uppercase tracking-wider">{count} supports</p>
-    </div>
-  );
-}
-
-function TaskCard({ title, subject, date, progress, status, statusColor }: any) {
-  return (
-    <div className="bg-white p-5 rounded-[32px] shadow-sm border border-gray-100 group hover:shadow-md transition-all">
-      <div className="flex justify-between items-start mb-3">
-        <span className={cn("text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider", statusColor)}>
-          {status}
-        </span>
-        <button className="text-gray-300">•••</button>
-      </div>
-      <h4 className="font-bold text-gray-800 mb-1 leading-tight">{title}</h4>
-      <p className="text-xs text-gray-500 mb-4">{subject}</p>
-
-      <div className="flex items-center justify-between mb-2">
-         <span className="text-[10px] font-bold text-gray-400">📅 {date}</span>
-         <span className="text-[10px] font-bold text-gray-400">💬 12 commentaires</span>
-      </div>
-
-      {progress !== undefined && (
-        <div className="flex items-center gap-3">
-          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-             <div className="h-full bg-green-500 rounded-full" style={{ width: `${progress}%` }}></div>
-          </div>
-          <span className="text-[10px] font-bold text-green-600">{progress}%</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ScheduleItem({ time, title, subtitle, instructor, location, color }: { time: string, title: string, subtitle: string, instructor: string, location: string, color: string }) {
-  return (
-    <div className={`${color} p-5 rounded-3xl text-white shadow-md relative overflow-hidden`}>
-      <div className="absolute right-[-20px] top-[-20px] w-24 h-24 bg-white/10 rounded-full"></div>
-      <div className="flex justify-between items-start mb-2">
-        <span className="text-sm opacity-90">{time}</span>
-        <button className="opacity-80">•••</button>
-      </div>
-      <h3 className="text-xl font-bold mb-1">{title}</h3>
-      <p className="text-sm opacity-80 mb-4">{subtitle}</p>
-
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-white/30 overflow-hidden">
-             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${instructor}`} alt={instructor} />
-          </div>
-          <span className="text-xs">{instructor}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-2 h-2 rounded-full bg-green-400"></div>
-          <span className="text-xs">{location}</span>
-        </div>
-      </div>
-    </div>
   );
 }

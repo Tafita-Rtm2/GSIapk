@@ -18,6 +18,9 @@ export const translations: Translations = {
   biblio: { fr: "Biblio", en: "Library" },
   career: { fr: "Career", en: "Career" },
   profil: { fr: "Profil", en: "Profile" },
+  mon_profil: { fr: "Mon Profil", en: "My Profile" },
+  reussites: { fr: "Réussites", en: "Achievements" },
+  demandes: { fr: "Demandes", en: "Requests" },
   bonjour: { fr: "Bonjour", en: "Hello" },
   tasks_today: { fr: "tâches aujourd'hui", en: "tasks today" },
   votre_progression: { fr: "Votre progression", en: "Your progress" },
@@ -78,6 +81,13 @@ export const translations: Translations = {
   matiere: { fr: "Matière", en: "Subject" },
   date_limite: { fr: "Date limite", en: "Deadline" },
   soumettre: { fr: "Soumettre", en: "Submit" },
+  success_today: { fr: "la réussite aujourd'hui", en: "success today" },
+  gsi_insight_tagline: { fr: "Comprendre aujourd'hui, réussir demain.", en: "Understanding today, succeeding tomorrow." },
+  gsi_mission: { fr: "L'application intelligente de GSI Internationale conçue pour accompagner chaque étudiant.", en: "The intelligent application of GSI Internationale designed to accompany every student." },
+  convoquer: { fr: "Convoquer", en: "Summon" },
+  convocation: { fr: "Convocation", en: "Summons" },
+  import_excel: { fr: "Import Excel", en: "Excel Import" },
+  moyenne_classe: { fr: "Moyenne de classe", en: "Class average" },
 };
 
 interface LanguageContextType {

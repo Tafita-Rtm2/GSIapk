@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   GraduationCap,
   Calendar,
@@ -12,27 +12,162 @@ import {
   LogOut,
   ChevronRight,
   Plus,
-  Upload
+  Upload,
+  Save,
+  CheckCircle,
+  Clock,
+  RefreshCw,
+  FileSpreadsheet,
+  Zap,
+  Wifi,
+  WifiOff,
+  CheckCircle2
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
+import { GSIStore, User, Lesson, Assignment, Grade } from "@/lib/store";
+import { toast } from "sonner";
+import { PageHeader } from "@/components/page-header";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { cn } from "@/lib/utils";
+
+const CAMPUSES = ["Antananarivo", "Antsirabe", "Bypass", "Tamatave"];
+const FILIERES = ["Informatique", "Gestion", "Commerce International", "Marketing Digital", "Comptabilité", "Finance", "Ressources Humaines", "Logistique", "Tourisme", "Communication", "Management", "Droit des Affaires", "Entrepreneuriat"];
+const NIVEAUX = ["L1", "L2", "L3", "M1", "M2"];
 
 export default function ProfessorPage() {
   const { t } = useLanguage();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [students, setStudents] = useState<User[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [syncStatus, setSyncStatus] = useState<'ready' | 'offline' | 'syncing'>('syncing');
 
-  const menuItems = [
-    { id: "schedule", icon: Calendar, label: t("modifier_edt"), color: "bg-blue-500" },
-    { id: "lessons", icon: BookOpen, label: t("publier_lecon"), color: "bg-emerald-500" },
-    { id: "assignments", icon: FileText, label: t("publier_devoir"), color: "bg-orange-500" },
-    { id: "grades", icon: BarChart3, label: t("gestion_notes"), color: "bg-pink-500" },
-    { id: "students", icon: Users, label: t("suivi_etudiants"), color: "bg-indigo-500" },
-    { id: "reports", icon: FileText, label: t("stats_rapports"), color: "bg-purple-500" },
-  ];
+  useEffect(() => {
+    const user = GSIStore.getCurrentUser();
+    if (!user || user.role !== 'professor') {
+      router.replace("/login");
+      return;
+    }
+
+    const unsubs = [
+      GSIStore.subscribeUsers((us) => { setStudents(us.filter(u => u.role === 'student')); setSyncStatus('ready'); }),
+      GSIStore.subscribeLessons({}, (ls) => setLessons(ls)),
+      GSIStore.subscribeAssignments({}, (as) => setAssignments(as))
+    ];
+
+    const handleOffline = () => setSyncStatus('offline');
+    const handleOnline = () => setSyncStatus('syncing');
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      unsubs.forEach(u => u());
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [router]);
+
+  const [selectedFilieres, setSelectedFilieres] = useState<string[]>([]);
+  const [selectedCampuses, setSelectedCampuses] = useState<string[]>([]);
+
+  const handlePublishLesson = async (e: any) => {
+    e.preventDefault();
+    if (selectedFilieres.length === 0 || selectedCampuses.length === 0) {
+      toast.error("Filière et campus obligatoires.");
+      return;
+    }
+
+    const form = e.target;
+    const filesInput = form.elements.namedItem('files') as HTMLInputElement;
+    const files = filesInput?.files;
+    const title = form.title.value;
+    const tempId = Math.random().toString(36).substr(2, 9);
+
+    setIsUploading(true);
+    setActiveTab("dashboard");
+    const toastId = toast.loading("Publication lancée...");
+
+    (async () => {
+      try {
+        let fileUrls: string[] = [];
+        if (files && files.length > 0) {
+          fileUrls = await Promise.all(Array.from(files).map(f => GSIStore.uploadFile(f, `lessons/${tempId}_${f.name}`, setUploadProgress)));
+        }
+
+        await GSIStore.addLesson({
+          id: tempId,
+          title,
+          description: form.description.value,
+          subject: form.subject.value,
+          niveau: form.niveau.value,
+          filiere: selectedFilieres,
+          campus: selectedCampuses,
+          date: new Date().toISOString(),
+          files: fileUrls
+        });
+        toast.success(`Leçon "${title}" prête !`, { id: toastId });
+      } catch (err: any) {
+        toast.error("Erreur Cloud : " + err.message, { id: toastId });
+      } finally {
+        setIsUploading(false);
+        setUploadProgress(0);
+      }
+    })();
+  };
+
+  const handlePublishAssignment = async (e: any) => {
+    e.preventDefault();
+    const form = e.target;
+    const title = form.title.value;
+    const tempId = Math.random().toString(36).substr(2, 9);
+
+    setIsUploading(true);
+    setActiveTab("dashboard");
+    const toastId = toast.loading("Publication du devoir...");
+
+    (async () => {
+       try {
+          await GSIStore.addAssignment({
+            id: tempId,
+            title,
+            description: form.description.value,
+            subject: form.subject.value,
+            niveau: form.niveau.value,
+            filiere: selectedFilieres,
+            campus: selectedCampuses,
+            deadline: form.deadline.value,
+            timeLimit: "23:59",
+            maxScore: 20,
+            files: []
+          });
+          toast.success(`Devoir "${title}" disponible.`, { id: toastId });
+       } catch (err: any) {
+          toast.error(err.message, { id: toastId });
+       } finally {
+          setIsUploading(false);
+       }
+    })();
+  };
 
   return (
-    <div className="flex flex-col min-h-screen max-w-md mx-auto bg-gray-50 pb-20">
+    <div className="flex flex-col min-h-screen max-w-md mx-auto bg-[#F8FAFC] pb-20">
+      {/* Sync Status Banner */}
+      <div className={cn(
+        "px-6 py-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest",
+        syncStatus === 'ready' ? "bg-emerald-500 text-white" :
+        syncStatus === 'offline' ? "bg-orange-500 text-white" : "bg-violet-600 text-white animate-pulse"
+      )}>
+        <div className="flex items-center gap-2">
+           {isUploading ? <RefreshCw size={12} className="animate-spin" /> : syncStatus === 'ready' ? <CheckCircle2 size={12} /> : <WifiOff size={12} />}
+           <span>{isUploading ? `Envoi en cours ${Math.round(uploadProgress)}%` : syncStatus === 'ready' ? "GSI Cloud : Connecté" : "Hors-ligne"}</span>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="bg-white p-6 rounded-b-[40px] shadow-sm mb-6 border-b border-violet-100">
         <div className="flex justify-between items-center mb-6">
@@ -42,109 +177,136 @@ export default function ProfessorPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold">Prof Portal</h1>
-              <p className="text-xs text-gray-500 font-medium italic">GSI Internationale — Expert</p>
+              <p className="text-[10px] text-gray-400 font-black uppercase">GSI Internationale</p>
             </div>
           </div>
           <button
-            onClick={() => router.push("/login")}
-            className="p-3 bg-gray-100 rounded-xl text-gray-400 hover:text-red-500 transition-colors"
+            onClick={async () => {
+              await signOut(auth);
+              GSIStore.setCurrentUser(null);
+              toast.success("Déconnexion");
+              router.replace("/login");
+            }}
+            className="p-3 bg-gray-50 rounded-xl text-gray-400 active:scale-90"
           >
             <LogOut size={20} />
           </button>
         </div>
-
-        <div className="bg-violet-50 p-4 rounded-3xl flex items-center gap-4 mb-4">
-           <div className="flex-1">
-              <h3 className="text-violet-900 font-bold text-sm">Bienvenue, Professeur</h3>
-              <p className="text-violet-600 text-[10px] font-medium">Vous avez 2 devoirs à corriger aujourd'hui.</p>
-           </div>
-           <button className="bg-violet-600 text-white p-2 rounded-xl shadow-md">
-              <Plus size={16} />
-           </button>
-        </div>
       </div>
 
-      <div className="px-6 space-y-8 flex-1">
+      <div className="px-6 space-y-8 flex-1 pb-10">
         {activeTab === "dashboard" && (
-          <>
-            {/* Menu Grid */}
-            <div>
-              <h2 className="text-lg font-bold mb-4">Outils Pédagogiques</h2>
-              <div className="grid grid-cols-2 gap-4">
-                {menuItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    className="bg-white p-5 rounded-[32px] shadow-sm border border-gray-100 flex flex-col items-center text-center gap-3 hover:shadow-md transition-all active:scale-95"
-                  >
-                    <div className={`${item.color} w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-${item.color.split('-')[1]}-500/20`}>
-                      <item.icon size={24} />
-                    </div>
-                    <span className="text-sm font-bold text-gray-700 leading-tight">{item.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Action Quick Access */}
-            <div>
-              <h2 className="text-lg font-bold mb-4">Dernières Publications</h2>
-              <div className="space-y-3">
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4">
-                  <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
-                      <Upload size={18} />
-                  </div>
-                  <div className="flex-1">
-                      <h4 className="text-sm font-bold">Leçon: Algorithmique</h4>
-                      <p className="text-[10px] text-gray-400">Publié pour L1 Informatique • Hier</p>
-                  </div>
-                  <ChevronRight size={16} className="text-gray-300" />
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4">
-                  <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center">
-                      <FileText size={18} />
-                  </div>
-                  <div className="flex-1">
-                      <h4 className="text-sm font-bold">Devoir: Marketing Digital</h4>
-                      <p className="text-[10px] text-gray-400">Deadline: 12 Fév 2025 • En cours</p>
-                  </div>
-                  <ChevronRight size={16} className="text-gray-300" />
-                </div>
-              </div>
-            </div>
-          </>
+          <div className="grid grid-cols-2 gap-4">
+            {[{id: "lessons", icon: BookOpen, label: "Publier Leçon", color: "bg-emerald-500"},
+              {id: "assignments", icon: FileText, label: "Publier Devoir", color: "bg-orange-500"},
+              {id: "grades", icon: BarChart3, label: "Notes", color: "bg-pink-500"},
+              {id: "students", icon: Users, label: "Étudiants", color: "bg-indigo-500"}].map(item => (
+              <button key={item.id} onClick={() => setActiveTab(item.id)} className="bg-white p-5 rounded-[32px] shadow-sm border border-gray-100 flex flex-col items-center gap-3 active:scale-95">
+                <div className={`${item.color} w-12 h-12 rounded-2xl flex items-center justify-center text-white`}><item.icon size={24} /></div>
+                <span className="text-xs font-black uppercase tracking-tight">{item.label}</span>
+              </button>
+            ))}
+          </div>
         )}
 
-        {activeTab !== "dashboard" && (
-          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm min-h-[400px] flex flex-col items-center justify-center text-center relative">
-             <button
-              onClick={() => setActiveTab("dashboard")}
-              className="absolute left-6 top-6 bg-gray-100 p-2 rounded-full text-gray-400"
-             >
-                <ChevronRight className="rotate-180" size={20} />
-             </button>
-             <div className={`w-20 h-20 rounded-[30%] flex items-center justify-center text-white mb-6 shadow-xl ${menuItems.find(i => i.id === activeTab)?.color}`}>
-                {(() => {
-                  const Icon = menuItems.find(i => i.id === activeTab)?.icon || GraduationCap;
-                  return <Icon size={40} />;
-                })()}
+        {(activeTab === "lessons" || activeTab === "assignments") && (
+          <div className="space-y-6">
+            <PageHeader title={activeTab === 'lessons' ? "Publier Leçon" : "Publier Devoir"} onBack={() => setActiveTab("dashboard")} />
+            <form onSubmit={activeTab === 'lessons' ? handlePublishLesson : handlePublishAssignment} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+                <input name="subject" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none" placeholder="Matière" />
+                <input name="title" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none" placeholder="Titre" />
+                <textarea name="description" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none min-h-[100px]" placeholder="Description"></textarea>
+
+                <div className="p-4 bg-gray-50 rounded-2xl space-y-3">
+                   <p className="text-[10px] font-black uppercase text-gray-400">Ciblage</p>
+                   <div className="grid grid-cols-2 gap-2">
+                     {FILIERES.slice(0, 6).map(f => (
+                       <label key={f} className="flex items-center gap-2 text-[10px] font-bold">
+                         <input type="checkbox" checked={selectedFilieres.includes(f)} onChange={e => e.target.checked ? setSelectedFilieres([...selectedFilieres, f]) : setSelectedFilieres(selectedFilieres.filter(x => x !== f))} /> {f}
+                       </label>
+                     ))}
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                   {CAMPUSES.map(c => (
+                     <button type="button" key={c} onClick={() => selectedCampuses.includes(c) ? setSelectedCampuses(selectedCampuses.filter(x => x !== c)) : setSelectedCampuses([...selectedCampuses, c])} className={cn("p-2 rounded-xl text-[10px] font-bold transition-all", selectedCampuses.includes(c) ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-400")}>{c}</button>
+                   ))}
+                </div>
+
+                <div className="flex gap-2">
+                   <select name="niveau" className="flex-1 p-4 bg-gray-50 rounded-2xl font-bold text-xs">
+                      {NIVEAUX.map(n => <option key={n}>{n}</option>)}
+                   </select>
+                   {activeTab === 'assignments' && (
+                     <input name="deadline" type="date" required className="flex-1 p-4 bg-gray-50 rounded-2xl font-bold text-xs" />
+                   )}
+                </div>
+
+                <input name="files" type="file" multiple className="w-full p-2 text-[10px]" />
+
+                <button type="submit" disabled={isUploading} className="w-full bg-violet-600 text-white py-5 rounded-2xl font-black uppercase shadow-lg active:scale-95">Publier Maintenant</button>
+            </form>
+          </div>
+        )}
+
+        {activeTab === "grades" && (
+          <div className="space-y-4">
+             <PageHeader title="Saisie des Notes" onBack={() => setActiveTab("dashboard")} />
+             <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+                <input id="grade-subject" className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold" placeholder="Matière de l'examen" />
+                <div className="max-h-60 overflow-y-auto space-y-2">
+                   {students.map(s => (
+                     <div key={s.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                        <span className="text-xs font-bold">{s.fullName}</span>
+                        <input id={`grade-${s.id}`} type="number" className="w-12 p-2 rounded-lg text-center font-bold" placeholder="-" max="20" />
+                     </div>
+                   ))}
+                </div>
+                <button
+                  onClick={async () => {
+                    const subject = (document.getElementById('grade-subject') as HTMLInputElement).value;
+                    if(!subject) return toast.error("Matière requise");
+                    const toastId = toast.loading("Enregistrement...");
+                    for(const s of students) {
+                      const score = (document.getElementById(`grade-${s.id}`) as HTMLInputElement).value;
+                      if(score) {
+                        await GSIStore.addGrade({
+                          id: Math.random().toString(36).substr(2,9),
+                          studentId: s.id,
+                          studentName: s.fullName,
+                          subject,
+                          score: parseFloat(score),
+                          maxScore: 20,
+                          date: new Date().toISOString().split('T')[0],
+                          niveau: s.niveau,
+                          filiere: s.filiere
+                        });
+                      }
+                    }
+                    toast.success("Notes publiées !", { id: toastId });
+                    setActiveTab("dashboard");
+                  }}
+                  className="w-full bg-pink-500 text-white py-4 rounded-xl font-bold active:scale-95"
+                >
+                  Valider la classe
+                </button>
              </div>
-             <h2 className="text-2xl font-black mb-2">{menuItems.find(i => i.id === activeTab)?.label}</h2>
-             <p className="text-gray-500 max-w-[200px]">Cette section est en cours de déploiement pour votre campus.</p>
-             <button
-              onClick={() => setActiveTab("dashboard")}
-              className="mt-8 bg-gray-100 text-gray-600 px-6 py-3 rounded-2xl font-bold"
-             >
-                Retour aux outils
-             </button>
+          </div>
+        )}
+
+        {activeTab === "students" && (
+          <div className="space-y-4">
+            <PageHeader title="Mes Étudiants" onBack={() => setActiveTab("dashboard")} />
+            {students.map((s, i) => (
+              <div key={i} className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4">
+                 <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center font-bold text-indigo-600">{s.fullName.charAt(0)}</div>
+                 <div className="flex-1"><h4 className="font-bold text-sm">{s.fullName}</h4><p className="text-[10px] text-gray-400 font-bold uppercase">{s.filiere} • {s.niveau}</p></div>
+              </div>
+            ))}
           </div>
         )}
       </div>
-
-      {/* Floating Action Button */}
-      <button className="fixed bottom-6 right-6 w-14 h-14 bg-violet-600 text-white rounded-full shadow-xl shadow-violet-600/40 flex items-center justify-center hover:scale-110 active:scale-90 transition-all z-50">
-        <Plus size={28} />
-      </button>
     </div>
   );
 }
