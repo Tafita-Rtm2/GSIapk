@@ -75,22 +75,18 @@ export default function LibraryPage() {
     };
   }, []);
 
-  const handleDownload = (url: string, id: string) => {
+  const handleDownload = (url: string, id: string, title: string) => {
     if (!url) return toast.error("Pas de fichier joint.");
 
     toast.promise(
-      new Promise((resolve) => {
-        window.open(url, '_blank');
-        GSIStore.setDownloaded(id);
-        setTimeout(() => {
-          setBooks(prev => prev.map(b => b.id === id ? { ...b, downloaded: true } : b));
-          resolve(true);
-        }, 1000);
-      }),
+      GSIStore.downloadPackFile(url, title, id),
       {
-        loading: 'Préparation du document...',
-        success: 'Document prêt pour consultation hors-ligne !',
-        error: 'Erreur lors du téléchargement.',
+        loading: 'Téléchargement du pack hors-ligne...',
+        success: (path) => {
+          setBooks(prev => prev.map(b => b.id === id ? { ...b, downloaded: true } : b));
+          return 'Document enregistré sur l\'appareil !';
+        },
+        error: 'Erreur lors du téléchargement local.',
       }
     );
   };
@@ -165,7 +161,7 @@ export default function LibraryPage() {
               onClick={() => {
                 if(book.url) {
                   GSIStore.saveProgress(book.id, { lastOpened: Date.now() });
-                  window.open(book.url, '_blank');
+                  GSIStore.openPackFile(book.id, book.url);
                 }
               }}
               className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 hover:border-primary/20 transition-all group cursor-pointer"
@@ -190,7 +186,7 @@ export default function LibraryPage() {
                   <Star size={16} fill={book.favorite ? "currentColor" : "none"} />
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleDownload(book.url, book.id); }}
+                  onClick={(e) => { e.stopPropagation(); handleDownload(book.url, book.id, book.title); }}
                   className={cn(
                     "p-2 rounded-xl transition-colors",
                     book.downloaded ? "bg-green-100 text-green-600" : "bg-gray-50 text-primary hover:bg-primary/10"

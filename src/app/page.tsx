@@ -55,8 +55,13 @@ export default function Home() {
         setAssignments(filtered);
       }),
       GSIStore.subscribeAnnouncements((anns) => {
-        // Filter for global or targeted to this user
-        setAnnouncements(anns.filter(a => !a.targetUserId || a.targetUserId === currentUser.id));
+        const filtered = anns.filter(a =>
+          (!a.targetUserId || a.targetUserId === currentUser.id) &&
+          (!a.campus || a.campus.includes(currentUser.campus) || a.campus.length === 0) &&
+          (!a.filiere || a.filiere.includes(currentUser.filiere) || a.filiere.length === 0) &&
+          (!a.niveau || a.niveau === currentUser.niveau)
+        );
+        setAnnouncements(filtered);
       })
     ];
 
@@ -152,7 +157,7 @@ export default function Home() {
             {lessons.map((l, i) => (
               <div
                 key={i}
-                onClick={() => l.files?.[0] && window.open(l.files[0], '_blank')}
+                onClick={() => l.files?.[0] && GSIStore.openPackFile(l.id, l.files[0])}
                 className="min-w-[200px] p-5 bg-white rounded-[32px] border border-gray-100 shadow-sm active:scale-95 transition-all cursor-pointer group"
               >
                 <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-white transition-colors">
@@ -180,7 +185,18 @@ export default function Home() {
                     </div>
                   </div>
                   <h4 className="font-black text-sm uppercase tracking-tight mb-1">{a.title}</h4>
-                  <p className="text-[10px] font-bold text-gray-400 mb-6">{a.subject}</p>
+                  <p className="text-[10px] font-bold text-gray-400 mb-4">{a.subject}</p>
+
+                  {a.files && a.files.length > 0 && (
+                     <button
+                        onClick={() => GSIStore.openPackFile(a.id, a.files![0])}
+                        className="w-full py-3 mb-3 bg-indigo-50 text-indigo-600 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                     >
+                        <FileText size={12} />
+                        Consulter les ressources
+                     </button>
+                  )}
+
                   <button
                     onClick={() => {
                       const input = document.createElement('input');

@@ -10,6 +10,7 @@ import {
   Users,
   Search,
   LogOut,
+  Megaphone,
   ChevronRight,
   Plus,
   Upload,
@@ -25,7 +26,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
-import { GSIStore, User, Lesson, Assignment, Grade } from "@/lib/store";
+import { GSIStore, User, Lesson, Assignment, Grade, Announcement } from "@/lib/store";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { signOut } from "firebase/auth";
@@ -43,6 +44,7 @@ export default function ProfessorPage() {
   const [students, setStudents] = useState<User[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [syncStatus, setSyncStatus] = useState<'ready' | 'offline' | 'syncing'>('syncing');
@@ -57,7 +59,8 @@ export default function ProfessorPage() {
     const unsubs = [
       GSIStore.subscribeUsers((us) => { setStudents(us.filter(u => u.role === 'student')); setSyncStatus('ready'); }),
       GSIStore.subscribeLessons({}, (ls) => setLessons(ls)),
-      GSIStore.subscribeAssignments({}, (as) => setAssignments(as))
+      GSIStore.subscribeAssignments({}, (as) => setAssignments(as)),
+      GSIStore.subscribeAnnouncements((as) => setAnnouncements(as))
     ];
 
     const handleOffline = () => setSyncStatus('offline');
@@ -74,6 +77,28 @@ export default function ProfessorPage() {
 
   const [selectedFilieres, setSelectedFilieres] = useState<string[]>([]);
   const [selectedCampuses, setSelectedCampuses] = useState<string[]>([]);
+
+  const handleSendAnnouncement = async (e: any) => {
+    e.preventDefault();
+    const title = e.target.title.value;
+    const message = e.target.message.value;
+    const niveau = e.target.niveau.value;
+
+    await GSIStore.addAnnouncement({
+      id: Math.random().toString(36).substr(2, 9),
+      title,
+      message,
+      date: new Date().toISOString(),
+      author: "Professeur",
+      campus: selectedCampuses,
+      filiere: selectedFilieres,
+      niveau: niveau === "Tous" ? undefined : niveau
+    });
+
+    toast.success("Annonce envoyée à vos classes !");
+    e.target.reset();
+    setActiveTab("dashboard");
+  };
 
   const handlePublishLesson = async (e: any) => {
     e.preventDefault();
@@ -200,10 +225,11 @@ export default function ProfessorPage() {
             {[{id: "lessons", icon: BookOpen, label: "Publier Leçon", color: "bg-emerald-500"},
               {id: "assignments", icon: FileText, label: "Publier Devoir", color: "bg-orange-500"},
               {id: "grades", icon: BarChart3, label: "Notes", color: "bg-pink-500"},
+              {id: "announcements", icon: Megaphone, label: "Annonce", color: "bg-orange-600"},
               {id: "students", icon: Users, label: "Étudiants", color: "bg-indigo-500"}].map(item => (
               <button key={item.id} onClick={() => setActiveTab(item.id)} className="bg-white p-5 rounded-[32px] shadow-sm border border-gray-100 flex flex-col items-center gap-3 active:scale-95">
-                <div className={`${item.color} w-12 h-12 rounded-2xl flex items-center justify-center text-white`}><item.icon size={24} /></div>
-                <span className="text-xs font-black uppercase tracking-tight">{item.label}</span>
+                <div className={`${item.color} w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-black/5`}><item.icon size={24} /></div>
+                <span className="text-[10px] font-black uppercase tracking-tight">{item.label}</span>
               </button>
             ))}
           </div>
@@ -315,6 +341,40 @@ export default function ProfessorPage() {
                   Valider la classe
                 </button>
              </div>
+          </div>
+        )}
+
+        {activeTab === "announcements" && (
+          <div className="space-y-6">
+            <PageHeader title="Envoyer une Annonce" onBack={() => setActiveTab("dashboard")} />
+            <form onSubmit={handleSendAnnouncement} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+                <input name="title" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none" placeholder="Titre de l'annonce" />
+                <textarea name="message" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none min-h-[100px]" placeholder="Votre message aux étudiants..."></textarea>
+
+                <div className="p-4 bg-gray-50 rounded-2xl space-y-3">
+                   <p className="text-[10px] font-black uppercase text-gray-400">Ciblage</p>
+                   <div className="grid grid-cols-2 gap-2">
+                     {FILIERES.slice(0, 6).map(f => (
+                       <label key={f} className="flex items-center gap-2 text-[10px] font-bold">
+                         <input type="checkbox" checked={selectedFilieres.includes(f)} onChange={e => e.target.checked ? setSelectedFilieres([...selectedFilieres, f]) : setSelectedFilieres(selectedFilieres.filter(x => x !== f))} /> {f}
+                       </label>
+                     ))}
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                   {CAMPUSES.map(c => (
+                     <button type="button" key={c} onClick={() => selectedCampuses.includes(c) ? setSelectedCampuses(selectedCampuses.filter(x => x !== c)) : setSelectedCampuses([...selectedCampuses, c])} className={cn("p-2 rounded-xl text-[10px] font-bold transition-all", selectedCampuses.includes(c) ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-400")}>{c}</button>
+                   ))}
+                </div>
+
+                <select name="niveau" className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-xs">
+                   <option>Tous</option>
+                   {NIVEAUX.map(n => <option key={n}>{n}</option>)}
+                </select>
+
+                <button type="submit" className="w-full bg-orange-600 text-white py-5 rounded-2xl font-black uppercase shadow-lg active:scale-95">Envoyer aux Étudiants</button>
+            </form>
           </div>
         )}
 

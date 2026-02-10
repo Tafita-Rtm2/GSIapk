@@ -80,19 +80,30 @@ export default function AdminPage() {
     }
   };
 
+  const [selectedAnncFilieres, setSelectedAnncFilieres] = useState<string[]>([]);
+  const [selectedAnncCampuses, setSelectedAnncCampuses] = useState<string[]>([]);
+
   const handleSendAnnouncement = async (e: any) => {
     e.preventDefault();
     const title = e.target.title.value;
     const message = e.target.message.value;
-    GSIStore.addAnnouncement({
+    const niveau = e.target.niveau.value;
+
+    await GSIStore.addAnnouncement({
       id: Math.random().toString(36).substr(2, 9),
       title,
       message,
       date: new Date().toISOString(),
-      author: "Administration"
+      author: "Administration",
+      campus: selectedAnncCampuses,
+      filiere: selectedAnncFilieres,
+      niveau: niveau === "Tous" ? undefined : niveau
     });
-    toast.success("Annonce diffusée !");
+
+    toast.success("Annonce diffusée aux profils ciblés !");
     e.target.reset();
+    setSelectedAnncFilieres([]);
+    setSelectedAnncCampuses([]);
     setActiveTab("dashboard");
   };
 
@@ -216,9 +227,40 @@ export default function AdminPage() {
           <div className="space-y-6">
             <PageHeader title={t("communication")} onBack={() => setActiveTab("dashboard")} />
             <form onSubmit={handleSendAnnouncement} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
-                <input name="title" required className="w-full bg-gray-50 rounded-xl p-3 outline-none" placeholder="Titre" />
-                <textarea name="message" required className="w-full bg-gray-50 rounded-xl p-3 outline-none min-h-[100px]" placeholder="Message"></textarea>
-                <button type="submit" className="w-full bg-orange-500 text-white py-4 rounded-xl font-bold">Diffuser</button>
+                <input name="title" required className="w-full bg-gray-50 rounded-xl p-3 outline-none font-bold" placeholder="Titre de l'annonce" />
+                <textarea name="message" required className="w-full bg-gray-50 rounded-xl p-3 outline-none min-h-[100px] text-sm" placeholder="Contenu du message..."></textarea>
+
+                <div className="p-4 bg-gray-50 rounded-2xl space-y-4">
+                   <p className="text-[10px] font-black uppercase text-gray-400">Ciblage de l'audience</p>
+
+                   <div className="space-y-2">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase">Campuses</p>
+                      <div className="flex flex-wrap gap-2">
+                        {CAMPUSES.map(c => (
+                          <button type="button" key={c} onClick={() => selectedAnncCampuses.includes(c) ? setSelectedAnncCampuses(selectedAnncCampuses.filter(x => x !== c)) : setSelectedAnncCampuses([...selectedAnncCampuses, c])} className={cn("px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all", selectedAnncCampuses.includes(c) ? "bg-orange-500 text-white" : "bg-white text-gray-400 border border-gray-100")}>{c}</button>
+                        ))}
+                      </div>
+                   </div>
+
+                   <div className="space-y-2">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase">Filières</p>
+                      <div className="flex flex-wrap gap-2">
+                        {["Informatique", "Gestion", "Marketing"].map(f => (
+                          <button type="button" key={f} onClick={() => selectedAnncFilieres.includes(f) ? setSelectedAnncFilieres(selectedAnncFilieres.filter(x => x !== f)) : setSelectedAnncFilieres([...selectedAnncFilieres, f])} className={cn("px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all", selectedAnncFilieres.includes(f) ? "bg-orange-500 text-white" : "bg-white text-gray-400 border border-gray-100")}>{f}</button>
+                        ))}
+                      </div>
+                   </div>
+
+                   <div className="space-y-2">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase">Niveau</p>
+                      <select name="niveau" className="w-full p-2 bg-white border border-gray-100 rounded-lg text-xs font-bold">
+                         <option>Tous</option>
+                         <option>L1</option><option>L2</option><option>L3</option><option>M1</option><option>M2</option>
+                      </select>
+                   </div>
+                </div>
+
+                <button type="submit" className="w-full bg-orange-500 text-white py-4 rounded-xl font-black uppercase tracking-widest shadow-lg shadow-orange-100 active:scale-95 transition-all">Diffuser l'annonce</button>
             </form>
           </div>
         )}

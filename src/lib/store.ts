@@ -7,6 +7,8 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { ref, getDownloadURL, uploadBytesResumable } from "firebase/storage";
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Browser } from '@capacitor/browser';
 
 // Types
 export interface User {
@@ -24,7 +26,7 @@ export interface Lesson { id: string; title: string; description: string; subjec
 export interface Assignment { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; deadline: string; timeLimit: string; maxScore: number; files?: string[]; }
 export interface Submission { id: string; assignmentId: string; studentId: string; studentName: string; date: string; file: string; score?: number; feedback?: string; }
 export interface Grade { id: string; studentId: string; studentName: string; subject: string; score: number; maxScore: number; date: string; niveau: string; filiere: string; }
-export interface Announcement { id: string; title: string; message: string; date: string; author: string; type?: 'info' | 'convocation'; targetUserId?: string; }
+export interface Announcement { id: string; title: string; message: string; date: string; author: string; type?: 'info' | 'convocation'; targetUserId?: string; campus?: string[]; filiere?: string[]; niveau?: string; }
 
 interface State {
   currentUser: User | null;
@@ -73,13 +75,23 @@ class GSIStoreClass {
   }
 
   private generateMockData() {
-    this.state.users = [
+    const mockUsers: User[] = [
       { id: 'admin-id', fullName: 'Nina GSI', email: 'admin@gsi.mg', role: 'admin', campus: 'Antananarivo', filiere: 'Directeur', niveau: 'N/A' },
       { id: 'prof-id', fullName: 'Professeur GSI', email: 'prof@gsi.mg', role: 'professor', campus: 'Antananarivo', filiere: 'Informatique', niveau: 'L1' }
     ];
-    this.state.lessons = [
-      { id: 'l1', title: 'Guide GSI Insight', description: 'Bienvenue.', subject: 'Général', niveau: 'L1', filiere: [], campus: [], date: new Date().toISOString(), files: [] }
-    ];
+
+    // Only add if not already present
+    mockUsers.forEach(mu => {
+      if (!this.state.users.find(u => u.id === mu.id)) {
+        this.state.users.push(mu);
+      }
+    });
+
+    if (this.state.lessons.length === 0) {
+      this.state.lessons = [
+        { id: 'l1', title: 'Guide GSI Insight', description: 'Bienvenue.', subject: 'Général', niveau: 'L1', filiere: [], campus: [], date: new Date().toISOString(), files: [] }
+      ];
+    }
     this.saveImmediate();
   }
 
@@ -199,17 +211,19 @@ class GSIStoreClass {
   subscribeUsers(cb: (us: User[]) => void) { return this.baseSubscribe('users', cb, 'users'); }
 
   subscribeLessons(filter: { niveau?: string }, cb: (ls: Lesson[]) => void) {
+    const q = filter.niveau ? query(collection(db, "lessons"), where("niveau", "==", filter.niveau)) : undefined;
     return this.baseSubscribe('lessons', (data) => {
       const filtered = filter.niveau ? data.filter((l: any) => l.niveau === filter.niveau) : data;
       cb(filtered);
-    }, 'lessons');
+    }, 'lessons', q, filter.niveau ? `lessons_${filter.niveau}` : undefined);
   }
 
   subscribeAssignments(filter: { niveau?: string }, cb: (as: Assignment[]) => void) {
+    const q = filter.niveau ? query(collection(db, "assignments"), where("niveau", "==", filter.niveau)) : undefined;
     return this.baseSubscribe('assignments', (data) => {
       const filtered = filter.niveau ? data.filter((a: any) => a.niveau === filter.niveau) : data;
       cb(filtered);
-    }, 'assignments');
+    }, 'assignments', q, filter.niveau ? `assignments_${filter.niveau}` : undefined);
   }
 
   subscribeAnnouncements(cb: (as: Announcement[]) => void) { return this.baseSubscribe('announcements', cb, 'announcements'); }
@@ -237,7 +251,10 @@ class GSIStoreClass {
     this.state.users = [user, ...this.state.users.filter(u => u.id !== user.id)];
     this.save();
     this.notify('users', this.state.users);
-    if (db) this.cloudTask(() => setDoc(doc(db, "users", user.id), { ...user, updatedAt: Timestamp.now() }));
+    if (db) {
+      // CRITICAL: Await user creation to prevent "Profil Introuvable" on immediate login/sync
+      return await setDoc(doc(db, "users", user.id), { ...user, updatedAt: Timestamp.now() });
+    }
   }
 
   async addLesson(lesson: Lesson) {
@@ -290,6 +307,78 @@ class GSIStoreClass {
     if (db) this.cloudTask(() => addDoc(collection(db, "schedules"), { ...schedule, createdAt: Timestamp.now() }));
   }
 
+  // --- OFFLINE PACKS ENGINE ---
+
+  async downloadPackFile(url: string, fileName: string, lessonId: string) {
+    try {
+      if (typeof window === 'undefined' || !window.navigator.onLine) {
+         throw new Error("Connexion requise pour le téléchargement.");
+      }
+
+      // 1. Fetch file as blob
+      const response = await fetch(url);
+      const blob = await response.blob();
+
+      // 2. Convert to Base64 (Capacitor requirement)
+      const reader = new FileReader();
+      const base64Data = await new Promise<string>((resolve) => {
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+
+      // 3. Save to Capacitor Filesystem
+      const path = `gsi_packs/${lessonId}_${fileName}`;
+      await Filesystem.writeFile({
+        path,
+        data: base64Data,
+        directory: Directory.Data,
+        recursive: true
+      });
+
+      // 4. Mark as downloaded locally
+      this.setDownloaded(lessonId, true);
+      this.saveProgress(lessonId, { localPath: path });
+
+      return path;
+    } catch (e: any) {
+      console.error("Pack download failed", e);
+      throw e;
+    }
+  }
+
+  async openPackFile(lessonId: string, fallbackUrl: string) {
+    try {
+      const progress = this.getProgress(lessonId);
+      if (progress?.localPath) {
+         // Check if file still exists
+         const stat = await Filesystem.stat({
+           path: progress.localPath,
+           directory: Directory.Data
+         });
+
+         if (stat) {
+            // Get URI for the local file
+            const fileUri = await Filesystem.getUri({
+              path: progress.localPath,
+              directory: Directory.Data
+            });
+
+            // Open via Capacitor Browser or standard window
+            await Browser.open({ url: fileUri.uri });
+            return;
+         }
+      }
+
+      // Fallback to cloud URL
+      if (fallbackUrl) {
+         if (typeof window !== 'undefined') window.open(fallbackUrl, '_blank');
+      }
+    } catch (e) {
+      console.warn("Could not open local pack, falling back to cloud.");
+      if (fallbackUrl && typeof window !== 'undefined') window.open(fallbackUrl, '_blank');
+    }
+  }
+
   async uploadFile(file: File, path: string, onProgress?: (p: number) => void): Promise<string> {
     if (!storage) throw new Error("Storage offline");
     const storageRef = ref(storage, path);
@@ -306,16 +395,32 @@ class GSIStoreClass {
     });
   }
 
-  async getUser(id: string): Promise<User | null> {
+  async getUser(id: string, forceCloud = false): Promise<User | null> {
     const local = this.state.users.find(u => u.id === id);
-    if (local) return local;
+    if (local && !forceCloud) return local;
+
     if (db) {
       try {
-        const snap = await getDoc(doc(db, "users", id));
-        if (snap.exists()) return { id: snap.id, ...snap.data() } as User;
-      } catch (e) {}
+        // Robust fetch: try immediate, then retry after a short delay if it's a new device sync
+        let snap = await getDoc(doc(db, "users", id));
+        if (!snap.exists() && forceCloud) {
+           // Small delay for Firestore propagation if needed
+           await new Promise(r => setTimeout(r, 1000));
+           snap = await getDoc(doc(db, "users", id));
+        }
+
+        if (snap.exists()) {
+          const userData = { id: snap.id, ...snap.data() } as User;
+          // Update local cache
+          this.state.users = [userData, ...this.state.users.filter(u => u.id !== id)];
+          this.save();
+          return userData;
+        }
+      } catch (e) {
+        console.error("Error fetching user from Firestore:", e);
+      }
     }
-    return null;
+    return local || null;
   }
 
   async getUsers() { return this.state.users; }

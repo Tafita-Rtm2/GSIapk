@@ -70,8 +70,8 @@ export default function LoginPage() {
       // Direct Firebase Login
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
-      // Get user from cache if possible, or fetch
-      const userData = await GSIStore.getUser(userCredential.user.uid);
+      // Get user from cache if possible, or fetch (force cloud to avoid missing profile on new device)
+      const userData = await GSIStore.getUser(userCredential.user.uid, true);
 
       if (userData) {
         GSIStore.setCurrentUser(userData);
