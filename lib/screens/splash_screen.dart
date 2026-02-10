@@ -13,12 +13,18 @@ class SplashScreen extends StatelessWidget {
     final auth = Provider.of<GSIAuthProvider>(context);
     if (!auth.isLoading) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (auth.user == null) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
-        else {
-          Widget home = const StudentDashboard();
-          if (auth.user!.role == 'admin') home = const AdminPortal();
-          else if (auth.user!.role == 'professor') home = const ProfessorPortal();
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => home));
+        if (context.mounted) {
+          if (auth.user == null) {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+          } else {
+            Widget home = const StudentDashboard();
+            if (auth.user!.role == 'admin') {
+              home = const AdminPortal();
+            } else if (auth.user!.role == 'professor') {
+              home = const ProfessorPortal();
+            }
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => home));
+          }
         }
       });
     }

@@ -34,7 +34,7 @@ class _AddLessonScreenState extends State<AddLessonScreen> {
     try {
       List<String> fileUrls = [];
       for (var file in _selectedFiles) {
-        String fileName = DateTime.now().millisecondsSinceEpoch.toString() + '_' + file.path.split('/').last;
+        String fileName = "${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}";
         Reference ref = FirebaseStorage.instance.ref().child('lessons/$fileName');
         await ref.putFile(file);
         fileUrls.add(await ref.getDownloadURL());
@@ -53,9 +53,13 @@ class _AddLessonScreenState extends State<AddLessonScreen> {
       );
 
       await DatabaseService().addLesson(lesson);
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -76,7 +80,7 @@ class _AddLessonScreenState extends State<AddLessonScreen> {
               TextFormField(controller: _descController, decoration: const InputDecoration(labelText: "Description"), maxLines: 3),
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
-                value: _niveau,
+                initialValue: _niveau,
                 items: ['L1', 'L2', 'L3', 'M1', 'M2'].map((n) => DropdownMenuItem(value: n, child: Text(n))).toList(),
                 onChanged: (v) => setState(() => _niveau = v!),
                 decoration: const InputDecoration(labelText: "Niveau"),

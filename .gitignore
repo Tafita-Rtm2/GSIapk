@@ -21,3 +21,4 @@ android/gsi_insight_android.iml
 # Misc
 .DS_Store
 *.log
+node_modules/

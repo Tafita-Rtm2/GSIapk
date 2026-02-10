@@ -17,8 +17,13 @@ class GSIProvider with ChangeNotifier {
 
   void updateUser(GSIUser? user) {
     _currentUser = user;
-    if (_currentUser != null) _listenToData();
-    else { _lessons = []; _assignments = []; _announcements = []; }
+    if (_currentUser != null) {
+      _listenToData();
+    } else {
+      _lessons = [];
+      _assignments = [];
+      _announcements = [];
+    }
   }
 
   void _listenToData() {

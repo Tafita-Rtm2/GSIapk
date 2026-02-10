@@ -58,7 +58,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         bottomRight: isUser ? const Radius.circular(0) : const Radius.circular(20),
                         bottomLeft: isUser ? const Radius.circular(20) : const Radius.circular(0),
                       ),
-                      boxShadow: [if (!isUser) BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                      boxShadow: [if (!isUser) BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
                     ),
                     child: Text(
                       msg['content']!,

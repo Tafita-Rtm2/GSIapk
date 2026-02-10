@@ -19,9 +19,14 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
   void _downloadAndOpen(String url) async {
     setState(() => _isDownloading = true);
     File? file = await _storage.downloadFile(url, url.split('/').last.split('?').first);
-    if (mounted) setState(() => _isDownloading = false);
-    if (file != null) OpenFile.open(file.path);
-    else if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Échec")));
+    if (mounted) {
+      setState(() => _isDownloading = false);
+    }
+    if (file != null) {
+      OpenFile.open(file.path);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Échec")));
+    }
   }
 
   @override

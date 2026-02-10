@@ -18,9 +18,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _handleLogin() async {
     setState(() => _isLoading = true);
-    try { await Provider.of<GSIAuthProvider>(context, listen: false).signIn(_emailController.text, _passwordController.text); }
-    catch (e) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: ${e.toString()}"))); }
-    finally { if (mounted) setState(() => _isLoading = false); }
+    try {
+      await Provider.of<GSIAuthProvider>(context, listen: false).signIn(_emailController.text, _passwordController.text);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: ${e.toString()}")));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override

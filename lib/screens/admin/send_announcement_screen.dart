@@ -25,9 +25,13 @@ class _SendAnnouncementScreenState extends State<SendAnnouncementScreen> {
         author: 'Admin',
         type: 'info',
       ));
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
