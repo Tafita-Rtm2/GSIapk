@@ -17,5 +17,15 @@ class GSIAuthProvider with ChangeNotifier {
     });
   }
   Future<void> signIn(String email, String password) => _authService.signIn(email, password);
+
+  Future<void> signUp(String email, String password, Map<String, dynamic> userData) =>
+      _authService.signUp(email, password, userData);
+
+  void setMockUser(GSIUser user) {
+    _user = user;
+    _isLoading = false;
+    notifyListeners();
+  }
+
   Future<void> signOut() => _authService.signOut();
 }

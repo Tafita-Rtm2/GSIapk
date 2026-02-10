@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:gsi_insight/providers/auth_provider.dart';
 import 'package:gsi_insight/providers/language_provider.dart';
 import 'package:gsi_insight/screens/admin/send_announcement_screen.dart';
+import 'package:gsi_insight/screens/admin/user_management_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class AdminPortal extends StatelessWidget {
@@ -16,7 +17,10 @@ class AdminPortal extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          _buildItem(LucideIcons.users, t('gestion_utilisateurs')),
+          GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UserManagementScreen())),
+            child: _buildItem(LucideIcons.users, t('gestion_utilisateurs')),
+          ),
           GestureDetector(
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SendAnnouncementScreen())),
             child: _buildItem(LucideIcons.megaphone, t('communication')),
