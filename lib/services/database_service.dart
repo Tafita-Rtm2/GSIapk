@@ -11,4 +11,12 @@ class DatabaseService {
   Stream<List<Assignment>> getAssignments(String niveau) => _db.collection('assignments').where('niveau', isEqualTo: niveau).snapshots().map((snap) => snap.docs.map((doc) => Assignment.fromJson(doc.data(), doc.id)).toList());
   Stream<List<Announcement>> getAnnouncements() => _db.collection('announcements').orderBy('date', descending: true).snapshots().map((snap) => snap.docs.map((doc) => Announcement.fromJson(doc.data(), doc.id)).toList());
   Stream<List<Grade>> getGrades(String studentId) => _db.collection('grades').where('studentId', isEqualTo: studentId).snapshots().map((snap) => snap.docs.map((doc) => Grade.fromJson(doc.data(), doc.id)).toList());
+
+  Future<void> addLesson(Lesson lesson) async {
+    await _db.collection('lessons').add(lesson.toJson());
+  }
+
+  Future<void> addAnnouncement(Announcement ann) async {
+    await _db.collection('announcements').add(ann.toJson());
+  }
 }

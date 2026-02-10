@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:gsi_insight/providers/auth_provider.dart';
 import 'package:gsi_insight/providers/language_provider.dart';
+import 'package:gsi_insight/screens/professor/add_lesson_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class ProfessorPortal extends StatelessWidget {
@@ -15,7 +16,10 @@ class ProfessorPortal extends StatelessWidget {
       body: GridView.count(
         padding: const EdgeInsets.all(24), crossAxisCount: 2, mainAxisSpacing: 16, crossAxisSpacing: 16,
         children: [
-          _buildActionCard(LucideIcons.bookOpen, t('publier_lecon'), Colors.indigo),
+          GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddLessonScreen())),
+            child: _buildActionCard(LucideIcons.bookOpen, t('publier_lecon'), Colors.indigo),
+          ),
           _buildActionCard(LucideIcons.fileText, t('publier_devoir'), Colors.orange),
           _buildActionCard(LucideIcons.barChart, t('gestion_notes'), Colors.green),
           _buildActionCard(LucideIcons.users, "Suivi", Colors.blue),
