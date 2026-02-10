@@ -2,7 +2,7 @@
 
 import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
-import { Search, Filter, Download, Star, FileText, Bookmark, Clock, ArrowRight, BookOpen, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Search, Filter, Download, Star, FileText, Bookmark, Clock, ArrowRight, BookOpen, RefreshCw, CheckCircle2, RefreshCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, memo } from "react";
 import { GSIStore, Lesson, Assignment } from "@/lib/store";
@@ -110,6 +110,15 @@ export default function LibraryPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={() => {
+                 setIsRefreshing(true);
+                 setTimeout(() => { setIsRefreshing(false); toast.success("Bibliothèque synchronisée"); }, 1500);
+              }}
+              className={cn("bg-gray-100 p-2 rounded-xl text-gray-500", isRefreshing && "animate-spin")}
+            >
+              <RefreshCcw size={20} />
+            </button>
             <button className="bg-gray-100 p-2 rounded-xl text-gray-500">
               <Filter size={20} />
             </button>

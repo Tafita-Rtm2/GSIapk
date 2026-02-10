@@ -2,7 +2,7 @@
 
 import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Download, FileText } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Download, FileText, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { GSIStore } from "@/lib/store";
@@ -150,14 +150,27 @@ export default function SchedulePage() {
 
         {/* Schedule Items */}
         <div className="space-y-6">
-          {(customData || defaultData)[selectedDay]?.map((item: any, i: number) => (
-            <ScheduleCard
-              key={i}
-              {...item}
-            />
-          ))}
-          {(!(customData || defaultData)[selectedDay] || (customData || defaultData)[selectedDay].length === 0) && (
-            <p className="text-center text-gray-400 italic">Aucun cours prévu pour ce jour.</p>
+          {view === "week" ? (
+            <>
+              {(customData || defaultData)[selectedDay]?.map((item: any, i: number) => (
+                <ScheduleCard
+                  key={i}
+                  {...item}
+                />
+              ))}
+              {(!(customData || defaultData)[selectedDay] || (customData || defaultData)[selectedDay].length === 0) && (
+                <p className="text-center text-gray-400 italic">Aucun cours prévu pour ce jour.</p>
+              )}
+            </>
+          ) : (
+            <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm text-center">
+               <CalendarIcon size={48} className="mx-auto text-gray-200 mb-4" />
+               <h3 className="text-lg font-bold text-gray-700 mb-2">Vue Mensuelle</h3>
+               <p className="text-xs text-gray-400 leading-relaxed">
+                 Le calendrier mensuel complet est en cours de synchronisation avec le portail académique.
+                 Veuillez consulter la vue hebdomadaire pour vos cours immédiats.
+               </p>
+            </div>
           )}
         </div>
       </div>

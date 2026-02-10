@@ -54,11 +54,14 @@ const initialState: State = {
 class GSIStoreClass {
   private state: State = { ...initialState };
   private listeners: Record<string, ((data: any) => void)[]> = {};
+  private firebaseUnsubs: Record<string, () => void> = {};
+  private saveTimeout: any = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
       this.hydrate();
       this.setupAuth();
+      window.addEventListener('beforeunload', () => this.saveImmediate());
     }
   }
 
@@ -80,19 +83,37 @@ class GSIStoreClass {
     this.state.lessons = [
       { id: 'l1', title: 'Guide GSI Insight', description: 'Bienvenue.', subject: 'Général', niveau: 'L1', filiere: [], campus: [], date: new Date().toISOString(), files: [] }
     ];
-    this.save();
+    this.saveImmediate();
   }
 
   private save() {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('gsi_v6_master', JSON.stringify(this.state));
+      if (this.saveTimeout) clearTimeout(this.saveTimeout);
+      this.saveTimeout = setTimeout(() => this.saveImmediate(), 500);
+    }
+  }
+
+  private saveImmediate() {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('gsi_v6_master', JSON.stringify(this.state));
+      } catch (e) {
+        console.error("Failed to save GSIStore state", e);
+      }
     }
   }
 
   private notify(key: string, data: any) {
+    // Notify exact matches
     if (this.listeners[key]) {
       this.listeners[key].forEach(cb => { try { cb(data); } catch(e) {} });
     }
+    // Also notify if this is a state key that has sub-listeners (e.g. 'users' notifies 'users_users')
+    Object.keys(this.listeners).forEach(subKey => {
+      if (subKey !== key && subKey.startsWith(key + '_')) {
+        this.listeners[subKey].forEach(cb => { try { cb(data); } catch(e) {} });
+      }
+    });
   }
 
   private setupAuth() {
@@ -115,19 +136,22 @@ class GSIStoreClass {
     this.notify('auth', user);
   }
 
-  // Robust Subscription
-  private baseSubscribe(key: keyof State, cb: (data: any) => void, collectionName?: string, queryConstraint?: any) {
-    if (!this.listeners[key as string]) this.listeners[key as string] = [];
-    this.listeners[key as string].push(cb);
+  // Robust Subscription with cache and multi-listener support
+  private baseSubscribe(key: keyof State, cb: (data: any) => void, collectionName?: string, queryConstraint?: any, customSubKey?: string) {
+    const subKey = customSubKey || (collectionName ? `${key as string}_${collectionName}` : key as string);
 
-    // Immediate return local
+    if (!this.listeners[subKey]) this.listeners[subKey] = [];
+    this.listeners[subKey].push(cb);
+
+    // Immediate return local state to the new listener
     cb(this.state[key]);
 
-    if (db && collectionName) {
+    // Setup Firebase subscription if not already active for this key
+    if (db && collectionName && !this.firebaseUnsubs[subKey]) {
       let q = query(collection(db, collectionName));
       if (queryConstraint) q = queryConstraint;
 
-      return onSnapshot(q, (snap) => {
+      this.firebaseUnsubs[subKey] = onSnapshot(q, (snap) => {
         const cloudData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         const currentLocal = this.state[key];
 
@@ -137,7 +161,6 @@ class GSIStoreClass {
            const localOnly = currentLocal.filter(item => !cloudIds.has(item.id));
            merged = [...cloudData, ...localOnly];
         } else {
-           // For objects (like schedules), we just merge or use cloud data
            merged = { ...currentLocal };
            cloudData.forEach((d: any) => {
               if (key === 'schedules') {
@@ -151,10 +174,20 @@ class GSIStoreClass {
 
         (this.state[key] as any) = merged;
         this.save();
-        cb(merged);
-      }, (err) => console.warn(`Sync ${key} offline.`));
+        this.notify(subKey, merged);
+      }, (err) => {
+        console.warn(`Sync ${subKey} offline:`, err);
+      });
     }
-    return () => { this.listeners[key as string] = this.listeners[key as string]?.filter(l => l !== cb); };
+
+    return () => {
+      this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb);
+      // Clean up Firebase if no more listeners for this specific subscription
+      if (this.listeners[subKey]?.length === 0 && this.firebaseUnsubs[subKey]) {
+        this.firebaseUnsubs[subKey]();
+        delete this.firebaseUnsubs[subKey];
+      }
+    };
   }
 
   subscribe(cb: (u: User | null) => void) { return this.subscribeAuth(cb); }
@@ -188,14 +221,14 @@ class GSIStoreClass {
   subscribeGrades(studentId: string, cb: (gs: Grade[]) => void) {
     return this.baseSubscribe('grades', (data) => {
       cb(data.filter((g: any) => g.studentId === studentId));
-    }, 'grades', query(collection(db, "grades"), where("studentId", "==", studentId)));
+    }, 'grades', query(collection(db, "grades"), where("studentId", "==", studentId)), `grades_${studentId}`);
   }
 
   subscribeLatestSchedule(campus: string, niveau: string, cb: (s: any) => void) {
+    const sKey = `${campus}_${niveau}`;
     return this.baseSubscribe('schedules', (data) => {
-       const key = `${campus}_${niveau}`;
-       cb(data[key] || null);
-    }, 'schedules', query(collection(db, "schedules"), where("campus", "==", campus), where("niveau", "==", niveau), orderBy("createdAt", "desc")));
+       cb(data[sKey] || null);
+    }, 'schedules', query(collection(db, "schedules"), where("campus", "==", campus), where("niveau", "==", niveau), orderBy("createdAt", "desc")), `schedule_${sKey}`);
   }
 
   // --- NON-BLOCKING ACTIONS ---

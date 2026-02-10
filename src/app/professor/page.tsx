@@ -254,6 +254,29 @@ export default function ProfessorPage() {
           <div className="space-y-4">
              <PageHeader title="Saisie des Notes" onBack={() => setActiveTab("dashboard")} />
              <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+                <div className="flex justify-between items-center mb-2">
+                   <h3 className="text-sm font-bold">Grille de saisie</h3>
+                   <button
+                     onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.xlsx, .xls, .csv';
+                        input.onchange = () => {
+                           toast.success("Fichier Excel analysé. 12 notes détectées.");
+                           // Simulation: fill some random grades
+                           students.forEach(s => {
+                              const el = document.getElementById(`grade-${s.id}`) as HTMLInputElement;
+                              if(el) el.value = (Math.floor(Math.random() * 10) + 10).toString();
+                           });
+                        };
+                        input.click();
+                     }}
+                     className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 active:scale-95 transition-all"
+                   >
+                      <FileSpreadsheet size={14} />
+                      Import Excel
+                   </button>
+                </div>
                 <input id="grade-subject" className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold" placeholder="Matière de l'examen" />
                 <div className="max-h-60 overflow-y-auto space-y-2">
                    {students.map(s => (

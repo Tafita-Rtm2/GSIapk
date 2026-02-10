@@ -280,8 +280,20 @@ export default function AdminPage() {
                <p className="text-xs font-bold uppercase opacity-60 mb-1">Croissance Annuelle</p>
                <h2 className="text-3xl font-black mb-4">+24.5%</h2>
                <div className="flex gap-2">
-                  <button onClick={() => toast.success("Export PDF lancé")} className="px-4 py-2 bg-white/20 rounded-xl text-[10px] font-bold">PDF REPORT</button>
-                  <button onClick={() => toast.success("Export Excel lancé")} className="px-4 py-2 bg-white/20 rounded-xl text-[10px] font-bold">EXCEL DATA</button>
+                  <button onClick={() => toast.success("Export PDF lancé pour tous les campus")} className="px-4 py-2 bg-white/20 rounded-xl text-[10px] font-bold active:scale-95 transition-all">PDF REPORT</button>
+                  <button onClick={() => toast.success("Export Excel lancé (Global GSI)")} className="px-4 py-2 bg-white/20 rounded-xl text-[10px] font-bold active:scale-95 transition-all">EXCEL DATA</button>
+               </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
+               <h3 className="font-bold text-sm mb-4">Rapports Financiers par Campus</h3>
+               <div className="space-y-2">
+                  {CAMPUSES.map(c => (
+                    <div key={c} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                       <span className="text-xs font-bold">{c}</span>
+                       <button onClick={() => toast.success(`Rapport financier ${c} généré.`)} className="text-[10px] font-black text-indigo-600 uppercase">Générer</button>
+                    </div>
+                  ))}
                </div>
             </div>
           </div>
@@ -291,7 +303,7 @@ export default function AdminPage() {
       {/* Convocation Modal */}
       {showConvocationModal && selectedUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative">
+          <div className="bg-white w-full max-sm rounded-[32px] p-8 shadow-2xl relative">
             <button onClick={() => setShowConvocationModal(false)} className="absolute right-6 top-6 text-gray-400"><X size={20} /></button>
             <h2 className="text-xl font-black mb-2">{t("convocation")}</h2>
             <p className="text-xs text-gray-500 mb-6 font-medium">Convoquer <span className="text-indigo-600 font-bold">{selectedUser.fullName}</span>.</p>

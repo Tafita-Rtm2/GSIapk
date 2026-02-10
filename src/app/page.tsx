@@ -146,12 +146,16 @@ export default function Home() {
         <div className="mb-10">
           <div className="flex justify-between items-end mb-5">
             <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter">Cours du jour</h2>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{lessons.length} PUBLIÉS</p>
+            <Link href="/library" className="text-[10px] font-bold text-primary uppercase tracking-widest hover:underline">Voir tout</Link>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
             {lessons.map((l, i) => (
-              <div key={i} className="min-w-[200px] p-5 bg-white rounded-[32px] border border-gray-100 shadow-sm">
-                <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center mb-4">
+              <div
+                key={i}
+                onClick={() => l.files?.[0] && window.open(l.files[0], '_blank')}
+                className="min-w-[200px] p-5 bg-white rounded-[32px] border border-gray-100 shadow-sm active:scale-95 transition-all cursor-pointer group"
+              >
+                <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-white transition-colors">
                   <BookOpen size={20} />
                 </div>
                 <h3 className="font-black text-xs text-gray-800 mb-1 line-clamp-1 uppercase">{l.title}</h3>
@@ -167,14 +171,43 @@ export default function Home() {
           <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter mb-5">Devoirs à rendre</h2>
           <div className="space-y-4">
             {assignments.map((a, i) => (
-               <div key={i} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
+               <div key={i} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden">
                   <div className="flex justify-between items-center mb-4">
                     <span className="bg-orange-50 text-orange-600 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">En attente</span>
-                    <span className="text-[9px] font-black text-gray-300 uppercase">{a.deadline}</span>
+                    <div className="flex items-center gap-1 text-[9px] font-black text-gray-300 uppercase">
+                       <Clock size={10} />
+                       {a.deadline}
+                    </div>
                   </div>
                   <h4 className="font-black text-sm uppercase tracking-tight mb-1">{a.title}</h4>
                   <p className="text-[10px] font-bold text-gray-400 mb-6">{a.subject}</p>
-                  <button onClick={() => toast.success("Interface de dépôt activée.")} className="w-full py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest">Déposer mon travail</button>
+                  <button
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.onchange = (e: any) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          toast.promise(GSIStore.addSubmission({
+                            id: Math.random().toString(36).substr(2, 9),
+                            assignmentId: a.id,
+                            studentId: user.id,
+                            studentName: user.fullName,
+                            date: new Date().toISOString(),
+                            file: "File Uploaded (Simulated)"
+                          }), {
+                            loading: 'Envoi du devoir...',
+                            success: 'Devoir envoyé avec succès !',
+                            error: 'Erreur lors de l\'envoi'
+                          });
+                        }
+                      };
+                      input.click();
+                    }}
+                    className="w-full py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-primary transition-colors shadow-lg active:scale-95"
+                  >
+                    Déposer mon travail
+                  </button>
                </div>
             ))}
             {assignments.length === 0 && <div className="p-10 border-2 border-dashed border-gray-100 rounded-[32px] text-center"><p className="text-[10px] font-black text-gray-300 uppercase">Aucune deadline</p></div>}

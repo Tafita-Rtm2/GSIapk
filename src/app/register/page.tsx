@@ -11,10 +11,10 @@ import { auth } from "@/lib/firebase";
 import { toast } from "sonner";
 
 const CAMPUSES = [
-  "Campus Antananarivo",
-  "Campus Antsirabe",
-  "Campus Bypass",
-  "Campus Tamatave"
+  "Antananarivo",
+  "Antsirabe",
+  "Bypass",
+  "Tamatave"
 ];
 
 const FILIERES = [

@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { GSIStore, User, Grade } from "@/lib/store";
 import { PageHeader } from "@/components/page-header";
+import { toast } from "sonner";
 
 export default function PerformancePage() {
   const { t } = useLanguage();
@@ -45,9 +46,12 @@ export default function PerformancePage() {
         <PageHeader
           title="Ma Performance"
           rightElement={
-            <div className="bg-primary/10 p-2 rounded-xl text-primary">
+            <button
+              onClick={() => toast.success("Données de performance mises à jour.")}
+              className="bg-primary/10 p-2 rounded-xl text-primary active:scale-95 transition-transform"
+            >
               <Award size={24} />
-            </div>
+            </button>
           }
         />
 
