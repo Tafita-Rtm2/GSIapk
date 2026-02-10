@@ -71,9 +71,6 @@ export default function ChatPage() {
           responseText = "Vos notes ne sont pas encore enregistrées dans le système. Dès qu'un professeur aura validé vos copies, elles apparaîtront ici et dans votre Dashboard.";
         }
       }
-      else if (userQuery.includes("paiement") || userQuery.includes("argent") || userQuery.includes("écolage") || userQuery.includes("frais")) {
-        responseText = `Concernant vos frais au campus de ${user?.campus}, votre dossier semble en règle. Vous pouvez télécharger vos reçus ou effectuer un nouveau paiement via 'Services' > 'Paiements'.`;
-      }
       else if (userQuery.includes("campus") || userQuery.includes("gsi") || userQuery.includes("où")) {
         responseText = `Vous êtes rattaché au campus GSI ${user?.campus}. Pour rappel, GSI est présente à Antananarivo, Antsirabe, Bypass et Tamatave. Chaque campus offre les mêmes standards d'excellence !`;
       }

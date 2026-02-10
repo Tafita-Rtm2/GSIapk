@@ -3,7 +3,6 @@
 import { useState, useEffect, memo } from "react";
 import {
   ShieldCheck,
-  CreditCard,
   Users,
   Megaphone,
   GraduationCap,
@@ -26,7 +25,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
-import { GSIStore, User, Payment, Lesson, Assignment } from "@/lib/store";
+import { GSIStore, User, Lesson, Assignment } from "@/lib/store";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { signOut } from "firebase/auth";
@@ -42,7 +41,6 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showConvocationModal, setShowConvocationModal] = useState(false);
-  const [payments, setPayments] = useState<Payment[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,7 +56,6 @@ export default function AdminPage() {
 
     const unsubs = [
       GSIStore.subscribeUsers((us) => { setUsers(us); setSyncStatus('ready'); }),
-      GSIStore.subscribePayments((ps) => setPayments(ps)),
       GSIStore.subscribeLessons({}, (ls) => setLessons(ls)),
       GSIStore.subscribeAssignments({}, (as) => setAssignments(as)),
       GSIStore.subscribeAnnouncements(() => {})
@@ -106,7 +103,6 @@ export default function AdminPage() {
 
   const menuItems = [
     { id: "dashboard", icon: ShieldCheck, label: t("dashboard"), color: "bg-indigo-500" },
-    { id: "payments", icon: CreditCard, label: t("gestion_paiements"), color: "bg-emerald-500" },
     { id: "users", icon: Users, label: t("gestion_utilisateurs"), color: "bg-blue-500" },
     { id: "communication", icon: Megaphone, label: t("communication"), color: "bg-orange-500" },
     { id: "academic", icon: GraduationCap, label: t("gestion_academique"), color: "bg-purple-500" },
@@ -168,9 +164,8 @@ export default function AdminPage() {
       <div className="px-6 space-y-8 flex-1 pb-10">
         {activeTab === "dashboard" && (
           <>
-            <div className="grid grid-cols-2 gap-4">
-              <StatCard label="Étudiants" value={users.filter(u => u.role === 'student').length.toString()} change="+12%" color="text-blue-600" />
-              <StatCard label="Recettes" value="45.2M Ar" change="+5%" color="text-emerald-600" />
+            <div className="grid grid-cols-1 gap-4">
+              <StatCard label="Étudiants Actifs" value={users.filter(u => u.role === 'student').length.toString()} change="+12% ce mois" color="text-blue-600" />
             </div>
 
             <div>
@@ -193,26 +188,6 @@ export default function AdminPage() {
           </>
         )}
 
-        {activeTab === "payments" && (
-          <div className="space-y-4">
-            <PageHeader title={t("gestion_paiements")} onBack={() => setActiveTab("dashboard")} />
-            <div className="space-y-3">
-              {payments.map((p, i) => (
-                <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center shadow-sm">
-                  <div>
-                    <h4 className="font-bold text-sm">{p.studentName}</h4>
-                    <p className="text-[10px] text-gray-500">{p.filiere} • {p.niveau}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-sm text-indigo-600">{p.amount}</p>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.status === 'paid' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>{p.status.toUpperCase()}</span>
-                  </div>
-                </div>
-              ))}
-              {payments.length === 0 && <p className="text-center text-gray-400 py-10 italic text-xs">Aucun paiement en cache.</p>}
-            </div>
-          </div>
-        )}
 
         {activeTab === "users" && (
           <div className="space-y-4">
@@ -285,17 +260,6 @@ export default function AdminPage() {
                </div>
             </div>
 
-            <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
-               <h3 className="font-bold text-sm mb-4">Rapports Financiers par Campus</h3>
-               <div className="space-y-2">
-                  {CAMPUSES.map(c => (
-                    <div key={c} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
-                       <span className="text-xs font-bold">{c}</span>
-                       <button onClick={() => toast.success(`Rapport financier ${c} généré.`)} className="text-[10px] font-black text-indigo-600 uppercase">Générer</button>
-                    </div>
-                  ))}
-               </div>
-            </div>
           </div>
         )}
       </div>

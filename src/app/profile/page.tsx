@@ -1,7 +1,7 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
-import { Settings, ChevronRight, CreditCard, FileCheck, Award, LogOut, QrCode, X } from "lucide-react";
+import { Settings, ChevronRight, FileCheck, Award, LogOut, QrCode, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -162,9 +162,6 @@ export default function ProfilePage() {
 
         <div className="space-y-2 mb-8">
           <h3 className="text-lg font-bold px-2 mb-4">Paramètres du compte</h3>
-          <Link href="/services">
-            <ProfileLink icon={CreditCard} label="Paiements & Reçus" color="text-blue-500" />
-          </Link>
           <Link href="/services">
             <ProfileLink icon={FileCheck} label="Documents Administratifs" color="text-green-500" />
           </Link>

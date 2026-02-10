@@ -20,7 +20,6 @@ export interface User {
   photo?: string;
 }
 
-export interface Payment { id: string; studentId: string; studentName: string; amount: string; date: string; status: 'paid' | 'pending' | 'overdue'; description: string; campus: string; filiere: string; niveau: string; }
 export interface Lesson { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; date: string; files: string[]; }
 export interface Assignment { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; deadline: string; timeLimit: string; maxScore: number; files?: string[]; }
 export interface Submission { id: string; assignmentId: string; studentId: string; studentName: string; date: string; file: string; score?: number; feedback?: string; }
@@ -35,7 +34,6 @@ interface State {
   submissions: Submission[];
   grades: Grade[];
   announcements: Announcement[];
-  payments: Payment[];
   schedules: Record<string, any>;
 }
 
@@ -47,7 +45,6 @@ const initialState: State = {
   submissions: [],
   grades: [],
   announcements: [],
-  payments: [],
   schedules: {}
 };
 
@@ -216,7 +213,6 @@ class GSIStoreClass {
   }
 
   subscribeAnnouncements(cb: (as: Announcement[]) => void) { return this.baseSubscribe('announcements', cb, 'announcements'); }
-  subscribePayments(cb: (ps: Payment[]) => void) { return this.baseSubscribe('payments', cb, 'payments'); }
 
   subscribeGrades(studentId: string, cb: (gs: Grade[]) => void) {
     return this.baseSubscribe('grades', (data) => {
@@ -272,13 +268,6 @@ class GSIStoreClass {
     if (db) this.cloudTask(() => addDoc(collection(db, "grades"), { ...grade, createdAt: Timestamp.now() }));
   }
 
-  async addPayment(payment: Payment) {
-    this.state.payments = [payment, ...this.state.payments];
-    this.save();
-    this.notify('payments', this.state.payments);
-    if (db) this.cloudTask(() => addDoc(collection(db, "payments"), { ...payment, createdAt: Timestamp.now() }));
-  }
-
   async updateUser(user: User) {
     this.state.users = this.state.users.map(u => u.id === user.id ? user : u);
     this.save();
@@ -330,7 +319,6 @@ class GSIStoreClass {
   }
 
   async getUsers() { return this.state.users; }
-  async getPayments() { return this.state.payments; }
   async getLessons() { return this.state.lessons; }
   async getAssignments() { return this.state.assignments; }
   async getGrades() { return this.state.grades; }

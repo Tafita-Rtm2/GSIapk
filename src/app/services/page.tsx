@@ -1,17 +1,16 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
-import { CreditCard, FileText, CheckCircle, AlertCircle, Plus, ChevronLeft } from "lucide-react";
+import { FileText, CheckCircle, AlertCircle, Plus, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { GSIStore, User, Payment } from "@/lib/store";
+import { GSIStore, User } from "@/lib/store";
 import Link from "next/link";
 
 export default function ServicesPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [payments, setPayments] = useState<Payment[]>([]);
 
   useEffect(() => {
     const init = async () => {
@@ -21,8 +20,6 @@ export default function ServicesPage() {
         return;
       }
       setUser(currentUser);
-      const allPayments = await GSIStore.getPayments();
-      setPayments(allPayments.filter((p: Payment) => p.studentId === currentUser.id));
     };
     init();
   }, [router]);
@@ -74,40 +71,6 @@ export default function ServicesPage() {
           </div>
         </section>
 
-        <section className="mb-10">
-          <h2 className="text-lg font-bold text-gray-700 mb-4">Paiements & Reçus</h2>
-          <div className="bg-white rounded-[32px] overflow-hidden border border-gray-100 shadow-sm divide-y divide-gray-50">
-            {payments.map((p, i) => (
-              <div key={i} className="p-5 flex justify-between items-center hover:bg-gray-50/50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "w-11 h-11 rounded-2xl flex items-center justify-center shadow-sm",
-                    p.status === "paid" ? "bg-emerald-50 text-emerald-500" : "bg-rose-50 text-rose-500"
-                  )}>
-                    <CreditCard size={20} />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm">{p.description}</h4>
-                    <p className="text-[10px] text-gray-400 font-medium">{p.date}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-black text-sm text-gray-800">{p.amount}</p>
-                  <p className={cn(
-                    "text-[10px] font-black uppercase tracking-widest",
-                    p.status === "paid" ? "text-emerald-500" : "text-rose-500"
-                  )}>{p.status}</p>
-                </div>
-              </div>
-            ))}
-            {payments.length === 0 && (
-               <div className="p-10 text-center text-gray-400">
-                  <CreditCard size={32} className="mx-auto mb-3 opacity-20" />
-                  <p className="text-xs font-medium">Aucun historique de paiement.</p>
-               </div>
-            )}
-          </div>
-        </section>
 
         <div className="bg-indigo-600 p-8 rounded-[32px] text-white shadow-xl shadow-indigo-100 flex flex-col gap-4 relative overflow-hidden">
           <div className="absolute right-[-20px] top-[-20px] w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
