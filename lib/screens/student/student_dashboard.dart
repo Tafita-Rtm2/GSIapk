@@ -19,9 +19,10 @@ class StudentDashboard extends StatelessWidget {
     if (user == null) return const Scaffold();
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-        child: Column(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(user, t),
@@ -35,7 +36,8 @@ class StudentDashboard extends StatelessWidget {
             _buildSectionHeader("Devoirs à rendre", "${gsi.assignments.length} EN ATTENTE"),
             const SizedBox(height: 16),
             _buildAssignmentsList(gsi.assignments),
-          ],
+            ],
+          ),
         ),
       ),
     );

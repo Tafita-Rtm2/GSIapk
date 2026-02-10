@@ -5,6 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:gsi_insight/providers/auth_provider.dart';
 import 'package:gsi_insight/providers/gsi_provider.dart';
 import 'package:gsi_insight/providers/language_provider.dart';
+import 'package:gsi_insight/screens/login_screen.dart';
+import 'package:gsi_insight/screens/student/student_dashboard.dart';
+import 'package:gsi_insight/screens/professor/professor_portal.dart';
+import 'package:gsi_insight/screens/admin/admin_portal.dart';
 import 'package:gsi_insight/screens/splash_screen.dart';
 
 void main() async {
@@ -51,11 +55,39 @@ class GSIApp extends StatelessWidget {
           seedColor: const Color(0xFF3F51B5),
           primary: const Color(0xFF3F51B5),
           secondary: const Color(0xFF7C4DFF),
-          surface: const Color(0xFFF0F4F8),
+          surface: const Color(0xFFF8FAFC),
         ),
         textTheme: GoogleFonts.plusJakartaSansTextTheme(),
       ),
-      home: const SplashScreen(),
+      home: const AuthWrapper(),
+    );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<GSIAuthProvider>(
+      builder: (context, auth, _) {
+        if (auth.isLoading) {
+          return const SplashScreen();
+        }
+
+        if (auth.user == null) {
+          return const LoginScreen();
+        }
+
+        switch (auth.user!.role) {
+          case 'admin':
+            return const AdminPortal();
+          case 'professor':
+            return const ProfessorPortal();
+          default:
+            return const StudentDashboard();
+        }
+      },
     );
   }
 }

@@ -1,33 +1,44 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:gsi_insight/providers/auth_provider.dart';
-import 'package:gsi_insight/screens/login_screen.dart';
-import 'package:gsi_insight/screens/student/student_dashboard.dart';
-import 'package:gsi_insight/screens/professor/professor_portal.dart';
-import 'package:gsi_insight/screens/admin/admin_portal.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
-    final auth = Provider.of<GSIAuthProvider>(context);
-    if (!auth.isLoading) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-          if (auth.user == null) {
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
-          } else {
-            Widget home = const StudentDashboard();
-            if (auth.user!.role == 'admin') {
-              home = const AdminPortal();
-            } else if (auth.user!.role == 'professor') {
-              home = const ProfessorPortal();
-            }
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => home));
-          }
-        }
-      });
-    }
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F4F8),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: const Icon(LucideIcons.sparkles, color: Color(0xFF3F51B5), size: 50),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              "GSI Insight",
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF1A1C1E),
+                letterSpacing: -1,
+              ),
+            ),
+            const SizedBox(height: 48),
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3F51B5)),
+              strokeWidth: 3,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
