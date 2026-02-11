@@ -7,6 +7,8 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { toast } from 'sonner';
 
 // --- CONFIGURATION ---
+// IMPORTANT: Assurez-vous que ces URLs correspondent exactement à votre config serveur.
+// Un slash manquant ou un domaine sans 'www' peut causer des erreurs 301.
 const API_BASE = "https://groupegsi.mg/rtmggmg/api";
 const MEDIA_BASE = "https://groupegsi.mg/rtmggmg";
 
@@ -244,11 +246,13 @@ class GSIStoreClass {
 
   // --- API HELPERS ---
 
-  private async apiCall(endpoint: string, method = 'GET', body?: any) {
+  private async apiCall(endpoint: string, method = 'GET', body?: any, redirectCount = 0): Promise<any> {
+    if (redirectCount > 3) return null;
+
     this.syncingCount++;
     this.notify('sync_status', true);
 
-    const url = `${API_BASE}${endpoint}`;
+    const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
 
     try {
       let response: any;
@@ -263,6 +267,15 @@ class GSIStoreClass {
           readTimeout: 15000
         };
         response = await CapacitorHttp.request(options);
+
+        // Manual Redirect Handling for 301/302/307/308
+        if (response.status >= 300 && response.status < 400) {
+          const location = response.headers['Location'] || response.headers['location'];
+          if (location) {
+            this.syncingCount = Math.max(0, this.syncingCount - 1);
+            return this.apiCall(location, method, body, redirectCount + 1);
+          }
+        }
       } else {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -773,7 +786,9 @@ class GSIStoreClass {
     });
   }
 
-  async downloadPackFile(url: string, fileName: string, lessonId: string) {
+  async downloadPackFile(url: string, fileName: string, lessonId: string, redirectCount = 0): Promise<string> {
+    if (redirectCount > 3) throw new Error("Trop de redirections.");
+
     try {
       const absoluteUrl = this.getAbsoluteUrl(url);
       const safeFileName = fileName.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
@@ -795,6 +810,12 @@ class GSIStoreClass {
           url: absoluteUrl,
           responseType: 'blob'
         });
+
+        if (response.status >= 300 && response.status < 400) {
+          const location = response.headers['Location'] || response.headers['location'];
+          if (location) return this.downloadPackFile(location, fileName, lessonId, redirectCount + 1);
+        }
+
         if (response.status !== 200) throw new Error(`Erreur serveur (${response.status})`);
         base64Data = response.data; // CapacitorHttp with responseType: 'blob' returns base64 on native
       } else {
@@ -860,6 +881,7 @@ class GSIStoreClass {
       }
     } catch (e: any) {
       console.error("Open pack failed:", e);
+      // Fallback: try opening the absolute URL directly in the viewer
       window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: absoluteUrl, type, originalUrl: absoluteUrl } }));
     }
   }
