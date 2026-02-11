@@ -111,6 +111,7 @@ class GSIStoreClass {
   private listeners: Record<string, ((data: any) => void)[]> = {};
   private saveTimeout: any = null;
   private syncingCount = 0;
+  private apiCache: Record<string, { data: any, ts: number }> = {};
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -249,6 +250,11 @@ class GSIStoreClass {
   private async apiCall(endpoint: string, method = 'GET', body?: any, redirectCount = 0): Promise<any> {
     if (redirectCount > 3) return null;
 
+    // Performance: Fast cache for GET requests (15s)
+    if (method === 'GET' && this.apiCache[endpoint] && (Date.now() - this.apiCache[endpoint].ts < 15000)) {
+       return this.apiCache[endpoint].data;
+    }
+
     this.syncingCount++;
     this.notify('sync_status', true);
 
@@ -298,6 +304,9 @@ class GSIStoreClass {
       if (this.syncingCount === 0) this.notify('sync_status', false);
 
       if (response.status >= 200 && response.status < 300) {
+        if (method === 'GET') {
+           this.apiCache[endpoint] = { data: response.data, ts: Date.now() };
+        }
         return response.data;
       }
       return null;
@@ -855,15 +864,30 @@ class GSIStoreClass {
     const type = lowUrl.includes('.pdf') ? 'pdf' :
                  lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/) ? 'video' : 'pdf';
 
+    const dispatchViewer = (targetUrl: string) => {
+      window.dispatchEvent(new CustomEvent('gsi-open-viewer', {
+        detail: { url: targetUrl, type, originalUrl: absoluteUrl }
+      }));
+    };
+
     try {
       const progress = this.getProgress(lessonId);
       if (progress?.localPath) {
         try {
-          await Filesystem.stat({ path: progress.localPath, directory: Directory.Data });
-          const fileUri = await Filesystem.getUri({ path: progress.localPath, directory: Directory.Data });
-          const targetUrl = Capacitor.convertFileSrc(fileUri.uri);
+          const path = progress.localPath;
+          await Filesystem.stat({ path, directory: Directory.Data });
 
-          window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: targetUrl, type, originalUrl: absoluteUrl } }));
+          // Robust loading: Convert to Blob URL for PDF if possible to bypass iframe restrictions
+          if (type === 'pdf' && Capacitor.isNativePlatform()) {
+             const file = await Filesystem.readFile({ path, directory: Directory.Data });
+             const dataStr = typeof file.data === 'string' ? file.data : '';
+             const blob = this.b64toBlob(dataStr, 'application/pdf');
+             const blobUrl = URL.createObjectURL(blob);
+             dispatchViewer(blobUrl);
+          } else {
+             const fileUri = await Filesystem.getUri({ path, directory: Directory.Data });
+             dispatchViewer(Capacitor.convertFileSrc(fileUri.uri));
+          }
           return;
         } catch (e) {
           this.setDownloaded(lessonId, false);
@@ -873,17 +897,38 @@ class GSIStoreClass {
       if (window.navigator.onLine) {
         const fileName = absoluteUrl.split('/').pop() || (type === 'pdf' ? 'doc.pdf' : 'video.mp4');
         const path = await this.downloadPackFile(absoluteUrl, fileName, lessonId);
-        const fileUri = await Filesystem.getUri({ path, directory: Directory.Data });
-        const targetUrl = Capacitor.convertFileSrc(fileUri.uri);
-        window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: targetUrl, type, originalUrl: absoluteUrl } }));
+
+        if (type === 'pdf' && Capacitor.isNativePlatform()) {
+          const file = await Filesystem.readFile({ path, directory: Directory.Data });
+          const dataStr = typeof file.data === 'string' ? file.data : '';
+          const blob = this.b64toBlob(dataStr, 'application/pdf');
+          dispatchViewer(URL.createObjectURL(blob));
+        } else {
+          const fileUri = await Filesystem.getUri({ path, directory: Directory.Data });
+          dispatchViewer(Capacitor.convertFileSrc(fileUri.uri));
+        }
       } else {
         toast.error("Connexion requise pour lire ce fichier.");
       }
     } catch (e: any) {
       console.error("Open pack failed:", e);
-      // Fallback: try opening the absolute URL directly in the viewer
-      window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: absoluteUrl, type, originalUrl: absoluteUrl } }));
+      dispatchViewer(absoluteUrl);
     }
+  }
+
+  private b64toBlob(b64Data: string, contentType = '', sliceSize = 512) {
+    const byteCharacters = atob(b64Data);
+    const byteArrays = [];
+    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+      const slice = byteCharacters.slice(offset, offset + sliceSize);
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+    return new Blob(byteArrays, { type: contentType });
   }
 
   async getUser(id: string, forceCloud = false): Promise<User | null> {

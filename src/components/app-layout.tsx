@@ -25,6 +25,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     const handleOpen = (e: any) => {
       setViewerLoading(true);
       setViewerData(e.detail);
+      // Safety timeout to prevent infinite loading screen
+      setTimeout(() => setViewerLoading(false), 8000);
     };
     window.addEventListener('gsi-open-viewer', handleOpen);
 
@@ -117,14 +119,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                  </div>
                  <div>
                     <span className="text-[10px] font-black uppercase tracking-widest block">Lecteur GSI</span>
-                    <button
-                      onClick={() => {
-                        import('@capacitor/browser').then(b => b.Browser.open({ url: viewerData.originalUrl || viewerData.url }));
-                      }}
-                      className="text-[8px] font-bold text-primary underline uppercase"
-                    >
-                      Ouvrir externe
-                    </button>
+                    <span className="text-[8px] font-bold text-gray-400 uppercase">Document Sécurisé</span>
                  </div>
               </div>
               <button onClick={() => setViewerData(null)} className="p-3 bg-white/10 rounded-xl active:scale-90 transition-all">
@@ -144,6 +139,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                    className="w-full h-full border-none"
                    title="GSI Reader"
                    onLoad={() => setViewerLoading(false)}
+                   onError={() => setViewerLoading(false)}
                  />
               ) : (
                  <video
@@ -151,6 +147,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                    controls
                    autoPlay
                    onLoadedData={() => setViewerLoading(false)}
+                   onError={() => {
+                     setViewerLoading(false);
+                     toast.error("Erreur de lecture vidéo.");
+                   }}
                    className="w-full h-full bg-black object-contain"
                  />
               )}
