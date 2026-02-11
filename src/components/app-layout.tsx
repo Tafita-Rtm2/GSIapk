@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, BookOpen, Library, User, MessageCircle, Users } from "lucide-react";
+import { Home, Calendar, BookOpen, Library, User, MessageCircle, Users, X, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n";
 import { useState, useEffect } from "react";
@@ -15,8 +15,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [user, setUser] = useState<GSIUser | null>(null);
 
+  const [viewerData, setViewerData] = useState<{ url: string, type: string } | null>(null);
+
   useEffect(() => {
     setUser(GSIStore.getCurrentUser());
+    const handleOpen = (e: any) => setViewerData(e.detail);
+    window.addEventListener('gsi-open-viewer', handleOpen);
+    return () => window.removeEventListener('gsi-open-viewer', handleOpen);
   }, []);
 
   const navItems = [
@@ -61,6 +66,42 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         >
           <MessageCircle size={24} />
         </Link>
+      )}
+
+      {/* In-App Global Viewer */}
+      {viewerData && (
+        <div className="fixed inset-0 bg-black z-[100] flex flex-col animate-in slide-in-from-bottom duration-300">
+           <div className="p-4 bg-gray-900 text-white flex justify-between items-center safe-top">
+              <div className="flex items-center gap-3">
+                 <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                    <Maximize2 size={16} />
+                 </div>
+                 <span className="text-[10px] font-black uppercase tracking-widest">Lecteur GSI Insight</span>
+              </div>
+              <button onClick={() => setViewerData(null)} className="p-3 bg-white/10 rounded-xl active:scale-90 transition-all">
+                 <X size={20} />
+              </button>
+           </div>
+           <div className="flex-1 bg-white relative overflow-hidden">
+              {viewerData.type === 'pdf' ? (
+                 <iframe
+                   src={`${viewerData.url}#toolbar=0&navpanes=0&scrollbar=0`}
+                   className="w-full h-full border-none"
+                   title="GSI Reader"
+                 />
+              ) : (
+                 <video
+                   src={viewerData.url}
+                   controls
+                   autoPlay
+                   className="w-full h-full bg-black object-contain"
+                 />
+              )}
+           </div>
+           <div className="p-4 bg-gray-900 text-center">
+              <p className="text-[8px] font-bold text-gray-500 uppercase tracking-widest">© Groupe GSI — Confidentialité Totale</p>
+           </div>
+        </div>
       )}
     </div>
   );

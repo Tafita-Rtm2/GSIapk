@@ -34,6 +34,10 @@ export interface ChatMessage {
   senderName: string;
   senderPhoto?: string;
   text: string;
+  replyTo?: {
+    senderName: string;
+    text: string;
+  };
   timestamp: string;
   filiere: string;
   niveau: string;
@@ -259,6 +263,17 @@ class GSIStoreClass {
       }
 
       (this.state[key] as any) = merged;
+
+      // Sync currentUser if it's in the users collection
+      if (key === 'users' && this.state.currentUser) {
+        const updatedSelf = (merged as User[]).find(u => u.id === this.state.currentUser!.id);
+        if (updatedSelf) {
+          // Merge but keep local password if cloud doesn't have it (for mock auth)
+          this.state.currentUser = { ...this.state.currentUser, ...updatedSelf };
+          this.notify('auth', this.state.currentUser);
+        }
+      }
+
       this.save();
       this.notify(key as string, merged);
 
@@ -575,7 +590,7 @@ class GSIStoreClass {
   }
 
   // --- CHAT ---
-  async sendMessage(text: string) {
+  async sendMessage(text: string, replyTo?: { senderName: string, text: string }) {
     if (!this.state.currentUser) return;
     const msg: ChatMessage = {
       id: Math.random().toString(36).substr(2, 9),
@@ -583,6 +598,7 @@ class GSIStoreClass {
       senderName: this.state.currentUser.fullName,
       senderPhoto: this.state.currentUser.photo,
       text,
+      replyTo,
       timestamp: new Date().toISOString(),
       filiere: this.state.currentUser.filiere,
       niveau: this.state.currentUser.niveau
@@ -677,6 +693,13 @@ class GSIStoreClass {
 
   async downloadPackFile(url: string, fileName: string, lessonId: string) {
     try {
+      const path = `gsi_packs/${lessonId}_${fileName}`;
+      // Check if already exists to prevent re-download
+      try {
+        await Filesystem.stat({ path, directory: Directory.Data });
+        return path;
+      } catch (e) {}
+
       if (typeof window === 'undefined' || !window.navigator.onLine) {
          throw new Error("Connexion requise pour le téléchargement.");
       }
@@ -687,7 +710,6 @@ class GSIStoreClass {
         reader.onloadend = () => resolve(reader.result as string);
         reader.readAsDataURL(blob);
       });
-      const path = `gsi_packs/${lessonId}_${fileName}`;
       await Filesystem.writeFile({
         path,
         data: base64Data,
@@ -706,27 +728,32 @@ class GSIStoreClass {
   async openPackFile(lessonId: string, fallbackUrl: string) {
     try {
       const progress = this.getProgress(lessonId);
-      let targetUrl = fallbackUrl;
-
       if (progress?.localPath) {
-         const fileUri = await Filesystem.getUri({
-           path: progress.localPath,
-           directory: Directory.Data
-         });
-         targetUrl = Capacitor.convertFileSrc(fileUri.uri);
+        try {
+          await Filesystem.stat({ path: progress.localPath, directory: Directory.Data });
+          const fileUri = await Filesystem.getUri({ path: progress.localPath, directory: Directory.Data });
+          const targetUrl = Capacitor.convertFileSrc(fileUri.uri);
+
+          // We'll use a custom event to notify the UI to show the InAppViewer
+          window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: targetUrl, type: fallbackUrl.endsWith('.pdf') ? 'pdf' : 'video' } }));
+          return;
+        } catch (e) {
+          this.setDownloaded(lessonId, false);
+        }
       }
 
-      if (targetUrl) {
-         // Open in Capacitor Browser (In-app)
-         await Browser.open({
-            url: targetUrl,
-            windowName: '_self', // Try to keep it inside if possible
-            toolbarColor: '#3F51B5'
-         });
+      if (window.navigator.onLine) {
+        const fileName = fallbackUrl.split('/').pop() || 'document';
+        const path = await this.downloadPackFile(fallbackUrl, fileName, lessonId);
+        const fileUri = await Filesystem.getUri({ path, directory: Directory.Data });
+        const targetUrl = Capacitor.convertFileSrc(fileUri.uri);
+        window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: targetUrl, type: fallbackUrl.endsWith('.pdf') ? 'pdf' : 'video' } }));
+      } else {
+        throw new Error("Fichier non disponible hors-ligne.");
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Open pack failed", e);
-      if (fallbackUrl) window.open(fallbackUrl, '_blank');
+      window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: fallbackUrl, type: fallbackUrl.endsWith('.pdf') ? 'pdf' : 'video' } }));
     }
   }
 

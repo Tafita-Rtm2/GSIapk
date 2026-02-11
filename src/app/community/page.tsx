@@ -2,7 +2,7 @@
 
 import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
-import { Send, Users, Sparkles, MessageSquare, Clock } from "lucide-react";
+import { Send, Users, Sparkles, MessageSquare, Clock, X, Paperclip, Image as ImageIcon, File } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { GSIStore, ChatMessage, User } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ export default function CommunityPage() {
   const [user, setUser] = useState<User | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,8 +34,10 @@ export default function CommunityPage() {
     e.preventDefault();
     if (!input.trim()) return;
     const text = input.trim();
+    const reply = replyTo ? { senderName: replyTo.senderName, text: replyTo.text } : undefined;
     setInput("");
-    await GSIStore.sendMessage(text);
+    setReplyTo(null);
+    await GSIStore.sendMessage(text, reply);
   };
 
   if (!user) return null;
@@ -56,22 +59,60 @@ export default function CommunityPage() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6">
            {messages.map((m, i) => (
              <div key={i} className={cn(
-               "flex flex-col animate-in fade-in slide-in-from-bottom-2",
-               m.senderId === user.id ? "items-end" : "items-start"
+               "flex gap-3 animate-in fade-in slide-in-from-bottom-2",
+               m.senderId === user.id ? "flex-row-reverse" : "flex-row"
              )}>
-                <div className="flex items-center gap-2 mb-1 px-1">
-                   {m.senderId !== user.id && (
-                      <span className="text-[9px] font-black text-gray-400 uppercase">{m.senderName}</span>
+                {/* Avatar */}
+                <div className="w-8 h-8 rounded-full bg-indigo-50 border-2 border-white shadow-sm flex-shrink-0 overflow-hidden flex items-center justify-center">
+                   {m.senderPhoto ? (
+                      <img src={m.senderPhoto} alt="" className="w-full h-full object-cover" />
+                   ) : (
+                      <span className="text-[10px] font-black text-indigo-400">{m.senderName.charAt(0)}</span>
                    )}
-                   <span className="text-[7px] text-gray-300 font-bold">{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
+
                 <div className={cn(
-                  "max-w-[80%] p-4 rounded-[24px] text-sm font-medium shadow-sm",
-                  m.senderId === user.id
-                    ? "bg-indigo-600 text-white rounded-tr-none shadow-indigo-100"
-                    : "bg-white text-gray-800 rounded-tl-none border border-gray-100"
+                  "flex flex-col max-w-[75%]",
+                  m.senderId === user.id ? "items-end" : "items-start"
                 )}>
-                   {m.text}
+                    <div className="flex items-center gap-2 mb-1 px-1">
+                       {m.senderId !== user.id && (
+                          <span className="text-[9px] font-black text-gray-400 uppercase">{m.senderName}</span>
+                       )}
+                       <span className="text-[7px] text-gray-300 font-bold">{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <div
+                      onContextMenu={(e) => { e.preventDefault(); setReplyTo(m); }}
+                      onClick={() => setReplyTo(m)}
+                      className={cn(
+                        "p-4 rounded-[24px] text-sm font-medium shadow-sm active:scale-[0.98] transition-transform overflow-hidden",
+                        m.senderId === user.id
+                          ? "bg-indigo-600 text-white rounded-tr-none shadow-indigo-100"
+                          : "bg-white text-gray-800 rounded-tl-none border border-gray-100"
+                      )}
+                    >
+                       {m.replyTo && (
+                          <div className={cn(
+                             "mb-2 p-2 rounded-xl text-[10px] border-l-4",
+                             m.senderId === user.id ? "bg-white/10 border-white/30 text-white/80" : "bg-gray-50 border-indigo-500 text-gray-500"
+                          )}>
+                             <span className="font-black block uppercase tracking-tighter opacity-50">{m.replyTo.senderName}</span>
+                             <p className="line-clamp-1">{m.replyTo.text}</p>
+                          </div>
+                       )}
+                       {m.text.startsWith('📷 Photo:') ? (
+                          <div className="space-y-2">
+                             <img src={m.text.split(': ')[1]} alt="Chat attachment" className="rounded-xl max-w-full h-auto" />
+                             <p className="text-[10px] opacity-70">Cliquer pour agrandir</p>
+                          </div>
+                       ) : m.text.startsWith('📄 Document:') ? (
+                          <a href={m.text.split(': ')[1]} target="_blank" className="flex items-center gap-2 underline decoration-white/30">
+                             <File size={16} /> Document joint
+                          </a>
+                       ) : (
+                          m.text
+                       )}
+                    </div>
                 </div>
              </div>
            ))}
@@ -83,8 +124,39 @@ export default function CommunityPage() {
            )}
         </div>
 
-        <div className="p-4 bg-white border-t border-gray-100 flex gap-2">
-           <form onSubmit={handleSend} className="flex-1 flex gap-2">
+        <div className="p-4 bg-white border-t border-gray-100">
+           {replyTo && (
+             <div className="mb-2 p-3 bg-gray-50 rounded-2xl flex items-center justify-between border border-gray-100 animate-in slide-in-from-bottom-1">
+                <div className="flex flex-col">
+                   <span className="text-[8px] font-black text-indigo-600 uppercase">En réponse à {replyTo.senderName}</span>
+                   <p className="text-[10px] text-gray-400 truncate max-w-[200px]">{replyTo.text}</p>
+                </div>
+                <button onClick={() => setReplyTo(null)} className="p-1 text-gray-400"><X size={14} /></button>
+             </div>
+           )}
+           <form onSubmit={handleSend} className="flex gap-2 items-end">
+              <div className="flex flex-col gap-2">
+                 <button
+                   type="button"
+                   onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/*,application/pdf';
+                      input.onchange = async (e: any) => {
+                         const file = e.target.files?.[0];
+                         if (file) {
+                            const url = await GSIStore.uploadFile(file, `chat/${user.id}_${Date.now()}`);
+                            const fileType = file.type.startsWith('image/') ? '📷 Photo' : '📄 Document';
+                            await GSIStore.sendMessage(`${fileType}: ${url}`);
+                         }
+                      };
+                      input.click();
+                   }}
+                   className="p-3 bg-gray-50 text-gray-400 rounded-2xl active:scale-95 transition-all"
+                 >
+                    <Paperclip size={20} />
+                 </button>
+              </div>
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
