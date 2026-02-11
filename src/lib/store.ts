@@ -813,6 +813,7 @@ class GSIStoreClass {
       }
 
       let base64Data = "";
+      let contentType = "";
 
       if (Capacitor.isNativePlatform()) {
         const response = await CapacitorHttp.get({
@@ -827,9 +828,11 @@ class GSIStoreClass {
 
         if (response.status !== 200) throw new Error(`Erreur serveur (${response.status})`);
         base64Data = response.data; // CapacitorHttp with responseType: 'blob' returns base64 on native
+        contentType = response.headers['Content-Type'] || response.headers['content-type'] || "";
       } else {
         const response = await fetch(absoluteUrl);
         if (!response.ok) throw new Error(`Erreur serveur (${response.status})`);
+        contentType = response.headers.get('content-type') || "";
         const blob = await response.blob();
         base64Data = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
@@ -850,7 +853,7 @@ class GSIStoreClass {
       });
 
       this.setDownloaded(lessonId, true);
-      this.saveProgress(lessonId, { localPath: path });
+      this.saveProgress(lessonId, { localPath: path, mimeType: contentType });
       return path;
     } catch (e: any) {
       console.error("Pack download failed:", e);
@@ -860,11 +863,21 @@ class GSIStoreClass {
 
   async openPackFile(lessonId: string, url: string) {
     const absoluteUrl = this.getAbsoluteUrl(url);
-    const lowUrl = absoluteUrl.toLowerCase();
-    const type = lowUrl.includes('.pdf') ? 'pdf' :
-                 lowUrl.includes('.docx') ? 'docx' :
-                 lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/) ? 'video' :
-                 lowUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/) ? 'image' : 'pdf';
+    const lowUrl = absoluteUrl.toLowerCase().split('?')[0];
+    const progress = this.getProgress(lessonId);
+
+    let type: 'pdf' | 'docx' | 'video' | 'image' = 'pdf';
+    const mime = (progress?.mimeType || "").toLowerCase();
+
+    if (mime.includes('pdf') || lowUrl.endsWith('.pdf')) type = 'pdf';
+    else if (mime.includes('word') || mime.includes('docx') || lowUrl.endsWith('.docx')) type = 'docx';
+    else if (mime.includes('video') || lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/)) type = 'video';
+    else if (mime.includes('image') || lowUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/)) type = 'image';
+    else {
+      if (lowUrl.includes('.pdf')) type = 'pdf';
+      else if (lowUrl.includes('.docx')) type = 'docx';
+      else if (lowUrl.includes('.mp4')) type = 'video';
+    }
 
     const dispatchViewer = (targetUrl: string) => {
       window.dispatchEvent(new CustomEvent('gsi-open-viewer', {
@@ -873,44 +886,42 @@ class GSIStoreClass {
     };
 
     try {
-      const progress = this.getProgress(lessonId);
+      // 1. Check for cached/downloaded file
       if (progress?.localPath) {
         try {
           const path = progress.localPath;
           await Filesystem.stat({ path, directory: Directory.Data });
+          const file = await Filesystem.readFile({ path, directory: Directory.Data });
+          const dataStr = typeof file.data === 'string' ? file.data : '';
 
-          // Robust loading: Convert to Blob URL for PDF/DOCX if possible to bypass WebView restrictions
-          if ((type === 'pdf' || type === 'docx') && Capacitor.isNativePlatform()) {
-             const file = await Filesystem.readFile({ path, directory: Directory.Data });
-             const dataStr = typeof file.data === 'string' ? file.data : '';
-             const mime = type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-             const blob = this.b64toBlob(dataStr, mime);
-             const blobUrl = URL.createObjectURL(blob);
-             dispatchViewer(blobUrl);
-          } else {
-             const fileUri = await Filesystem.getUri({ path, directory: Directory.Data });
-             dispatchViewer(Capacitor.convertFileSrc(fileUri.uri));
+          let actualMime = mime;
+          if (!actualMime) {
+             actualMime = type === 'pdf' ? 'application/pdf' :
+                          type === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' :
+                          type === 'video' ? 'video/mp4' : 'image/jpeg';
           }
+
+          const blob = this.b64toBlob(dataStr, actualMime);
+          const blobUrl = URL.createObjectURL(blob);
+          dispatchViewer(blobUrl);
           return;
         } catch (e) {
           this.setDownloaded(lessonId, false);
         }
       }
 
+      // 2. If not cached, download or stream
       if (window.navigator.onLine) {
         const fileName = absoluteUrl.split('/').pop() || (type === 'pdf' ? 'doc.pdf' : type === 'docx' ? 'doc.docx' : 'video.mp4');
         const path = await this.downloadPackFile(absoluteUrl, fileName, lessonId);
 
-        if ((type === 'pdf' || type === 'docx') && Capacitor.isNativePlatform()) {
-          const file = await Filesystem.readFile({ path, directory: Directory.Data });
-          const dataStr = typeof file.data === 'string' ? file.data : '';
-          const mime = type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-          const blob = this.b64toBlob(dataStr, mime);
-          dispatchViewer(URL.createObjectURL(blob));
-        } else {
-          const fileUri = await Filesystem.getUri({ path, directory: Directory.Data });
-          dispatchViewer(Capacitor.convertFileSrc(fileUri.uri));
-        }
+        // After download, re-read progress to get the correct mimeType
+        const updatedProgress = this.getProgress(lessonId);
+        const file = await Filesystem.readFile({ path, directory: Directory.Data });
+        const dataStr = typeof file.data === 'string' ? file.data : '';
+        const blob = this.b64toBlob(dataStr, updatedProgress?.mimeType || mime || 'application/pdf');
+        const blobUrl = URL.createObjectURL(blob);
+        dispatchViewer(blobUrl);
       } else {
         toast.error("Connexion requise pour lire ce fichier.");
       }

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import mammoth from 'mammoth';
 import { Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { toast } from 'sonner';
@@ -25,6 +25,7 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
+    console.log(`GSIViewer: Loading ${type} from ${url}`);
     setLoading(true);
     if (type === 'pdf') {
       renderPdf();
@@ -33,12 +34,25 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
     } else if (type === 'video' || type === 'image') {
       setLoading(false);
       onLoadComplete?.();
+    } else {
+      setLoading(false);
+      onError?.("Type de fichier non reconnu.");
     }
   }, [url, type]);
 
   const renderPdf = async (pageNum = 1) => {
     try {
-      const loadingTask = pdfjsLib.getDocument(url);
+      const response = await fetch(url);
+      const arrayBuffer = await response.arrayBuffer();
+
+      // Basic PDF magic number check (%PDF-)
+      const header = new Uint8Array(arrayBuffer.slice(0, 5));
+      const headerString = String.fromCharCode(...header);
+      if (!headerString.includes('%PDF-')) {
+         throw new Error("Le fichier n'est pas un document PDF valide.");
+      }
+
+      const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
       const pdf = await loadingTask.promise;
       setPdfData({ numPages: pdf.numPages, currentPage: pageNum });
 
@@ -65,13 +79,14 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
     } catch (err: any) {
       console.error("PDF Render Error:", err);
       setLoading(false);
-      onError?.("Erreur de rendu PDF.");
+      onError?.(`Erreur de rendu PDF: ${err.message || 'Fichier invalide'}`);
     }
   };
 
   const renderDocx = async () => {
     try {
       const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const arrayBuffer = await response.arrayBuffer();
       const result = await mammoth.convertToHtml({ arrayBuffer });
       setDocxHtml(result.value);
@@ -80,7 +95,7 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
     } catch (err: any) {
       console.error("DOCX Render Error:", err);
       setLoading(false);
-      onError?.("Erreur de rendu DOCX.");
+      onError?.(`Erreur de rendu DOCX: ${err.message}`);
     }
   };
 
