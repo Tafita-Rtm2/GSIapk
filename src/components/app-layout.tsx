@@ -17,11 +17,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
 
-  const [viewerData, setViewerData] = useState<{ url: string, type: string } | null>(null);
+  const [viewerData, setViewerData] = useState<{ url: string, type: string, originalUrl?: string } | null>(null);
+  const [viewerLoading, setViewerLoading] = useState(true);
 
   useEffect(() => {
     setUser(GSIStore.getCurrentUser());
-    const handleOpen = (e: any) => setViewerData(e.detail);
+    const handleOpen = (e: any) => {
+      setViewerLoading(true);
+      setViewerData(e.detail);
+    };
     window.addEventListener('gsi-open-viewer', handleOpen);
 
     const unsubSync = GSIStore.subscribeSyncStatus((s) => setIsSyncing(s));
@@ -111,24 +115,42 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                  <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                     <Maximize2 size={16} />
                  </div>
-                 <span className="text-[10px] font-black uppercase tracking-widest">Lecteur GSI Insight</span>
+                 <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest block">Lecteur GSI</span>
+                    <button
+                      onClick={() => {
+                        import('@capacitor/browser').then(b => b.Browser.open({ url: viewerData.originalUrl || viewerData.url }));
+                      }}
+                      className="text-[8px] font-bold text-primary underline uppercase"
+                    >
+                      Ouvrir externe
+                    </button>
+                 </div>
               </div>
               <button onClick={() => setViewerData(null)} className="p-3 bg-white/10 rounded-xl active:scale-90 transition-all">
                  <X size={20} />
               </button>
            </div>
-           <div className="flex-1 bg-white relative overflow-hidden">
+           <div className="flex-1 bg-white relative overflow-hidden flex flex-col items-center justify-center">
+              {viewerLoading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
+                   <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+                   <p className="text-[10px] font-bold text-gray-400 uppercase">Chargement du document...</p>
+                </div>
+              )}
               {viewerData.type === 'pdf' ? (
                  <iframe
                    src={`${viewerData.url}#toolbar=0&navpanes=0&scrollbar=0`}
                    className="w-full h-full border-none"
                    title="GSI Reader"
+                   onLoad={() => setViewerLoading(false)}
                  />
               ) : (
                  <video
                    src={viewerData.url}
                    controls
                    autoPlay
+                   onLoadedData={() => setViewerLoading(false)}
                    className="w-full h-full bg-black object-contain"
                  />
               )}

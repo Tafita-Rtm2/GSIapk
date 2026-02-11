@@ -2,7 +2,7 @@
 
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Browser } from '@capacitor/browser';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { toast } from 'sonner';
 
@@ -248,25 +248,46 @@ class GSIStoreClass {
     this.syncingCount++;
     this.notify('sync_status', true);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout for API calls
-
-    const options: RequestInit = {
-      method,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      signal: controller.signal
-    };
-    if (body) options.body = JSON.stringify(body);
+    const url = `${API_BASE}${endpoint}`;
 
     try {
-      const response = await fetch(`${API_BASE}${endpoint}`, options);
-      clearTimeout(timeoutId);
+      let response: any;
+
+      if (Capacitor.isNativePlatform()) {
+        const options = {
+          url,
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          data: body,
+          connectTimeout: 15000,
+          readTimeout: 15000
+        };
+        response = await CapacitorHttp.request(options);
+      } else {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const options: RequestInit = {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: body ? JSON.stringify(body) : undefined
+        };
+        const res = await fetch(url, options);
+        clearTimeout(timeoutId);
+        response = {
+          status: res.status,
+          data: await res.json(),
+          ok: res.ok
+        };
+      }
+
       this.syncingCount = Math.max(0, this.syncingCount - 1);
       if (this.syncingCount === 0) this.notify('sync_status', false);
-      if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
-      return await response.json();
+
+      if (response.status >= 200 && response.status < 300) {
+        return response.data;
+      }
+      return null;
     } catch (e: any) {
       this.syncingCount = Math.max(0, this.syncingCount - 1);
       if (this.syncingCount === 0) this.notify('sync_status', false);
@@ -758,7 +779,6 @@ class GSIStoreClass {
       const safeFileName = fileName.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
       const path = `gsi_packs/${lessonId}_${safeFileName}`;
 
-      // Check if already exists to prevent re-download
       try {
         await Filesystem.stat({ path, directory: Directory.Data });
         return path;
@@ -768,29 +788,29 @@ class GSIStoreClass {
          throw new Error("Connexion requise pour le téléchargement.");
       }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout for downloads
+      let base64Data = "";
 
-      const response = await fetch(absoluteUrl, { signal: controller.signal }).catch(err => {
-         if (err.name === 'AbortError') throw new Error("Délai d'attente dépassé (2 min). Le fichier est peut-être trop lourd.");
-         throw new Error(`Erreur de connexion : ${err.message}. Vérifiez votre accès internet.`);
-      });
-      clearTimeout(timeoutId);
-
-      if (!response.ok) throw new Error(`Erreur serveur (${response.status}) : Impossible de récupérer le fichier.`);
-
-      const blob = await response.blob();
-      const reader = new FileReader();
-      const base64Data = await new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => {
-          const res = reader.result as string;
-          const b64 = res.split(',')[1];
-          if (b64) resolve(b64);
-          else reject(new Error("Échec de la conversion Base64"));
-        };
-        reader.onerror = () => reject(new Error("Erreur de lecture du blob"));
-        reader.readAsDataURL(blob);
-      });
+      if (Capacitor.isNativePlatform()) {
+        const response = await CapacitorHttp.get({
+          url: absoluteUrl,
+          responseType: 'blob'
+        });
+        if (response.status !== 200) throw new Error(`Erreur serveur (${response.status})`);
+        base64Data = response.data; // CapacitorHttp with responseType: 'blob' returns base64 on native
+      } else {
+        const response = await fetch(absoluteUrl);
+        if (!response.ok) throw new Error(`Erreur serveur (${response.status})`);
+        const blob = await response.blob();
+        base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const b64 = (reader.result as string).split(',')[1];
+            if (b64) resolve(b64);
+            else reject(new Error("Échec Base64"));
+          };
+          reader.readAsDataURL(blob);
+        });
+      }
 
       await Filesystem.writeFile({
         path,
@@ -822,7 +842,7 @@ class GSIStoreClass {
           const fileUri = await Filesystem.getUri({ path: progress.localPath, directory: Directory.Data });
           const targetUrl = Capacitor.convertFileSrc(fileUri.uri);
 
-          window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: targetUrl, type } }));
+          window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: targetUrl, type, originalUrl: absoluteUrl } }));
           return;
         } catch (e) {
           this.setDownloaded(lessonId, false);
@@ -834,14 +854,13 @@ class GSIStoreClass {
         const path = await this.downloadPackFile(absoluteUrl, fileName, lessonId);
         const fileUri = await Filesystem.getUri({ path, directory: Directory.Data });
         const targetUrl = Capacitor.convertFileSrc(fileUri.uri);
-        window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: targetUrl, type } }));
+        window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: targetUrl, type, originalUrl: absoluteUrl } }));
       } else {
         toast.error("Connexion requise pour lire ce fichier.");
       }
     } catch (e: any) {
       console.error("Open pack failed:", e);
-      // Fallback to direct URL if possible
-      window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: absoluteUrl, type } }));
+      window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: absoluteUrl, type, originalUrl: absoluteUrl } }));
     }
   }
 
