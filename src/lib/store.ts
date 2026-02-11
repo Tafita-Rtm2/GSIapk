@@ -185,19 +185,19 @@ class GSIStoreClass {
        this.syncAll();
     }, 45000);
 
-    // Background polling for chat (more frequent for real-time feel)
+    // Background polling for chat
     setInterval(() => {
        if (this.state.currentUser) {
          this.fetchChatMessages();
        }
-    }, 5000);
+    }, 15000);
 
     // Background polling for announcements/notifications
     setInterval(() => {
       if (this.state.currentUser) {
         this.fetchCollection('announcements', 'announcements');
       }
-    }, 15000);
+    }, 30000);
   }
 
   private async autoDownloadEssentials() {
@@ -228,8 +228,8 @@ class GSIStoreClass {
   private async fetchChatMessages() {
     if (!this.state.currentUser) return;
     const { filiere, niveau } = this.state.currentUser;
-    // Faster query: only get messages for the current promo
-    const data = await this.apiCall(`/db/messages?q={"filiere":"${filiere}","niveau":"${niveau}"}&s={"timestamp":-1}&l=60`);
+    const q = encodeURIComponent(JSON.stringify({ filiere, niveau }));
+    const data = await this.apiCall(`/db/messages?q=${q}&s={"timestamp":-1}&l=60`);
     if (data && Array.isArray(data)) {
       const newMessages = data.reverse();
       // Only update if something changed (simple length check or deep compare if needed)
@@ -248,38 +248,28 @@ class GSIStoreClass {
     const options: RequestInit = {
       method,
       headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
+        'Content-Type': 'application/json'
       }
     };
     if (body) options.body = JSON.stringify(body);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-    options.signal = controller.signal;
-
     try {
       const response = await fetch(`${API_BASE}${endpoint}`, options);
-      clearTimeout(timeoutId);
       this.syncingCount = Math.max(0, this.syncingCount - 1);
       if (this.syncingCount === 0) this.notify('sync_status', false);
       if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
       return await response.json();
     } catch (e: any) {
-      clearTimeout(timeoutId);
       this.syncingCount = Math.max(0, this.syncingCount - 1);
       if (this.syncingCount === 0) this.notify('sync_status', false);
-      if (e.name === 'AbortError') {
-        console.warn(`API call to ${endpoint} timed out`);
-      } else {
-        console.warn(`API call to ${endpoint} failed:`, e);
-      }
+      console.warn(`API call to ${endpoint} failed:`, e);
       return null;
     }
   }
 
   private async fetchCollection(key: keyof State, collectionName: string, queryParams = "") {
+    // If queryParams has a q=, we should ensure it's encoded if not already,
+    // but usually it's passed already formed.
     const data = await this.apiCall(`/db/${collectionName}${queryParams}`);
     if (data) {
       const cloudData = Array.isArray(data) ? data : [];
@@ -328,7 +318,8 @@ class GSIStoreClass {
   // --- CUSTOM AUTH ---
 
   async login(email: string, password: string): Promise<User | null> {
-    const data = await this.apiCall(`/db/users?q={"email":"${email}","password":"${password}"}`);
+    const q = encodeURIComponent(JSON.stringify({ email, password }));
+    const data = await this.apiCall(`/db/users?q=${q}`);
     if (data && Array.isArray(data) && data.length > 0) {
        const user = data[0] as User;
        this.setCurrentUser(user);
@@ -359,7 +350,8 @@ class GSIStoreClass {
   }
 
   async resetPassword(email: string): Promise<boolean> {
-     const data = await this.apiCall(`/db/users?q={"email":"${email}"}`);
+     const q = encodeURIComponent(JSON.stringify({ email }));
+     const data = await this.apiCall(`/db/users?q=${q}`);
      if (data && Array.isArray(data) && data.length > 0) {
         // Simulated success
         return true;
@@ -506,7 +498,8 @@ class GSIStoreClass {
     if (item?._id) {
        await this.apiCall(`/db/lessons/${item._id}`, 'DELETE');
     } else {
-       const existing = await this.apiCall(`/db/lessons?q={"id":"${id}"}`);
+       const q = encodeURIComponent(JSON.stringify({ id }));
+       const existing = await this.apiCall(`/db/lessons?q=${q}`);
        if (existing && Array.isArray(existing) && existing.length > 0) {
           await this.apiCall(`/db/lessons/${existing[0]._id}`, 'DELETE');
        }
@@ -528,7 +521,8 @@ class GSIStoreClass {
     if (item?._id) {
        await this.apiCall(`/db/assignments/${item._id}`, 'DELETE');
     } else {
-       const existing = await this.apiCall(`/db/assignments?q={"id":"${id}"}`);
+       const q = encodeURIComponent(JSON.stringify({ id }));
+       const existing = await this.apiCall(`/db/assignments?q=${q}`);
        if (existing && Array.isArray(existing) && existing.length > 0) {
           await this.apiCall(`/db/assignments/${existing[0]._id}`, 'DELETE');
        }
@@ -550,7 +544,8 @@ class GSIStoreClass {
     if (ann?._id) {
        await this.apiCall(`/db/announcements/${ann._id}`, 'DELETE');
     } else {
-       const existing = await this.apiCall(`/db/announcements?q={"id":"${id}"}`);
+       const q = encodeURIComponent(JSON.stringify({ id }));
+       const existing = await this.apiCall(`/db/announcements?q=${q}`);
        if (existing && Array.isArray(existing) && existing.length > 0) {
           await this.apiCall(`/db/announcements/${existing[0]._id}`, 'DELETE');
        }
@@ -572,7 +567,8 @@ class GSIStoreClass {
     if (item?._id) {
        await this.apiCall(`/db/grades/${item._id}`, 'DELETE');
     } else {
-       const existing = await this.apiCall(`/db/grades?q={"id":"${id}"}`);
+       const q = encodeURIComponent(JSON.stringify({ id }));
+       const existing = await this.apiCall(`/db/grades?q=${q}`);
        if (existing && Array.isArray(existing) && existing.length > 0) {
           await this.apiCall(`/db/grades/${existing[0]._id}`, 'DELETE');
        }
@@ -593,7 +589,8 @@ class GSIStoreClass {
     if (targetId) {
        await this.apiCall(`/db/users/${targetId}`, 'PATCH', user);
     } else {
-       const existing = await this.apiCall(`/db/users?q={"id":"${user.id}"}`);
+       const q = encodeURIComponent(JSON.stringify({ id: user.id }));
+       const existing = await this.apiCall(`/db/users?q=${q}`);
        if (existing && Array.isArray(existing) && existing.length > 0) {
           await this.apiCall(`/db/users/${existing[0]._id}`, 'PATCH', user);
        }
@@ -608,7 +605,8 @@ class GSIStoreClass {
     if (userToDelete?._id) {
        await this.apiCall(`/db/users/${userToDelete._id}`, 'DELETE');
     } else {
-       const existing = await this.apiCall(`/db/users?q={"id":"${id}"}`);
+       const q = encodeURIComponent(JSON.stringify({ id }));
+       const existing = await this.apiCall(`/db/users?q=${q}`);
        if (existing && Array.isArray(existing) && existing.length > 0) {
           await this.apiCall(`/db/users/${existing[0]._id}`, 'DELETE');
        }
@@ -620,7 +618,8 @@ class GSIStoreClass {
   }
 
   async addSchedule(schedule: StructuredSchedule) {
-    const existing = await this.apiCall(`/db/schedules?q={"campus":"${schedule.campus}","niveau":"${schedule.niveau}"}`);
+    const q = encodeURIComponent(JSON.stringify({ campus: schedule.campus, niveau: schedule.niveau }));
+    const existing = await this.apiCall(`/db/schedules?q=${q}`);
     if (existing && Array.isArray(existing) && existing.length > 0) {
        await this.apiCall(`/db/schedules/${existing[0]._id}`, 'PATCH', schedule);
     } else {
@@ -808,7 +807,8 @@ class GSIStoreClass {
     const local = this.state.users.find(u => u.id === id);
     if (local && !forceCloud) return local;
     try {
-      const data = await this.apiCall(`/db/users?q={"id":"${id}"}`);
+      const q = encodeURIComponent(JSON.stringify({ id }));
+      const data = await this.apiCall(`/db/users?q=${q}`);
       if (data && data.length > 0) {
         const userData = data[0] as User;
         this.state.users = [userData, ...this.state.users.filter(u => u.id !== id)];
