@@ -739,7 +739,9 @@ class GSIStoreClass {
 
   async downloadPackFile(url: string, fileName: string, lessonId: string) {
     try {
-      const path = `gsi_packs/${lessonId}_${fileName}`;
+      const safeFileName = fileName.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+      const path = `gsi_packs/${lessonId}_${safeFileName}`;
+
       // Check if already exists to prevent re-download
       try {
         await Filesystem.stat({ path, directory: Directory.Data });
@@ -749,29 +751,46 @@ class GSIStoreClass {
       if (typeof window === 'undefined' || !window.navigator.onLine) {
          throw new Error("Connexion requise pour le téléchargement.");
       }
-      const response = await fetch(url);
+
+      const response = await fetch(url).catch(err => {
+         throw new Error(`Erreur de connexion : ${err.message}. Vérifiez votre accès internet.`);
+      });
+      if (!response.ok) throw new Error(`Le serveur a répondu avec une erreur ${response.status}.`);
+
       const blob = await response.blob();
       const reader = new FileReader();
-      const base64Data = await new Promise<string>((resolve) => {
-        reader.onloadend = () => resolve(reader.result as string);
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => {
+          const res = reader.result as string;
+          const b64 = res.split(',')[1];
+          if (b64) resolve(b64);
+          else reject(new Error("Échec de la conversion Base64"));
+        };
+        reader.onerror = () => reject(new Error("Erreur de lecture du blob"));
         reader.readAsDataURL(blob);
       });
+
       await Filesystem.writeFile({
         path,
         data: base64Data,
         directory: Directory.Data,
         recursive: true
       });
+
       this.setDownloaded(lessonId, true);
       this.saveProgress(lessonId, { localPath: path });
       return path;
     } catch (e: any) {
-      console.error("Pack download failed", e);
+      console.error("Pack download failed:", e);
       throw e;
     }
   }
 
   async openPackFile(lessonId: string, fallbackUrl: string) {
+    const lowUrl = fallbackUrl.toLowerCase();
+    const type = lowUrl.includes('.pdf') ? 'pdf' :
+                 lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/) ? 'video' : 'pdf';
+
     try {
       const progress = this.getProgress(lessonId);
       if (progress?.localPath) {
@@ -780,8 +799,7 @@ class GSIStoreClass {
           const fileUri = await Filesystem.getUri({ path: progress.localPath, directory: Directory.Data });
           const targetUrl = Capacitor.convertFileSrc(fileUri.uri);
 
-          // We'll use a custom event to notify the UI to show the InAppViewer
-          window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: targetUrl, type: fallbackUrl.endsWith('.pdf') ? 'pdf' : 'video' } }));
+          window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: targetUrl, type } }));
           return;
         } catch (e) {
           this.setDownloaded(lessonId, false);
@@ -789,17 +807,19 @@ class GSIStoreClass {
       }
 
       if (window.navigator.onLine) {
-        const fileName = fallbackUrl.split('/').pop() || 'document';
+        const fileName = fallbackUrl.split('/').pop() || (type === 'pdf' ? 'doc.pdf' : 'video.mp4');
         const path = await this.downloadPackFile(fallbackUrl, fileName, lessonId);
         const fileUri = await Filesystem.getUri({ path, directory: Directory.Data });
         const targetUrl = Capacitor.convertFileSrc(fileUri.uri);
-        window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: targetUrl, type: fallbackUrl.endsWith('.pdf') ? 'pdf' : 'video' } }));
+        window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: targetUrl, type } }));
       } else {
-        throw new Error("Fichier non disponible hors-ligne.");
+        toast.error("Connexion requise pour lire ce fichier.");
+        // If offline and not downloaded, show nothing or alert
       }
     } catch (e: any) {
-      console.error("Open pack failed", e);
-      window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: fallbackUrl, type: fallbackUrl.endsWith('.pdf') ? 'pdf' : 'video' } }));
+      console.error("Open pack failed:", e);
+      // Fallback to direct URL if possible
+      window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: fallbackUrl, type } }));
     }
   }
 

@@ -27,7 +27,7 @@ export default function LibraryPage() {
 
     const updateLibrary = (lessons: Lesson[], assignments: Assignment[]) => {
       const lessonItems = lessons.filter(l =>
-        !user || (l.niveau === user.niveau && (l.filiere.includes(user.filiere) || l.filiere.length === 0))
+        !user || user.role === 'admin' || (l.niveau === user.niveau && (l.filiere.includes(user.filiere) || l.filiere.length === 0))
       ).map(l => ({
         id: l.id,
         title: l.title,
@@ -39,7 +39,7 @@ export default function LibraryPage() {
       }));
 
       const assignmentItems = assignments.filter(a =>
-        !user || (a.niveau === user.niveau && (a.filiere.includes(user.filiere) || a.filiere.length === 0))
+        !user || user.role === 'admin' || (a.niveau === user.niveau && (a.filiere.includes(user.filiere) || a.filiere.length === 0))
       ).map(a => ({
         id: a.id,
         title: a.title,
@@ -81,12 +81,12 @@ export default function LibraryPage() {
     toast.promise(
       GSIStore.downloadPackFile(url, title, id),
       {
-        loading: 'Téléchargement du pack hors-ligne...',
+        loading: `Téléchargement de "${title}"...`,
         success: (path) => {
           setBooks(prev => prev.map(b => b.id === id ? { ...b, downloaded: true } : b));
-          return 'Document enregistré sur l\'appareil !';
+          return 'Document enregistré hors-ligne !';
         },
-        error: 'Erreur lors du téléchargement local.',
+        error: (err) => `Échec: ${err.message || 'Erreur inconnue'}`,
       }
     );
   };
@@ -170,10 +170,13 @@ export default function LibraryPage() {
                 <FileText className="text-primary opacity-40" size={24} />
               </div>
               <div className="flex-1">
-                <h4 className="font-bold text-gray-800 text-sm">{book.title}</h4>
+                <div className="flex items-center gap-2">
+                   <h4 className="font-bold text-gray-800 text-sm line-clamp-1">{book.title}</h4>
+                   {book.downloaded && <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></div>}
+                </div>
                 <p className="text-[10px] text-gray-400 font-medium">{book.author}</p>
                 {GSIStore.getProgress(book.id) && (
-                   <span className="text-[8px] text-indigo-500 font-bold uppercase tracking-tighter">Déjà lu</span>
+                   <span className="text-[8px] text-indigo-500 font-bold uppercase tracking-tighter">Lu le {new Date(GSIStore.getProgress(book.id).ts).toLocaleDateString()}</span>
                 )}
               </div>
               <div className="flex gap-2">
