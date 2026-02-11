@@ -1,15 +1,28 @@
+   ▲ Next.js 15.5.9
+   - Local:        http://localhost:9005
+   - Network:      http://192.168.0.2:9005
 
-> nextn@0.1.0 dev
-> next dev --turbopack -p 9002
-
- ⨯ Failed to start server
-Error: listen EADDRINUSE: address already in use :::9002
-    at <unknown> (Error: listen EADDRINUSE: address already in use :::9002)
-    at new Promise (<anonymous>) {
-  code: 'EADDRINUSE',
-  errno: -98,
-  syscall: 'listen',
-  address: '::',
-  port: 9002
-}
-[?25h
+ ✓ Starting...
+ ✓ Ready in 4.3s
+ ○ Compiling /login ...
+ ✓ Compiled /login in 12.2s (717 modules)
+ GET /login 200 in 13654ms
+ ✓ Compiled in 362ms (267 modules)
+ GET /login 200 in 259ms
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 1208ms (743 modules)
+ GET /admin 200 in 1405ms
+ GET /admin 200 in 51ms
+ ○ Compiling /library ...
+ ✓ Compiled /library in 1009ms (780 modules)
+ GET /library 200 in 1776ms
+ GET /login 200 in 118ms
+ GET /admin 200 in 80ms
+ GET /admin 200 in 47ms
+ GET /library 200 in 84ms
+ ○ Compiling /community ...
+ ✓ Compiled /community in 892ms (797 modules)
+ GET /community 200 in 1289ms
+ ○ Compiling /profile ...
+ ✓ Compiled /profile in 548ms (818 modules)
+ GET /profile 200 in 874ms

@@ -213,7 +213,7 @@ export default function AdminPage() {
               {filteredUsers.map((u, i) => (
                 <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-sm">
                   <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center overflow-hidden font-bold">
-                    {u.photo ? <img src={u.photo} className="w-full h-full object-cover" /> : u.fullName.charAt(0)}
+                    {u.photo ? <img src={GSIStore.getAbsoluteUrl(u.photo)} className="w-full h-full object-cover" /> : u.fullName.charAt(0)}
                   </div>
                   <div className="flex-1">
                     <h4 className="font-bold text-sm">{u.fullName}</h4>

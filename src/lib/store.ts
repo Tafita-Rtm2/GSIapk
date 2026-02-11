@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 
 // --- CONFIGURATION ---
 const API_BASE = "https://groupegsi.mg/rtmggmg/api";
+const MEDIA_BASE = "https://groupegsi.mg/rtmggmg";
 
 // Types
 export interface User {
@@ -181,24 +182,24 @@ class GSIStoreClass {
        this.autoDownloadEssentials();
     });
 
-    // Background polling for general data (less frequent)
+    // Background polling for general data
     setInterval(() => {
        this.syncAll();
-    }, 45000);
+    }, 30000);
 
-    // Background polling for chat
+    // Background polling for chat (Faster for better UX)
     setInterval(() => {
        if (this.state.currentUser) {
          this.fetchChatMessages();
        }
-    }, 15000);
+    }, 8000);
 
     // Background polling for announcements/notifications
     setInterval(() => {
       if (this.state.currentUser) {
         this.fetchCollection('announcements', 'announcements');
       }
-    }, 30000);
+    }, 20000);
   }
 
   private async autoDownloadEssentials() {
@@ -246,16 +247,22 @@ class GSIStoreClass {
   private async apiCall(endpoint: string, method = 'GET', body?: any) {
     this.syncingCount++;
     this.notify('sync_status', true);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout for API calls
+
     const options: RequestInit = {
       method,
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      signal: controller.signal
     };
     if (body) options.body = JSON.stringify(body);
 
     try {
       const response = await fetch(`${API_BASE}${endpoint}`, options);
+      clearTimeout(timeoutId);
       this.syncingCount = Math.max(0, this.syncingCount - 1);
       if (this.syncingCount === 0) this.notify('sync_status', false);
       if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
@@ -704,6 +711,13 @@ class GSIStoreClass {
 
   // --- FILES ENGINE ---
 
+  getAbsoluteUrl(url: string | undefined): string {
+    if (!url) return "";
+    if (url.startsWith('http') || url.startsWith('data:') || url.startsWith('blob:')) return url;
+    const base = MEDIA_BASE;
+    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+  }
+
   async uploadFile(file: File, path: string, onProgress?: (p: number) => void): Promise<string> {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -740,6 +754,7 @@ class GSIStoreClass {
 
   async downloadPackFile(url: string, fileName: string, lessonId: string) {
     try {
+      const absoluteUrl = this.getAbsoluteUrl(url);
       const safeFileName = fileName.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
       const path = `gsi_packs/${lessonId}_${safeFileName}`;
 
@@ -753,10 +768,16 @@ class GSIStoreClass {
          throw new Error("Connexion requise pour le téléchargement.");
       }
 
-      const response = await fetch(url).catch(err => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout for downloads
+
+      const response = await fetch(absoluteUrl, { signal: controller.signal }).catch(err => {
+         if (err.name === 'AbortError') throw new Error("Délai d'attente dépassé (2 min). Le fichier est peut-être trop lourd.");
          throw new Error(`Erreur de connexion : ${err.message}. Vérifiez votre accès internet.`);
       });
-      if (!response.ok) throw new Error(`Le serveur a répondu avec une erreur ${response.status}.`);
+      clearTimeout(timeoutId);
+
+      if (!response.ok) throw new Error(`Erreur serveur (${response.status}) : Impossible de récupérer le fichier.`);
 
       const blob = await response.blob();
       const reader = new FileReader();
@@ -787,8 +808,9 @@ class GSIStoreClass {
     }
   }
 
-  async openPackFile(lessonId: string, fallbackUrl: string) {
-    const lowUrl = fallbackUrl.toLowerCase();
+  async openPackFile(lessonId: string, url: string) {
+    const absoluteUrl = this.getAbsoluteUrl(url);
+    const lowUrl = absoluteUrl.toLowerCase();
     const type = lowUrl.includes('.pdf') ? 'pdf' :
                  lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/) ? 'video' : 'pdf';
 
@@ -808,19 +830,18 @@ class GSIStoreClass {
       }
 
       if (window.navigator.onLine) {
-        const fileName = fallbackUrl.split('/').pop() || (type === 'pdf' ? 'doc.pdf' : 'video.mp4');
-        const path = await this.downloadPackFile(fallbackUrl, fileName, lessonId);
+        const fileName = absoluteUrl.split('/').pop() || (type === 'pdf' ? 'doc.pdf' : 'video.mp4');
+        const path = await this.downloadPackFile(absoluteUrl, fileName, lessonId);
         const fileUri = await Filesystem.getUri({ path, directory: Directory.Data });
         const targetUrl = Capacitor.convertFileSrc(fileUri.uri);
         window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: targetUrl, type } }));
       } else {
         toast.error("Connexion requise pour lire ce fichier.");
-        // If offline and not downloaded, show nothing or alert
       }
     } catch (e: any) {
       console.error("Open pack failed:", e);
       // Fallback to direct URL if possible
-      window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: fallbackUrl, type } }));
+      window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: absoluteUrl, type } }));
     }
   }
 

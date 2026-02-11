@@ -61,7 +61,7 @@ export default function ProfilePage() {
           <div className="relative mb-4">
             <div className="w-24 h-24 rounded-full border-4 border-white overflow-hidden shadow-lg bg-white/20 flex items-center justify-center">
               <img
-                src={user.photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
+                src={GSIStore.getAbsoluteUrl(user.photo) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
                 alt="Profile"
                 className="w-full h-full object-cover"
               />

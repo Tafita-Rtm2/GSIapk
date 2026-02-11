@@ -38,7 +38,8 @@ export default function CommunityPage() {
 
   const getUserPhoto = (msg: ChatMessage) => {
     const found = users.find(u => u.id === msg.senderId);
-    return found?.photo || msg.senderPhoto || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.senderName}`;
+    const photo = found?.photo || msg.senderPhoto;
+    return GSIStore.getAbsoluteUrl(photo) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.senderName}`;
   };
 
   const handleSend = async (e: React.FormEvent) => {
@@ -117,11 +118,11 @@ export default function CommunityPage() {
                        )}
                        {m.text.startsWith('📷 Photo:') ? (
                           <div className="space-y-2">
-                             <img src={m.text.split(': ')[1]} alt="Chat attachment" className="rounded-xl max-w-full h-auto" />
+                             <img src={GSIStore.getAbsoluteUrl(m.text.split(': ')[1])} alt="Chat attachment" className="rounded-xl max-w-full h-auto" />
                              <p className="text-[10px] opacity-70">Cliquer pour agrandir</p>
                           </div>
                        ) : m.text.startsWith('📄 Document:') ? (
-                          <a href={m.text.split(': ')[1]} target="_blank" className="flex items-center gap-2 underline decoration-white/30">
+                          <a href={GSIStore.getAbsoluteUrl(m.text.split(': ')[1])} target="_blank" className="flex items-center gap-2 underline decoration-white/30">
                              <File size={16} /> Document joint
                           </a>
                        ) : (

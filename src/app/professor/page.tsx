@@ -404,7 +404,7 @@ export default function ProfessorPage() {
             {students.map((s, i) => (
               <div key={i} className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4">
                  <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center font-bold text-indigo-600 overflow-hidden">
-                    {s.photo ? <img src={s.photo} className="w-full h-full object-cover" /> : s.fullName.charAt(0)}
+                    {s.photo ? <img src={GSIStore.getAbsoluteUrl(s.photo)} className="w-full h-full object-cover" /> : s.fullName.charAt(0)}
                  </div>
                  <div className="flex-1"><h4 className="font-bold text-sm">{s.fullName}</h4><p className="text-[10px] text-gray-400 font-bold uppercase">{s.filiere} • {s.niveau}</p></div>
               </div>
