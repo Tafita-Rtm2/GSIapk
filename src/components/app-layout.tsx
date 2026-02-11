@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, BookOpen, Library, User, MessageCircle, Users, X, Maximize2 } from "lucide-react";
+import { Home, Calendar, BookOpen, Library, User, MessageCircle, Users, X, Maximize2, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n";
 import { useState, useEffect } from "react";
@@ -14,6 +14,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();
   const pathname = usePathname();
   const [user, setUser] = useState<GSIUser | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
 
   const [viewerData, setViewerData] = useState<{ url: string, type: string } | null>(null);
 
@@ -21,7 +23,21 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     setUser(GSIStore.getCurrentUser());
     const handleOpen = (e: any) => setViewerData(e.detail);
     window.addEventListener('gsi-open-viewer', handleOpen);
-    return () => window.removeEventListener('gsi-open-viewer', handleOpen);
+
+    const unsubSync = GSIStore.subscribeSyncStatus((s) => setIsSyncing(s));
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    setIsOnline(navigator.onLine);
+
+    return () => {
+      window.removeEventListener('gsi-open-viewer', handleOpen);
+      unsubSync();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   const navItems = [
@@ -35,6 +51,25 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col h-screen max-w-md mx-auto bg-background shadow-xl overflow-hidden relative">
+      {/* Top Status Bar (Integrated) */}
+      <div className="absolute top-0 left-0 right-0 h-1 z-[60] flex">
+         {isSyncing && (
+            <div className="h-full bg-accent animate-pulse w-full shadow-[0_0_10px_rgba(255,107,0,0.5)]"></div>
+         )}
+      </div>
+
+      <div className="absolute top-4 right-4 z-[60] pointer-events-none">
+         <div className={cn(
+            "px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-tighter flex items-center gap-1.5 transition-all duration-500 backdrop-blur-md border",
+            !isOnline ? "bg-red-500/90 text-white border-red-400" :
+            isSyncing ? "bg-accent/90 text-white border-accent-400 scale-105" :
+            "bg-green-500/10 text-green-600 border-green-500/20 opacity-40 hover:opacity-100"
+         )}>
+            {!isOnline ? <WifiOff size={10} /> : <Wifi size={10} className={cn(isSyncing && "animate-ping")} />}
+            <span>{!isOnline ? "Hors-ligne" : isSyncing ? "Sync..." : "GSI Cloud"}</span>
+         </div>
+      </div>
+
       <main className="flex-1 overflow-y-auto pb-20">
         {children}
       </main>

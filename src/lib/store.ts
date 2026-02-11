@@ -106,6 +106,7 @@ class GSIStoreClass {
   private state: State = { ...initialState };
   private listeners: Record<string, ((data: any) => void)[]> = {};
   private saveTimeout: any = null;
+  private syncingCount = 0;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -178,11 +179,25 @@ class GSIStoreClass {
     this.syncAll().then(() => {
        this.autoDownloadEssentials();
     });
-    setTimeout(() => this.syncAll(), 5000);
-    // Background polling
+
+    // Background polling for general data (less frequent)
     setInterval(() => {
        this.syncAll();
-    }, 30000);
+    }, 45000);
+
+    // Background polling for chat (more frequent for real-time feel)
+    setInterval(() => {
+       if (this.state.currentUser) {
+         this.fetchChatMessages();
+       }
+    }, 5000);
+
+    // Background polling for announcements/notifications
+    setInterval(() => {
+      if (this.state.currentUser) {
+        this.fetchCollection('announcements', 'announcements');
+      }
+    }, 15000);
   }
 
   private async autoDownloadEssentials() {
@@ -213,28 +228,53 @@ class GSIStoreClass {
   private async fetchChatMessages() {
     if (!this.state.currentUser) return;
     const { filiere, niveau } = this.state.currentUser;
-    const data = await this.apiCall(`/db/messages?q={"filiere":"${filiere}","niveau":"${niveau}"}&s={"timestamp":-1}&l=50`);
+    // Faster query: only get messages for the current promo
+    const data = await this.apiCall(`/db/messages?q={"filiere":"${filiere}","niveau":"${niveau}"}&s={"timestamp":-1}&l=60`);
     if (data && Array.isArray(data)) {
-      this.state.messages = data.reverse();
-      this.notify('messages', this.state.messages);
+      const newMessages = data.reverse();
+      // Only update if something changed (simple length check or deep compare if needed)
+      if (JSON.stringify(newMessages) !== JSON.stringify(this.state.messages)) {
+        this.state.messages = newMessages;
+        this.notify('messages', this.state.messages);
+      }
     }
   }
 
   // --- API HELPERS ---
 
   private async apiCall(endpoint: string, method = 'GET', body?: any) {
+    this.syncingCount++;
+    this.notify('sync_status', true);
     const options: RequestInit = {
       method,
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
     };
     if (body) options.body = JSON.stringify(body);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    options.signal = controller.signal;
+
     try {
       const response = await fetch(`${API_BASE}${endpoint}`, options);
+      clearTimeout(timeoutId);
+      this.syncingCount = Math.max(0, this.syncingCount - 1);
+      if (this.syncingCount === 0) this.notify('sync_status', false);
       if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
       return await response.json();
-    } catch (e) {
-      console.warn(`API call to ${endpoint} failed:`, e);
+    } catch (e: any) {
+      clearTimeout(timeoutId);
+      this.syncingCount = Math.max(0, this.syncingCount - 1);
+      if (this.syncingCount === 0) this.notify('sync_status', false);
+      if (e.name === 'AbortError') {
+        console.warn(`API call to ${endpoint} timed out`);
+      } else {
+        console.warn(`API call to ${endpoint} failed:`, e);
+      }
       return null;
     }
   }
@@ -421,6 +461,13 @@ class GSIStoreClass {
     cb(this.state.messages);
     this.fetchChatMessages();
     return () => { this.listeners['messages'] = this.listeners['messages']?.filter(l => l !== cb); };
+  }
+
+  subscribeSyncStatus(cb: (isSyncing: boolean) => void) {
+    if (!this.listeners['sync_status']) this.listeners['sync_status'] = [];
+    this.listeners['sync_status'].push(cb);
+    cb(this.syncingCount > 0);
+    return () => { this.listeners['sync_status'] = this.listeners['sync_status']?.filter(l => l !== cb); };
   }
 
   subscribeReminders(cb: (rs: Reminder[]) => void) {

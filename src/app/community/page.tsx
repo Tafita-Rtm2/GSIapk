@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/page-header";
 export default function CommunityPage() {
   const { t } = useLanguage();
   const [user, setUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
@@ -20,15 +21,25 @@ export default function CommunityPage() {
     const u = GSIStore.getCurrentUser();
     setUser(u);
 
-    const unsub = GSIStore.subscribeMessages((ms) => {
+    const unsubMessages = GSIStore.subscribeMessages((ms) => {
       setMessages(ms);
       setTimeout(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }, 100);
     });
 
-    return () => unsub();
+    const unsubUsers = GSIStore.subscribeUsers((us) => setUsers(us));
+
+    return () => {
+      unsubMessages();
+      unsubUsers();
+    };
   }, []);
+
+  const getUserPhoto = (msg: ChatMessage) => {
+    const found = users.find(u => u.id === msg.senderId);
+    return found?.photo || msg.senderPhoto || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.senderName}`;
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,11 +75,15 @@ export default function CommunityPage() {
              )}>
                 {/* Avatar */}
                 <div className="w-8 h-8 rounded-full bg-indigo-50 border-2 border-white shadow-sm flex-shrink-0 overflow-hidden flex items-center justify-center">
-                   {m.senderPhoto ? (
-                      <img src={m.senderPhoto} alt="" className="w-full h-full object-cover" />
-                   ) : (
-                      <span className="text-[10px] font-black text-indigo-400">{m.senderName.charAt(0)}</span>
-                   )}
+                   <img
+                      src={getUserPhoto(m)}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      onError={(e: any) => {
+                        e.target.onerror = null;
+                        e.target.src = `https://api.dicebear.com/7.x/initials/svg?seed=${m.senderName}`;
+                      }}
+                   />
                 </div>
 
                 <div className={cn(
