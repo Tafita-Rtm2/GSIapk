@@ -1,7 +1,5 @@
 "use client";
 
-import { auth } from "./firebase";
-import { onAuthStateChanged } from "firebase/auth";
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Browser } from '@capacitor/browser';
 
@@ -10,15 +8,16 @@ const API_BASE = "https://groupegsi.mg/rtmggmg/api";
 
 // Types
 export interface User {
-  id: string; // This will store the Firebase UID
+  id: string; // Internal/Public UID
   fullName: string;
   email: string;
+  password?: string; // Stored for custom auth
   role: 'student' | 'professor' | 'admin';
   campus: string;
   filiere: string;
   niveau: string;
   photo?: string;
-  _id?: string; // API auto-generated internal ID
+  _id?: string; // API internal ID
 }
 
 export interface Lesson { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; date: string; files: string[]; }
@@ -57,7 +56,6 @@ class GSIStoreClass {
   constructor() {
     if (typeof window !== 'undefined') {
       this.hydrate();
-      this.setupAuth();
       this.startGlobalSync();
       window.addEventListener('beforeunload', () => this.saveImmediate());
     }
@@ -65,7 +63,7 @@ class GSIStoreClass {
 
   private hydrate() {
     try {
-      const saved = localStorage.getItem('gsi_v7_master');
+      const saved = localStorage.getItem('gsi_v8_master');
       if (saved) {
         this.state = { ...initialState, ...JSON.parse(saved) };
       }
@@ -75,8 +73,8 @@ class GSIStoreClass {
 
   private generateMockData() {
     const mockUsers: User[] = [
-      { id: 'admin-id', fullName: 'Nina GSI', email: 'admin@gsi.mg', role: 'admin', campus: 'Antananarivo', filiere: 'Directeur', niveau: 'N/A' },
-      { id: 'prof-id', fullName: 'Professeur GSI', email: 'prof@gsi.mg', role: 'professor', campus: 'Antananarivo', filiere: 'Informatique', niveau: 'L1' }
+      { id: 'admin-id', fullName: 'Nina GSI', email: 'admin@gsi.mg', password: 'password', role: 'admin', campus: 'Antananarivo', filiere: 'Directeur', niveau: 'N/A' },
+      { id: 'prof-id', fullName: 'Professeur GSI', email: 'prof@gsi.mg', password: 'password', role: 'professor', campus: 'Antananarivo', filiere: 'Informatique', niveau: 'L1' }
     ];
 
     mockUsers.forEach(mu => {
@@ -103,7 +101,7 @@ class GSIStoreClass {
   private saveImmediate() {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('gsi_v7_master', JSON.stringify(this.state));
+        localStorage.setItem('gsi_v8_master', JSON.stringify(this.state));
       } catch (e) {
         console.error("Failed to save GSIStore state", e);
       }
@@ -121,21 +119,11 @@ class GSIStoreClass {
     });
   }
 
-  private setupAuth() {
-    if (auth) {
-      onAuthStateChanged(auth, async (fbUser) => {
-        if (fbUser) {
-          const user = await this.getUser(fbUser.uid, true);
-          if (user) this.setCurrentUser(user);
-        }
-      });
-    }
-  }
-
   private startGlobalSync() {
-    // Initial sync
+    // Initial aggressive sync
     this.syncAll();
-    // Periodic sync every 30 seconds
+    setTimeout(() => this.syncAll(), 5000);
+    // Background polling
     setInterval(() => this.syncAll(), 30000);
   }
 
@@ -175,7 +163,6 @@ class GSIStoreClass {
 
       let merged: any;
       if (Array.isArray(currentLocal)) {
-         // Merge by 'id' field (Firebase UID or custom ID)
          const cloudIds = new Set(cloudData.map((d: any) => d.id));
          const localOnly = currentLocal.filter(item => !cloudIds.has(item.id));
          merged = [...cloudData, ...localOnly];
@@ -195,13 +182,52 @@ class GSIStoreClass {
       this.save();
       this.notify(key as string, merged);
 
-      // Also notify sub-listeners that might be waiting for specific filters
       Object.keys(this.listeners).forEach(subKey => {
          if (subKey.startsWith(`${key as string}_`)) {
             this.notify(subKey, merged);
          }
       });
     }
+  }
+
+  // --- CUSTOM AUTH ---
+
+  async login(email: string, password: string): Promise<User | null> {
+    const data = await this.apiCall(`/db/users?q={"email":"${email}","password":"${password}"}`);
+    if (data && Array.isArray(data) && data.length > 0) {
+       const user = data[0] as User;
+       this.setCurrentUser(user);
+       return user;
+    }
+    // Check local fallback (mock accounts)
+    const local = this.state.users.find(u => u.email === email && u.password === password);
+    if (local) {
+       this.setCurrentUser(local);
+       return local;
+    }
+    return null;
+  }
+
+  async register(user: User): Promise<User | null> {
+    const res = await this.apiCall('/db/users', 'POST', user);
+    if (res) {
+       this.setCurrentUser(res);
+       return res;
+    }
+    return null;
+  }
+
+  logout() {
+    this.setCurrentUser(null);
+  }
+
+  async resetPassword(email: string): Promise<boolean> {
+     const data = await this.apiCall(`/db/users?q={"email":"${email}"}`);
+     if (data && Array.isArray(data) && data.length > 0) {
+        // Simulated success
+        return true;
+     }
+     return false;
   }
 
   // --- STORE ACCESS ---
@@ -234,15 +260,12 @@ class GSIStoreClass {
     const subKey = filter.niveau ? `lessons_${filter.niveau}` : 'lessons';
     if (!this.listeners[subKey]) this.listeners[subKey] = [];
     this.listeners[subKey].push(cb);
-
     const applyFilter = (data: Lesson[]) => {
       const filtered = filter.niveau ? data.filter((l: any) => l.niveau === filter.niveau) : data;
       cb(filtered);
     };
-
     applyFilter(this.state.lessons);
     this.fetchCollection('lessons', 'lessons');
-
     return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
   }
 
@@ -250,15 +273,12 @@ class GSIStoreClass {
     const subKey = filter.niveau ? `assignments_${filter.niveau}` : 'assignments';
     if (!this.listeners[subKey]) this.listeners[subKey] = [];
     this.listeners[subKey].push(cb);
-
     const applyFilter = (data: Assignment[]) => {
       const filtered = filter.niveau ? data.filter((a: any) => a.niveau === filter.niveau) : data;
       cb(filtered);
     };
-
     applyFilter(this.state.assignments);
     this.fetchCollection('assignments', 'assignments');
-
     return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
   }
 
@@ -274,14 +294,11 @@ class GSIStoreClass {
     const subKey = `grades_${studentId}`;
     if (!this.listeners[subKey]) this.listeners[subKey] = [];
     this.listeners[subKey].push(cb);
-
     const applyFilter = (data: Grade[]) => {
       cb(data.filter((g: any) => g.studentId === studentId));
     };
-
     applyFilter(this.state.grades);
     this.fetchCollection('grades', 'grades', `?q={"studentId":"${studentId}"}`);
-
     return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
   }
 
@@ -290,10 +307,8 @@ class GSIStoreClass {
     const subKey = `schedule_${sKey}`;
     if (!this.listeners[subKey]) this.listeners[subKey] = [];
     this.listeners[subKey].push(cb);
-
     cb(this.state.schedules[sKey] || null);
     this.fetchCollection('schedules', 'schedules', `?q={"campus":"${campus}","niveau":"${niveau}"}`);
-
     return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
   }
 
@@ -303,8 +318,6 @@ class GSIStoreClass {
     this.state.users = [user, ...this.state.users.filter(u => u.id !== user.id)];
     this.save();
     this.notify('users', this.state.users);
-
-    // Check if user already exists in API
     const existing = await this.apiCall(`/db/users?q={"id":"${user.id}"}`);
     if (existing && Array.isArray(existing) && existing.length > 0) {
        return await this.apiCall(`/db/users/${existing[0]._id}`, 'PATCH', user);
@@ -345,7 +358,6 @@ class GSIStoreClass {
     this.state.users = this.state.users.map(u => u.id === user.id ? user : u);
     this.save();
     this.notify('users', this.state.users);
-
     const targetId = user._id;
     if (targetId) {
        await this.apiCall(`/db/users/${targetId}`, 'PATCH', user);
@@ -362,12 +374,11 @@ class GSIStoreClass {
     this.state.users = this.state.users.filter(u => u.id !== id);
     this.save();
     this.notify('users', this.state.users);
-
     if (userToDelete?._id) {
        await this.apiCall(`/db/users/${userToDelete._id}`, 'DELETE');
     } else {
        const existing = await this.apiCall(`/db/users?q={"id":"${id}"}`);
-       if (existing && existing.length > 0) {
+       if (existing && Array.isArray(existing) && existing.length > 0) {
           await this.apiCall(`/db/users/${existing[0]._id}`, 'DELETE');
        }
     }
@@ -388,18 +399,15 @@ class GSIStoreClass {
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
       formData.append('file', file);
-
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable && onProgress) {
           onProgress((e.loaded / e.total) * 100);
         }
       });
-
       xhr.addEventListener('load', () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const response = JSON.parse(xhr.responseText);
-            // The API returns viewUrl and downloadUrl
             resolve(response.viewUrl || response.downloadUrl);
           } catch (e) {
             reject(new Error("Failed to parse upload response"));
@@ -408,9 +416,7 @@ class GSIStoreClass {
           reject(new Error(`Upload failed with status ${xhr.status}`));
         }
       });
-
       xhr.addEventListener('error', () => reject(new Error("Network error during upload")));
-
       xhr.open('POST', `${API_BASE}/upload`);
       xhr.send(formData);
     });
@@ -421,16 +427,13 @@ class GSIStoreClass {
       if (typeof window === 'undefined' || !window.navigator.onLine) {
          throw new Error("Connexion requise pour le téléchargement.");
       }
-
       const response = await fetch(url);
       const blob = await response.blob();
-
       const reader = new FileReader();
       const base64Data = await new Promise<string>((resolve) => {
         reader.onloadend = () => resolve(reader.result as string);
         reader.readAsDataURL(blob);
       });
-
       const path = `gsi_packs/${lessonId}_${fileName}`;
       await Filesystem.writeFile({
         path,
@@ -438,10 +441,8 @@ class GSIStoreClass {
         directory: Directory.Data,
         recursive: true
       });
-
       this.setDownloaded(lessonId, true);
       this.saveProgress(lessonId, { localPath: path });
-
       return path;
     } catch (e: any) {
       console.error("Pack download failed", e);
@@ -457,7 +458,6 @@ class GSIStoreClass {
            path: progress.localPath,
            directory: Directory.Data
          });
-
          if (stat) {
             const fileUri = await Filesystem.getUri({
               path: progress.localPath,
@@ -479,7 +479,6 @@ class GSIStoreClass {
   async getUser(id: string, forceCloud = false): Promise<User | null> {
     const local = this.state.users.find(u => u.id === id);
     if (local && !forceCloud) return local;
-
     try {
       const data = await this.apiCall(`/db/users?q={"id":"${id}"}`);
       if (data && data.length > 0) {

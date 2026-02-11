@@ -2,8 +2,6 @@
 
 import { useState, useEffect, createContext, useContext } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { auth } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
 import { GSIStore, User } from "@/lib/store";
 import { Sparkles } from "lucide-react";
 
@@ -17,7 +15,6 @@ const AuthContext = createContext<AuthContextType>({ user: null, loading: true }
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Synchronous initialization for zero-latency start
   const initialCachedUser = typeof window !== 'undefined' ? GSIStore.getCurrentUser() : null;
   const [user, setUser] = useState<User | null>(initialCachedUser);
   const [loading, setLoading] = useState(!initialCachedUser);
@@ -26,51 +23,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    let unsubscribeAuth = () => {};
-
-    // Auth Listener for Firebase (Background sync)
-    if (auth) {
-      try {
-        unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-          if (firebaseUser) {
-            // Background update of user data
-            try {
-              const userData = await GSIStore.getUser(firebaseUser.uid);
-              if (userData) {
-                GSIStore.setCurrentUser(userData);
-              }
-            } catch (e) {
-              console.warn("Auth sync: Could not fetch user data from cloud.");
-            }
-          } else {
-            const current = GSIStore.getCurrentUser();
-            // Only clear if it's a real student account (not bypass)
-            if (current && !['admin-id', 'prof-id'].includes(current.id)) {
-               GSIStore.setCurrentUser(null);
-            }
-          }
-          setLoading(false);
-        });
-      } catch (e) {
-        console.error("Firebase Auth failed to attach listener", e);
-        setLoading(false);
-      }
-    } else {
-      console.warn("Firebase Auth not available. Running in local/bypass mode.");
-      setLoading(false);
-    }
-
-    // Store Listener (handles role-based manual login and sync updates)
+    // Store Listener (Handles all session updates)
     const unsubscribeStore = GSIStore.subscribe((newUser) => {
       setUser(newUser);
       setLoading(false);
     });
 
+    // Initial check
+    if (initialCachedUser) setLoading(false);
+
     // Final safety to avoid stuck loading
-    const timer = setTimeout(() => setLoading(false), 500);
+    const timer = setTimeout(() => setLoading(false), 1500);
 
     return () => {
-      unsubscribeAuth();
       unsubscribeStore();
       clearTimeout(timer);
     };

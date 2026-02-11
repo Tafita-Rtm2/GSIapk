@@ -6,10 +6,7 @@ import { Sparkles, ShieldCheck, GraduationCap, Languages, X } from "lucide-react
 import { useLanguage } from "@/lib/i18n";
 import Link from "next/link";
 import { GSIStore } from "@/lib/store";
-import { signInWithEmailAndPassword, signInWithRedirect, getRedirectResult, signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "@/lib/firebase";
 import { toast } from "sonner";
-import { useEffect } from "react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -23,130 +20,47 @@ export default function LoginPage() {
 
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    // Check for Google redirect result
-    const checkRedirect = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          setLoading(true);
-          const userData = await GSIStore.getUser(result.user.uid);
-          if (userData) {
-            GSIStore.setCurrentUser(userData);
-            toast.success("Bienvenue, " + userData.fullName);
-            router.push("/");
-          } else {
-            const newUser: any = {
-              id: result.user.uid,
-              fullName: result.user.displayName || "Étudiant GSI",
-              email: result.user.email || "",
-              role: 'student',
-              campus: 'Antananarivo',
-              filiere: 'Informatique',
-              niveau: 'L1',
-              photo: result.user.photoURL || ""
-            };
-            await GSIStore.addUser(newUser);
-            GSIStore.setCurrentUser(newUser);
-            toast.success("Compte Google créé avec succès !");
-            router.push("/");
-          }
-        }
-      } catch (error: any) {
-        console.error("Google redirect error:", error);
-        toast.error("Erreur d'authentification Google.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    checkRedirect();
-  }, [router]);
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     const toastId = toast.loading("Vérification...");
     try {
-      // Direct Firebase Login
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-
-      // Get user from cache if possible, or fetch (force cloud to avoid missing profile on new device)
-      const userData = await GSIStore.getUser(userCredential.user.uid, true);
-
+      const userData = await GSIStore.login(email, password);
       if (userData) {
-        GSIStore.setCurrentUser(userData);
         toast.success("Ravi de vous revoir !", { id: toastId });
-        // Redirection will be handled by AuthProvider automatically
+        if (userData.role === 'admin') router.push("/admin");
+        else if (userData.role === 'professor') router.push("/professor");
+        else router.push("/");
       } else {
-        toast.error("Profil introuvable.", { id: toastId });
+        toast.error("Identifiants incorrects ou profil introuvable.", { id: toastId });
       }
     } catch (error: any) {
-      if (error.code === 'auth/configuration-not-found') {
-        toast.error("Veuillez activer l'email/mot de passe dans Firebase.", { id: toastId });
-      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        toast.error("Email ou mot de passe incorrect.", { id: toastId });
-      } else {
-        toast.error("Erreur: " + error.message, { id: toastId });
-      }
+      toast.error("Erreur: " + error.message, { id: toastId });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    try {
-      // Try popup first (faster for web)
-      await signInWithPopup(auth, googleProvider).then(async (result: any) => {
-        if (result) {
-          const userData = await GSIStore.getUser(result.user.uid);
-          if (userData) {
-            GSIStore.setCurrentUser(userData);
-            toast.success("Bienvenue, " + userData.fullName);
-            router.push("/");
-          } else {
-             const newUser: any = {
-              id: result.user.uid,
-              fullName: result.user.displayName || "Étudiant GSI",
-              email: result.user.email || "",
-              role: 'student',
-              campus: 'Antananarivo',
-              filiere: 'Informatique',
-              niveau: 'L1',
-              photo: result.user.photoURL || ""
-            };
-            await GSIStore.addUser(newUser);
-            GSIStore.setCurrentUser(newUser);
-            toast.success("Compte Google créé !");
-            router.push("/");
-          }
-        }
-      });
-    } catch (error: any) {
-      if (error.code === 'auth/popup-blocked') {
-        toast.info("L'onglet de connexion est bloqué, utilisation de la redirection...");
-        await signInWithRedirect(auth, googleProvider);
-      } else {
-        toast.error("Erreur Google: " + error.message);
-        setLoading(false);
-      }
     }
   };
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (adminCode === "Nina GSI") {
-      GSIStore.setCurrentUser({
-        id: 'admin-id',
-        fullName: 'Nina GSI',
-        email: 'admin@gsi.mg',
-        role: 'admin',
-        campus: 'Antananarivo',
-        filiere: 'Administration',
-        niveau: 'N/A'
-      });
-      toast.success("Accès Administrateur accordé");
-      router.push("/admin");
+      const adminUser = await GSIStore.login("admin@gsi.mg", "password");
+      if (adminUser) {
+        toast.success("Accès Administrateur accordé");
+        router.push("/admin");
+      } else {
+         GSIStore.setCurrentUser({
+            id: 'admin-id',
+            fullName: 'Nina GSI',
+            email: 'admin@gsi.mg',
+            role: 'admin',
+            campus: 'Antananarivo',
+            filiere: 'Administration',
+            niveau: 'N/A'
+          });
+          toast.success("Accès Administrateur (Local)");
+          router.push("/admin");
+      }
     } else {
       toast.error("Code administrateur incorrect");
     }
@@ -155,18 +69,23 @@ export default function LoginPage() {
   const handleProfLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (profPass === "prof-gsi-mg") {
-      const profUser: any = {
-        id: 'prof-id',
-        fullName: 'Professeur GSI',
-        email: 'prof@gsi.mg',
-        role: 'professor',
-        campus: 'Antananarivo',
-        filiere: 'Multiple',
-        niveau: 'Multiple'
-      };
-      GSIStore.setCurrentUser(profUser);
-      toast.success("Accès Professeur accordé");
-      router.push("/professor");
+      const profUser = await GSIStore.login("prof@gsi.mg", "password");
+      if (profUser) {
+        toast.success("Accès Professeur accordé");
+        router.push("/professor");
+      } else {
+        GSIStore.setCurrentUser({
+            id: 'prof-id',
+            fullName: 'Professeur GSI',
+            email: 'prof@gsi.mg',
+            role: 'professor',
+            campus: 'Antananarivo',
+            filiere: 'Multiple',
+            niveau: 'Multiple'
+          });
+          toast.success("Accès Professeur (Local)");
+          router.push("/professor");
+      }
     } else {
       toast.error("Mot de passe professeur incorrect");
     }
@@ -174,7 +93,6 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col min-h-screen max-w-md mx-auto bg-white p-8 relative">
-      {/* Top Controls */}
       <div className="flex justify-end items-center gap-4 mb-8">
         <button
           onClick={() => setLanguage(language === "fr" ? "en" : "fr")}
@@ -240,21 +158,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-4 flex items-center gap-4">
-          <div className="flex-1 h-[1px] bg-gray-100"></div>
-          <span className="text-[10px] text-gray-400 font-bold uppercase">Ou continuer avec</span>
-          <div className="flex-1 h-[1px] bg-gray-100"></div>
-        </div>
-
-        <button
-          onClick={handleGoogleLogin}
-          disabled={loading}
-          className="mt-6 w-full bg-white border border-gray-200 text-gray-700 py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-gray-50 active:scale-[0.98] transition-all disabled:opacity-50"
-        >
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-          Google
-        </button>
-
         <div className="mt-8 text-center">
           <p className="text-gray-500 text-sm">
             {t("no_account")}{" "}
@@ -265,7 +168,6 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Admin Modal */}
       {showAdminModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl relative">
@@ -296,7 +198,6 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* Professor Modal */}
       {showProfModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl relative">

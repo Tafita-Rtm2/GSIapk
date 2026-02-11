@@ -1,7 +1,7 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
-import { Settings, ChevronRight, FileCheck, Award, LogOut, QrCode, X } from "lucide-react";
+import { Settings, ChevronRight, FileCheck, Award, LogOut, QrCode, X, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -9,9 +9,6 @@ import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
 import { GSIStore, User } from "@/lib/store";
 import { toast } from "sonner";
-import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
-import { Camera } from "lucide-react";
 
 export default function ProfilePage() {
   const { t, language, setLanguage } = useLanguage();
@@ -31,18 +28,10 @@ export default function ProfilePage() {
     }
   }, [router]);
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      GSIStore.setCurrentUser(null);
-      toast.success("Déconnexion réussie");
-      router.push("/login");
-    } catch (err: any) {
-      toast.error("Erreur de déconnexion");
-      // Fallback
-      GSIStore.setCurrentUser(null);
-      router.push("/login");
-    }
+  const handleLogout = () => {
+    GSIStore.logout();
+    toast.success("Déconnexion réussie");
+    router.push("/login");
   };
 
   if (!user) return null;
@@ -91,7 +80,6 @@ export default function ProfilePage() {
                       setUploadProgress(0);
                       try {
                         setIsUploading(true);
-                        // Optimistic Preview
                         const previewUrl = URL.createObjectURL(file);
                         setUser({ ...user, photo: previewUrl });
 
@@ -105,7 +93,6 @@ export default function ProfilePage() {
                         toast.success("Photo mise à jour avec succès !", { id: toastId });
                       } catch (err: any) {
                         toast.error("Erreur: " + err.message, { id: toastId });
-                        // Revert preview on error
                         const original = GSIStore.getCurrentUser();
                         setUser(original);
                       } finally {
@@ -212,7 +199,6 @@ export default function ProfilePage() {
         </button>
       </div>
 
-      {/* QR Code Modal */}
       {showQr && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
           <div className="bg-white rounded-[40px] w-full max-w-xs p-8 flex flex-col items-center relative">

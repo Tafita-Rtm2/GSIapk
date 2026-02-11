@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import { Sparkles, ArrowLeft, Camera } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import Link from "next/link";
-import { GSIStore } from "@/lib/store";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { GSIStore, User } from "@/lib/store";
 import { toast } from "sonner";
 
 const CAMPUSES = [
@@ -50,31 +48,26 @@ export default function RegisterPage() {
     setLoading(true);
     const toastId = toast.loading("Création de votre compte...");
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-
-      const newUser: any = {
-        id: userCredential.user.uid,
+      const newUser: User = {
+        id: Math.random().toString(36).substr(2, 9),
         fullName: formData.fullName,
         email: formData.email,
-        role: 'student' as const,
+        password: formData.password,
+        role: 'student',
         campus: formData.campus,
         filiere: formData.filiere,
         niveau: formData.niveau
       };
 
-      await GSIStore.addUser(newUser);
-      GSIStore.setCurrentUser(newUser);
-
-      toast.success("Bienvenue chez GSI Insight !", { id: toastId });
-      router.push("/");
-    } catch (error: any) {
-      if (error.code === 'auth/configuration-not-found') {
-        toast.error("Veuillez activer l'email/mot de passe dans Firebase.", { id: toastId });
-      } else if (error.code === 'auth/email-already-in-use') {
-        toast.error("Cet email est déjà utilisé.", { id: toastId });
+      const result = await GSIStore.register(newUser);
+      if (result) {
+        toast.success("Bienvenue chez GSI Insight !", { id: toastId });
+        router.push("/");
       } else {
-        toast.error("Erreur: " + error.message, { id: toastId });
+        toast.error("Erreur lors de la création du compte.", { id: toastId });
       }
+    } catch (error: any) {
+      toast.error("Erreur: " + error.message, { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -90,7 +83,6 @@ export default function RegisterPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5 pb-10">
-        {/* Profile Photo Mockup */}
         <div className="flex justify-center mb-8">
           <div className="relative">
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center border-2 border-dashed border-gray-300">
