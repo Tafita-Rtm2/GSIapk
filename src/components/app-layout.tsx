@@ -9,6 +9,7 @@ import { useLanguage } from "@/lib/i18n";
 import { useState, useEffect } from "react";
 import { GSIStore, User as GSIUser } from "@/lib/store";
 import { toast } from "sonner";
+import { GSIViewer } from "./gsi-viewer";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();
@@ -126,34 +127,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                  <X size={20} />
               </button>
            </div>
-           <div className="flex-1 bg-white relative overflow-hidden flex flex-col items-center justify-center">
-              {viewerLoading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
-                   <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-                   <p className="text-[10px] font-bold text-gray-400 uppercase">Chargement du document...</p>
-                </div>
-              )}
-              {viewerData.type === 'pdf' ? (
-                 <iframe
-                   src={`${viewerData.url}#toolbar=0&navpanes=0&scrollbar=0`}
-                   className="w-full h-full border-none"
-                   title="GSI Reader"
-                   onLoad={() => setViewerLoading(false)}
-                   onError={() => setViewerLoading(false)}
-                 />
-              ) : (
-                 <video
-                   src={viewerData.url}
-                   controls
-                   autoPlay
-                   onLoadedData={() => setViewerLoading(false)}
-                   onError={() => {
-                     setViewerLoading(false);
-                     toast.error("Erreur de lecture vidéo.");
-                   }}
-                   className="w-full h-full bg-black object-contain"
-                 />
-              )}
+           <div className="flex-1 bg-white relative overflow-hidden">
+              <GSIViewer
+                url={viewerData.url}
+                type={viewerData.type as any}
+                onLoadComplete={() => setViewerLoading(false)}
+                onError={(err) => {
+                  setViewerLoading(false);
+                  toast.error(err);
+                }}
+              />
            </div>
            <div className="p-4 bg-gray-900 text-center">
               <p className="text-[8px] font-bold text-gray-500 uppercase tracking-widest">© Groupe GSI — Confidentialité Totale</p>

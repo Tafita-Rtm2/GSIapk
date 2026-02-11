@@ -862,7 +862,9 @@ class GSIStoreClass {
     const absoluteUrl = this.getAbsoluteUrl(url);
     const lowUrl = absoluteUrl.toLowerCase();
     const type = lowUrl.includes('.pdf') ? 'pdf' :
-                 lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/) ? 'video' : 'pdf';
+                 lowUrl.includes('.docx') ? 'docx' :
+                 lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/) ? 'video' :
+                 lowUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/) ? 'image' : 'pdf';
 
     const dispatchViewer = (targetUrl: string) => {
       window.dispatchEvent(new CustomEvent('gsi-open-viewer', {
@@ -877,11 +879,12 @@ class GSIStoreClass {
           const path = progress.localPath;
           await Filesystem.stat({ path, directory: Directory.Data });
 
-          // Robust loading: Convert to Blob URL for PDF if possible to bypass iframe restrictions
-          if (type === 'pdf' && Capacitor.isNativePlatform()) {
+          // Robust loading: Convert to Blob URL for PDF/DOCX if possible to bypass WebView restrictions
+          if ((type === 'pdf' || type === 'docx') && Capacitor.isNativePlatform()) {
              const file = await Filesystem.readFile({ path, directory: Directory.Data });
              const dataStr = typeof file.data === 'string' ? file.data : '';
-             const blob = this.b64toBlob(dataStr, 'application/pdf');
+             const mime = type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+             const blob = this.b64toBlob(dataStr, mime);
              const blobUrl = URL.createObjectURL(blob);
              dispatchViewer(blobUrl);
           } else {
@@ -895,13 +898,14 @@ class GSIStoreClass {
       }
 
       if (window.navigator.onLine) {
-        const fileName = absoluteUrl.split('/').pop() || (type === 'pdf' ? 'doc.pdf' : 'video.mp4');
+        const fileName = absoluteUrl.split('/').pop() || (type === 'pdf' ? 'doc.pdf' : type === 'docx' ? 'doc.docx' : 'video.mp4');
         const path = await this.downloadPackFile(absoluteUrl, fileName, lessonId);
 
-        if (type === 'pdf' && Capacitor.isNativePlatform()) {
+        if ((type === 'pdf' || type === 'docx') && Capacitor.isNativePlatform()) {
           const file = await Filesystem.readFile({ path, directory: Directory.Data });
           const dataStr = typeof file.data === 'string' ? file.data : '';
-          const blob = this.b64toBlob(dataStr, 'application/pdf');
+          const mime = type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          const blob = this.b64toBlob(dataStr, mime);
           dispatchViewer(URL.createObjectURL(blob));
         } else {
           const fileUri = await Filesystem.getUri({ path, directory: Directory.Data });
