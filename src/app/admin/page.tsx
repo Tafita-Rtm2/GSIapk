@@ -41,6 +41,8 @@ export default function AdminPage() {
   const [showConvocationModal, setShowConvocationModal] = useState(false);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [schedules, setSchedules] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCampus, setFilterCampus] = useState("");
   const [syncStatus, setSyncStatus] = useState<'syncing' | 'ready' | 'offline'>('syncing');
@@ -56,7 +58,12 @@ export default function AdminPage() {
       GSIStore.subscribeUsers((us) => { setUsers(us); setSyncStatus('ready'); }),
       GSIStore.subscribeLessons({}, (ls) => setLessons(ls)),
       GSIStore.subscribeAssignments({}, (as) => setAssignments(as)),
-      GSIStore.subscribeAnnouncements(() => {})
+      GSIStore.subscribeAnnouncements((anns) => setAnnouncements(anns)),
+      GSIStore.subscribeLatestSchedule("", "", () => {
+         // Generic fetch for all schedules
+         const scheds = GSIStore.getCache<Record<string, any>>('schedules') || {};
+         setSchedules(Object.values(scheds));
+      })
     ];
 
     const handleOffline = () => setSyncStatus('offline');
@@ -115,6 +122,7 @@ export default function AdminPage() {
     { id: "users", icon: Users, label: t("gestion_utilisateurs"), color: "bg-blue-500" },
     { id: "communication", icon: Megaphone, label: t("communication"), color: "bg-orange-500" },
     { id: "academic", icon: GraduationCap, label: t("gestion_academique"), color: "bg-purple-500" },
+    { id: "schedule", icon: RefreshCcw, label: "Emploi du temps", color: "bg-violet-500" },
     { id: "media", icon: BookOpen, label: "Médiathèque", color: "bg-emerald-500" },
     { id: "stats", icon: BarChart3, label: t("stats_rapports"), color: "bg-pink-500" },
   ];
@@ -205,7 +213,7 @@ export default function AdminPage() {
               {filteredUsers.map((u, i) => (
                 <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-sm">
                   <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center overflow-hidden font-bold">
-                    {u.fullName.charAt(0)}
+                    {u.photo ? <img src={u.photo} className="w-full h-full object-cover" /> : u.fullName.charAt(0)}
                   </div>
                   <div className="flex-1">
                     <h4 className="font-bold text-sm">{u.fullName}</h4>
@@ -224,8 +232,10 @@ export default function AdminPage() {
         {activeTab === "communication" && (
           <div className="space-y-6">
             <PageHeader title={t("communication")} onBack={() => setActiveTab("dashboard")} />
+
             <form onSubmit={handleSendAnnouncement} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
-                <input name="title" required className="w-full bg-gray-50 rounded-xl p-3 outline-none font-bold" placeholder="Titre de l'annonce" />
+                <h3 className="text-xs font-black uppercase tracking-widest text-indigo-600">Nouvelle Annonce</h3>
+                <input name="title" required className="w-full bg-gray-50 rounded-xl p-3 outline-none font-bold text-sm" placeholder="Titre de l'annonce" />
                 <textarea name="message" required className="w-full bg-gray-50 rounded-xl p-3 outline-none min-h-[100px] text-sm" placeholder="Contenu du message..."></textarea>
 
                 <div className="p-4 bg-gray-50 rounded-2xl space-y-4">
@@ -260,6 +270,28 @@ export default function AdminPage() {
 
                 <button type="submit" className="w-full bg-orange-500 text-white py-4 rounded-xl font-black uppercase tracking-widest shadow-lg shadow-orange-100 active:scale-95 transition-all">Diffuser l'annonce</button>
             </form>
+
+            <div className="space-y-3">
+               <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 px-2">Historique des annonces</h3>
+               {announcements.map((a, i) => (
+                 <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-between shadow-sm">
+                    <div className="flex-1 pr-4">
+                       <h4 className="font-bold text-xs uppercase mb-1">{a.title}</h4>
+                       <p className="text-[10px] text-gray-500 line-clamp-2">{a.message}</p>
+                       <p className="text-[8px] font-bold text-gray-400 mt-1">{new Date(a.date).toLocaleDateString()}</p>
+                    </div>
+                    <button onClick={() => {
+                       if(confirm("Supprimer cette annonce ?")) {
+                          GSIStore.deleteAnnouncement(a.id);
+                          toast.success("Annonce supprimée");
+                       }
+                    }} className="p-2 text-red-500 bg-red-50 rounded-lg active:scale-95 transition-all">
+                       <Trash2 size={16} />
+                    </button>
+                 </div>
+               ))}
+               {announcements.length === 0 && <p className="text-center py-10 text-[10px] font-bold text-gray-400 uppercase">Aucune annonce diffusée</p>}
+            </div>
           </div>
         )}
 
@@ -269,21 +301,108 @@ export default function AdminPage() {
             <div className="grid grid-cols-1 gap-4">
                <div className="bg-white p-5 rounded-3xl border border-gray-100">
                   <h3 className="font-bold mb-4 flex items-center gap-2"><BookOpen size={18} className="text-emerald-500" /> Leçons ({lessons.length})</h3>
-                  <div className="space-y-2">
-                    {lessons.slice(0, 5).map((l, i) => (
-                      <div key={i} className="text-xs p-2 bg-gray-50 rounded-lg flex justify-between">{l.title} <span>{l.niveau}</span></div>
+                  <div className="space-y-3">
+                    {lessons.map((l, i) => (
+                      <div key={i} className="p-3 bg-gray-50 rounded-xl flex items-center justify-between shadow-sm">
+                         <div className="flex flex-col">
+                            <span className="text-xs font-black uppercase text-gray-800">{l.title}</span>
+                            <span className="text-[9px] font-bold text-gray-400">{l.subject} • {l.niveau}</span>
+                         </div>
+                         <button onClick={() => { if(confirm("Supprimer ?")) GSIStore.deleteLesson(l.id); }} className="text-red-500 p-2"><Trash2 size={14} /></button>
+                      </div>
                     ))}
                   </div>
                </div>
                <div className="bg-white p-5 rounded-3xl border border-gray-100">
                   <h3 className="font-bold mb-4 flex items-center gap-2"><FileText size={18} className="text-orange-500" /> Devoirs ({assignments.length})</h3>
-                  <div className="space-y-2">
-                    {assignments.slice(0, 5).map((a, i) => (
-                      <div key={i} className="text-xs p-2 bg-gray-50 rounded-lg flex justify-between">{a.title} <span>{a.deadline}</span></div>
+                  <div className="space-y-3">
+                    {assignments.map((a, i) => (
+                      <div key={i} className="p-3 bg-gray-50 rounded-xl flex items-center justify-between shadow-sm">
+                         <div className="flex flex-col">
+                            <span className="text-xs font-black uppercase text-gray-800">{a.title}</span>
+                            <span className="text-[9px] font-bold text-gray-400">Deadline: {a.deadline}</span>
+                         </div>
+                         <button onClick={() => { if(confirm("Supprimer ?")) GSIStore.deleteAssignment(a.id); }} className="text-red-500 p-2"><Trash2 size={14} /></button>
+                      </div>
                     ))}
                   </div>
                </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === "schedule" && (
+          <div className="space-y-6">
+             <PageHeader title="Emploi du temps" onBack={() => setActiveTab("dashboard")} />
+             <form onSubmit={async (e: any) => {
+                e.preventDefault();
+                const file = e.target.file.files[0];
+                if (!file) return toast.error("Veuillez choisir un fichier JSON ou PDF");
+
+                const toastId = toast.loading("Publication de l'emploi du temps...");
+                try {
+                  let scheduleData: any = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    campus: e.target.campus.value,
+                    niveau: e.target.niveau.value,
+                    lastUpdated: new Date().toISOString()
+                  };
+
+                  if (file.name.endsWith('.json')) {
+                     const text = await file.text();
+                     scheduleData.data = JSON.parse(text);
+                  } else {
+                     const url = await GSIStore.uploadFile(file, `schedules/${scheduleData.id}_${file.name}`);
+                     scheduleData.fileUrl = url;
+                  }
+
+                  await GSIStore.addSchedule(scheduleData);
+                  toast.success("Emploi du temps publié avec succès !", { id: toastId });
+                  setActiveTab("dashboard");
+                } catch (err: any) {
+                  toast.error("Erreur: " + err.message, { id: toastId });
+                }
+             }} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                   <select name="campus" className="p-3 bg-gray-50 rounded-xl text-xs font-bold border-none outline-none">
+                      {CAMPUSES.map(c => <option key={c}>{c}</option>)}
+                   </select>
+                   <select name="niveau" className="p-3 bg-gray-50 rounded-xl text-xs font-bold border-none outline-none">
+                      <option>L1</option><option>L2</option><option>L3</option><option>M1</option><option>M2</option>
+                   </select>
+                </div>
+                <div className="p-4 border-2 border-dashed border-gray-100 rounded-2xl text-center">
+                   <input name="file" type="file" required className="text-[10px] font-bold text-gray-400" />
+                   <p className="text-[9px] text-gray-400 mt-2 font-medium">Format supporté: .json (interactif) ou .pdf / .png</p>
+                </div>
+                <button type="submit" className="w-full bg-violet-600 text-white py-4 rounded-xl font-black uppercase tracking-widest active:scale-95 shadow-lg shadow-violet-100">Publier l'emploi du temps</button>
+             </form>
+
+             <div className="space-y-3">
+               <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 px-2">Emplois du temps actifs</h3>
+               {schedules.map((s, i) => (
+                 <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-between shadow-sm">
+                    <div className="flex-1">
+                       <h4 className="font-bold text-xs uppercase mb-1">{s.campus} — {s.niveau}</h4>
+                       <p className="text-[8px] font-bold text-gray-400">Mis à jour: {new Date(s.lastUpdated).toLocaleString()}</p>
+                    </div>
+                    <button onClick={async () => {
+                       if(confirm("Supprimer cet emploi du temps ?")) {
+                          const targetId = s._id || s.id;
+                          await GSIStore.deleteSchedule(targetId);
+                          toast.success("Supprimé");
+                          // Refresh
+                          const scheds = GSIStore.getCache<Record<string, any>>('schedules') || {};
+                          delete scheds[`${s.campus}_${s.niveau}`];
+                          setSchedules(Object.values(scheds));
+                       }
+                    }} className="p-2 text-red-500 bg-red-50 rounded-lg">
+                       <Trash2 size={16} />
+                    </button>
+                 </div>
+               ))}
+               {schedules.length === 0 && <p className="text-center py-10 text-[10px] font-bold text-gray-400 uppercase">Aucun emploi du temps</p>}
+             </div>
           </div>
         )}
 

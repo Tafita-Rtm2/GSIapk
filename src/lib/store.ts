@@ -2,6 +2,7 @@
 
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Browser } from '@capacitor/browser';
+import { Capacitor } from '@capacitor/core';
 
 // --- CONFIGURATION ---
 const API_BASE = "https://groupegsi.mg/rtmggmg/api";
@@ -20,11 +21,11 @@ export interface User {
   _id?: string; // API internal ID
 }
 
-export interface Lesson { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; date: string; files: string[]; }
-export interface Assignment { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; deadline: string; timeLimit: string; maxScore: number; files?: string[]; }
-export interface Submission { id: string; assignmentId: string; studentId: string; studentName: string; date: string; file: string; score?: number; feedback?: string; }
-export interface Grade { id: string; studentId: string; studentName: string; subject: string; score: number; maxScore: number; date: string; niveau: string; filiere: string; }
-export interface Announcement { id: string; title: string; message: string; date: string; author: string; type?: 'info' | 'convocation'; targetUserId?: string; campus?: string[]; filiere?: string[]; niveau?: string; }
+export interface Lesson { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; date: string; files: string[]; _id?: string; }
+export interface Assignment { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; deadline: string; timeLimit: string; maxScore: number; files?: string[]; _id?: string; }
+export interface Submission { id: string; assignmentId: string; studentId: string; studentName: string; date: string; file: string; score?: number; feedback?: string; _id?: string; }
+export interface Grade { id: string; studentId: string; studentName: string; subject: string; score: number; maxScore: number; date: string; niveau: string; filiere: string; _id?: string; }
+export interface Announcement { id: string; title: string; message: string; date: string; author: string; type?: 'info' | 'convocation'; targetUserId?: string; campus?: string[]; filiere?: string[]; niveau?: string; _id?: string; }
 
 interface State {
   currentUser: User | null;
@@ -128,12 +129,14 @@ class GSIStoreClass {
   }
 
   private async syncAll() {
-     this.fetchCollection('users', 'users');
-     this.fetchCollection('lessons', 'lessons');
-     this.fetchCollection('assignments', 'assignments');
-     this.fetchCollection('announcements', 'announcements');
-     this.fetchCollection('grades', 'grades');
-     this.fetchCollection('schedules', 'schedules');
+     return Promise.all([
+       this.fetchCollection('users', 'users'),
+       this.fetchCollection('lessons', 'lessons'),
+       this.fetchCollection('assignments', 'assignments'),
+       this.fetchCollection('announcements', 'announcements'),
+       this.fetchCollection('grades', 'grades'),
+       this.fetchCollection('schedules', 'schedules')
+     ]);
   }
 
   // --- API HELPERS ---
@@ -303,12 +306,18 @@ class GSIStoreClass {
   }
 
   subscribeLatestSchedule(campus: string, niveau: string, cb: (s: any) => void) {
-    const sKey = `${campus}_${niveau}`;
+    const sKey = campus && niveau ? `${campus}_${niveau}` : 'all';
     const subKey = `schedule_${sKey}`;
     if (!this.listeners[subKey]) this.listeners[subKey] = [];
     this.listeners[subKey].push(cb);
-    cb(this.state.schedules[sKey] || null);
-    this.fetchCollection('schedules', 'schedules', `?q={"campus":"${campus}","niveau":"${niveau}"}`);
+
+    if (sKey === 'all') {
+       cb(this.state.schedules);
+       this.fetchCollection('schedules', 'schedules');
+    } else {
+       cb(this.state.schedules[sKey] || null);
+       this.fetchCollection('schedules', 'schedules', `?q={"campus":"${campus}","niveau":"${niveau}"}`);
+    }
     return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
   }
 
@@ -333,11 +342,41 @@ class GSIStoreClass {
     await this.apiCall('/db/lessons', 'POST', lesson);
   }
 
+  async deleteLesson(id: string) {
+    const item = this.state.lessons.find(x => x.id === id);
+    this.state.lessons = this.state.lessons.filter(x => x.id !== id);
+    this.save();
+    this.notify('lessons', this.state.lessons);
+    if (item?._id) {
+       await this.apiCall(`/db/lessons/${item._id}`, 'DELETE');
+    } else {
+       const existing = await this.apiCall(`/db/lessons?q={"id":"${id}"}`);
+       if (existing && Array.isArray(existing) && existing.length > 0) {
+          await this.apiCall(`/db/lessons/${existing[0]._id}`, 'DELETE');
+       }
+    }
+  }
+
   async addAssignment(assignment: Assignment) {
     this.state.assignments = [assignment, ...this.state.assignments.filter(a => a.id !== assignment.id)];
     this.save();
     this.notify('assignments', this.state.assignments);
     await this.apiCall('/db/assignments', 'POST', assignment);
+  }
+
+  async deleteAssignment(id: string) {
+    const item = this.state.assignments.find(x => x.id === id);
+    this.state.assignments = this.state.assignments.filter(x => x.id !== id);
+    this.save();
+    this.notify('assignments', this.state.assignments);
+    if (item?._id) {
+       await this.apiCall(`/db/assignments/${item._id}`, 'DELETE');
+    } else {
+       const existing = await this.apiCall(`/db/assignments?q={"id":"${id}"}`);
+       if (existing && Array.isArray(existing) && existing.length > 0) {
+          await this.apiCall(`/db/assignments/${existing[0]._id}`, 'DELETE');
+       }
+    }
   }
 
   async addAnnouncement(ann: Announcement) {
@@ -347,6 +386,21 @@ class GSIStoreClass {
     await this.apiCall('/db/announcements', 'POST', ann);
   }
 
+  async deleteAnnouncement(id: string) {
+    const ann = this.state.announcements.find(a => a.id === id);
+    this.state.announcements = this.state.announcements.filter(a => a.id !== id);
+    this.save();
+    this.notify('announcements', this.state.announcements);
+    if (ann?._id) {
+       await this.apiCall(`/db/announcements/${ann._id}`, 'DELETE');
+    } else {
+       const existing = await this.apiCall(`/db/announcements?q={"id":"${id}"}`);
+       if (existing && Array.isArray(existing) && existing.length > 0) {
+          await this.apiCall(`/db/announcements/${existing[0]._id}`, 'DELETE');
+       }
+    }
+  }
+
   async addGrade(grade: Grade) {
     this.state.grades = [grade, ...this.state.grades];
     this.save();
@@ -354,10 +408,29 @@ class GSIStoreClass {
     await this.apiCall('/db/grades', 'POST', grade);
   }
 
+  async deleteGrade(id: string) {
+    const item = this.state.grades.find(x => x.id === id);
+    this.state.grades = this.state.grades.filter(x => x.id !== id);
+    this.save();
+    this.notify('grades', this.state.grades);
+    if (item?._id) {
+       await this.apiCall(`/db/grades/${item._id}`, 'DELETE');
+    } else {
+       const existing = await this.apiCall(`/db/grades?q={"id":"${id}"}`);
+       if (existing && Array.isArray(existing) && existing.length > 0) {
+          await this.apiCall(`/db/grades/${existing[0]._id}`, 'DELETE');
+       }
+    }
+  }
+
   async updateUser(user: User) {
     this.state.users = this.state.users.map(u => u.id === user.id ? user : u);
+    if (this.state.currentUser && this.state.currentUser.id === user.id) {
+       this.state.currentUser = { ...this.state.currentUser, ...user };
+    }
     this.save();
     this.notify('users', this.state.users);
+    this.notify('auth', this.state.currentUser);
     const targetId = user._id;
     if (targetId) {
        await this.apiCall(`/db/users/${targetId}`, 'PATCH', user);
@@ -392,6 +465,10 @@ class GSIStoreClass {
     await this.apiCall('/db/schedules', 'POST', schedule);
   }
 
+  async deleteSchedule(id: string) {
+    await this.apiCall(`/db/schedules/${id}`, 'DELETE');
+  }
+
   // --- FILES ENGINE ---
 
   async uploadFile(file: File, path: string, onProgress?: (p: number) => void): Promise<string> {
@@ -408,12 +485,18 @@ class GSIStoreClass {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const response = JSON.parse(xhr.responseText);
-            resolve(response.viewUrl || response.downloadUrl);
+            // Enhanced robustness for different API response formats
+            const url = response.viewUrl || response.downloadUrl || response.url || response.path || (response.data && response.data.url);
+            if (url) {
+              resolve(url);
+            } else {
+              reject(new Error("Upload succeeded but no URL returned in response"));
+            }
           } catch (e) {
-            reject(new Error("Failed to parse upload response"));
+            reject(new Error("Failed to parse upload response: " + xhr.responseText));
           }
         } else {
-          reject(new Error(`Upload failed with status ${xhr.status}`));
+          reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.responseText}`));
         }
       });
       xhr.addEventListener('error', () => reject(new Error("Network error during upload")));
@@ -463,7 +546,8 @@ class GSIStoreClass {
               path: progress.localPath,
               directory: Directory.Data
             });
-            await Browser.open({ url: fileUri.uri });
+            const finalUrl = Capacitor.convertFileSrc(fileUri.uri);
+            await Browser.open({ url: finalUrl });
             return;
          }
       }

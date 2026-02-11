@@ -22,44 +22,45 @@ export default function Home() {
   const [syncStatus, setSyncStatus] = useState<'syncing' | 'offline' | 'ready'>('syncing');
 
   useEffect(() => {
-    const currentUser = GSIStore.getCurrentUser();
-    if (!currentUser) {
+    const initialUser = GSIStore.getCurrentUser();
+    if (!initialUser) {
       router.replace("/login");
       return;
     }
 
-    if (currentUser.role === 'admin') {
+    if (initialUser.role === 'admin') {
       router.replace("/admin");
       return;
-    } else if (currentUser.role === 'professor') {
+    } else if (initialUser.role === 'professor') {
       router.replace("/professor");
       return;
     }
 
-    setUser(currentUser);
+    setUser(initialUser);
 
     const unsubs = [
-      GSIStore.subscribeLessons({ niveau: currentUser.niveau }, (all) => {
+      GSIStore.subscribeAuth((u) => setUser(u)),
+      GSIStore.subscribeLessons({ niveau: initialUser.niveau }, (all) => {
         const filtered = all.filter(l =>
-          (l.campus.includes(currentUser.campus) || l.campus.length === 0) &&
-          (l.filiere.includes(currentUser.filiere) || l.filiere.length === 0)
+          (l.campus.includes(initialUser.campus) || l.campus.length === 0) &&
+          (l.filiere.includes(initialUser.filiere) || l.filiere.length === 0)
         );
         setLessons(filtered);
         setSyncStatus('ready');
       }),
-      GSIStore.subscribeAssignments({ niveau: currentUser.niveau }, (all) => {
+      GSIStore.subscribeAssignments({ niveau: initialUser.niveau }, (all) => {
         const filtered = all.filter(a =>
-          (a.campus.includes(currentUser.campus) || a.campus.length === 0) &&
-          (a.filiere.includes(currentUser.filiere) || a.filiere.length === 0)
+          (a.campus.includes(initialUser.campus) || a.campus.length === 0) &&
+          (a.filiere.includes(initialUser.filiere) || a.filiere.length === 0)
         );
         setAssignments(filtered);
       }),
       GSIStore.subscribeAnnouncements((anns) => {
         const filtered = anns.filter(a =>
-          (!a.targetUserId || a.targetUserId === currentUser.id) &&
-          (!a.campus || a.campus.includes(currentUser.campus) || a.campus.length === 0) &&
-          (!a.filiere || a.filiere.includes(currentUser.filiere) || a.filiere.length === 0) &&
-          (!a.niveau || a.niveau === currentUser.niveau)
+          (!a.targetUserId || a.targetUserId === initialUser.id) &&
+          (!a.campus || a.campus.includes(initialUser.campus) || a.campus.length === 0) &&
+          (!a.filiere || a.filiere.includes(initialUser.filiere) || a.filiere.length === 0) &&
+          (!a.niveau || a.niveau === initialUser.niveau)
         );
         setAnnouncements(filtered);
       })
@@ -126,7 +127,7 @@ export default function Home() {
                 {announcements.length > 0 && <div className="absolute top-3 right-3 w-2 h-2 bg-rose-500 border-2 border-white rounded-full"></div>}
              </button>
              <Link href="/profile" className="w-11 h-11 rounded-2xl bg-indigo-50 overflow-hidden border-2 border-white shadow-md">
-                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`} alt="Avatar" />
+                <img src={user.photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`} alt="Avatar" className="w-full h-full object-cover" />
              </Link>
           </div>
         </div>

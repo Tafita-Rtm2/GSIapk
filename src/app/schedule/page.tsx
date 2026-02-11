@@ -28,12 +28,15 @@ export default function SchedulePage() {
       setLatestSchedule(schedule);
       GSIStore.setCache("latest_schedule", schedule);
 
-      if (schedule?.url && schedule.url.includes('.json')) {
+      const url = schedule?.fileUrl || schedule?.url;
+      if (url && url.includes('.json')) {
         try {
-          const res = await fetch(schedule.url);
+          const res = await fetch(url);
           const data = await res.json();
           setCustomData(data);
         } catch (e) { console.error("JSON parsing failed", e); }
+      } else if (schedule?.data) {
+          setCustomData(schedule.data);
       }
     });
 
@@ -110,25 +113,26 @@ export default function SchedulePage() {
         </div>
 
         {/* Latest Uploaded Schedule */}
-        {latestSchedule && (
+        {latestSchedule && (latestSchedule.fileUrl || latestSchedule.url) && (
           <div className="mb-8 bg-emerald-50 p-6 rounded-[32px] border border-emerald-100 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="bg-emerald-100 p-3 rounded-2xl text-emerald-600">
                 <FileText size={24} />
               </div>
               <div>
-                <h4 className="font-bold text-emerald-900 text-sm">Nouvel emploi du temps</h4>
-                <p className="text-[10px] text-emerald-600 font-medium">Mis à jour le {new Date(latestSchedule.date).toLocaleDateString()}</p>
+                <h4 className="font-bold text-emerald-900 text-sm">Emploi du temps PDF</h4>
+                <p className="text-[10px] text-emerald-600 font-medium">Dernière version officielle</p>
               </div>
             </div>
-            <a
-              href={latestSchedule.url}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={() => {
+                 const url = latestSchedule.fileUrl || latestSchedule.url;
+                 if (url) GSIStore.openPackFile(latestSchedule.id, url);
+              }}
               className="bg-white text-emerald-600 p-3 rounded-2xl shadow-sm hover:scale-110 transition-transform active:scale-95"
             >
               <Download size={20} />
-            </a>
+            </button>
           </div>
         )}
 

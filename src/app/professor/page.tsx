@@ -146,6 +146,8 @@ export default function ProfessorPage() {
   const handlePublishAssignment = async (e: any) => {
     e.preventDefault();
     const form = e.target;
+    const filesInput = form.elements.namedItem('files') as HTMLInputElement;
+    const files = filesInput?.files;
     const title = form.title.value;
     const tempId = Math.random().toString(36).substr(2, 9);
 
@@ -155,6 +157,11 @@ export default function ProfessorPage() {
 
     (async () => {
        try {
+          let fileUrls: string[] = [];
+          if (files && files.length > 0) {
+            fileUrls = await Promise.all(Array.from(files).map(f => GSIStore.uploadFile(f, `assignments/${tempId}_${f.name}`, setUploadProgress)));
+          }
+
           await GSIStore.addAssignment({
             id: tempId,
             title,
@@ -166,13 +173,14 @@ export default function ProfessorPage() {
             deadline: form.deadline.value,
             timeLimit: "23:59",
             maxScore: 20,
-            files: []
+            files: fileUrls
           });
           toast.success(`Devoir "${title}" disponible.`, { id: toastId });
        } catch (err: any) {
           toast.error(err.message, { id: toastId });
        } finally {
           setIsUploading(false);
+          setUploadProgress(0);
        }
     })();
   };
@@ -395,7 +403,9 @@ export default function ProfessorPage() {
             <PageHeader title="Mes Étudiants" onBack={() => setActiveTab("dashboard")} />
             {students.map((s, i) => (
               <div key={i} className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4">
-                 <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center font-bold text-indigo-600">{s.fullName.charAt(0)}</div>
+                 <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center font-bold text-indigo-600 overflow-hidden">
+                    {s.photo ? <img src={s.photo} className="w-full h-full object-cover" /> : s.fullName.charAt(0)}
+                 </div>
                  <div className="flex-1"><h4 className="font-bold text-sm">{s.fullName}</h4><p className="text-[10px] text-gray-400 font-bold uppercase">{s.filiere} • {s.niveau}</p></div>
               </div>
             ))}
