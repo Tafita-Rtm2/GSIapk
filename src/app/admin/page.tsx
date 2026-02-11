@@ -117,6 +117,7 @@ export default function AdminPage() {
     { id: "users", icon: Users, label: t("gestion_utilisateurs"), color: "bg-blue-500" },
     { id: "communication", icon: Megaphone, label: t("communication"), color: "bg-orange-500" },
     { id: "academic", icon: GraduationCap, label: t("gestion_academique"), color: "bg-purple-500" },
+    { id: "media", icon: BookOpen, label: "Médiathèque", color: "bg-emerald-500" },
     { id: "stats", icon: BarChart3, label: t("stats_rapports"), color: "bg-pink-500" },
   ];
 
@@ -289,6 +290,20 @@ export default function AdminPage() {
           </div>
         )}
 
+        {activeTab === "media" && (
+          <div className="space-y-4">
+            <PageHeader title="Médiathèque GSI" onBack={() => setActiveTab("dashboard")} />
+            <div className="bg-white rounded-[32px] overflow-hidden border border-gray-100 shadow-sm h-[600px]">
+               <iframe
+                 src="https://groupegsi.mg/rtmggmg/embed/gallery?category=application"
+                 width="100%"
+                 height="100%"
+                 frameBorder="0"
+               ></iframe>
+            </div>
+          </div>
+        )}
+
         {activeTab === "stats" && (
            <div className="space-y-4">
             <PageHeader title="Stats & Rapports" onBack={() => setActiveTab("dashboard")} />
@@ -309,7 +324,7 @@ export default function AdminPage() {
       {/* Convocation Modal */}
       {showConvocationModal && selectedUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-sm rounded-[32px] p-8 shadow-2xl relative">
+          <div className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative">
             <button onClick={() => setShowConvocationModal(false)} className="absolute right-6 top-6 text-gray-400"><X size={20} /></button>
             <h2 className="text-xl font-black mb-2">{t("convocation")}</h2>
             <p className="text-xs text-gray-500 mb-6 font-medium">Convoquer <span className="text-indigo-600 font-bold">{selectedUser.fullName}</span>.</p>

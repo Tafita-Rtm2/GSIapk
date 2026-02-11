@@ -226,6 +226,7 @@ export default function ProfessorPage() {
               {id: "assignments", icon: FileText, label: "Publier Devoir", color: "bg-orange-500"},
               {id: "grades", icon: BarChart3, label: "Notes", color: "bg-pink-500"},
               {id: "announcements", icon: Megaphone, label: "Annonce", color: "bg-orange-600"},
+              {id: "media", icon: BookOpen, label: "Médiathèque", color: "bg-emerald-600"},
               {id: "students", icon: Users, label: "Étudiants", color: "bg-indigo-500"}].map(item => (
               <button key={item.id} onClick={() => setActiveTab(item.id)} className="bg-white p-5 rounded-[32px] shadow-sm border border-gray-100 flex flex-col items-center gap-3 active:scale-95">
                 <div className={`${item.color} w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-black/5`}><item.icon size={24} /></div>
@@ -375,6 +376,20 @@ export default function ProfessorPage() {
 
                 <button type="submit" className="w-full bg-orange-600 text-white py-5 rounded-2xl font-black uppercase shadow-lg active:scale-95">Envoyer aux Étudiants</button>
             </form>
+          </div>
+        )}
+
+        {activeTab === "media" && (
+          <div className="space-y-4">
+            <PageHeader title="Médiathèque" onBack={() => setActiveTab("dashboard")} />
+            <div className="bg-white rounded-[32px] overflow-hidden border border-gray-100 shadow-sm h-[600px]">
+               <iframe
+                 src="https://groupegsi.mg/rtmggmg/embed/gallery?category=application"
+                 width="100%"
+                 height="100%"
+                 frameBorder="0"
+               ></iframe>
+            </div>
           </div>
         )}
 
