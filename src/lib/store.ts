@@ -3,6 +3,7 @@
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 // --- CONFIGURATION ---
 const API_BASE = "https://groupegsi.mg/rtmggmg/api";
@@ -27,6 +28,50 @@ export interface Submission { id: string; assignmentId: string; studentId: strin
 export interface Grade { id: string; studentId: string; studentName: string; subject: string; score: number; maxScore: number; date: string; niveau: string; filiere: string; _id?: string; }
 export interface Announcement { id: string; title: string; message: string; date: string; author: string; type?: 'info' | 'convocation'; targetUserId?: string; campus?: string[]; filiere?: string[]; niveau?: string; _id?: string; }
 
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderPhoto?: string;
+  text: string;
+  timestamp: string;
+  filiere: string;
+  niveau: string;
+  _id?: string;
+}
+
+export interface Reminder {
+  id: string;
+  title: string;
+  date: string; // ISO date
+  time: string; // HH:mm
+  subject: string;
+  notes?: string;
+  completed: boolean;
+}
+
+export interface ScheduleSlot {
+  day: string; // "Lundi", "Mardi", ...
+  startTime: string;
+  endTime: string;
+  subject: string;
+  room: string;
+  instructor: string;
+  color?: string;
+}
+
+export interface StructuredSchedule {
+  id: string;
+  campus: string;
+  niveau: string;
+  lastUpdated: string;
+  slots: ScheduleSlot[];
+  url?: string;
+  fileUrl?: string;
+  data?: any;
+  _id?: string;
+}
+
 interface State {
   currentUser: User | null;
   users: User[];
@@ -35,7 +80,9 @@ interface State {
   submissions: Submission[];
   grades: Grade[];
   announcements: Announcement[];
-  schedules: Record<string, any>;
+  schedules: Record<string, StructuredSchedule>;
+  messages: ChatMessage[];
+  reminders: Reminder[];
 }
 
 const initialState: State = {
@@ -46,7 +93,9 @@ const initialState: State = {
   submissions: [],
   grades: [],
   announcements: [],
-  schedules: {}
+  schedules: {},
+  messages: [],
+  reminders: []
 };
 
 class GSIStoreClass {
@@ -122,10 +171,27 @@ class GSIStoreClass {
 
   private startGlobalSync() {
     // Initial aggressive sync
-    this.syncAll();
+    this.syncAll().then(() => {
+       this.autoDownloadEssentials();
+    });
     setTimeout(() => this.syncAll(), 5000);
     // Background polling
-    setInterval(() => this.syncAll(), 30000);
+    setInterval(() => {
+       this.syncAll();
+    }, 30000);
+  }
+
+  private async autoDownloadEssentials() {
+     if (!this.state.currentUser) return;
+     const { campus, niveau } = this.state.currentUser;
+
+     // Auto-download current schedule if structured
+     const sched = this.state.schedules[`${campus}_${niveau}`];
+     if (sched && (sched.fileUrl || sched.url)) {
+        try {
+           await this.downloadPackFile(sched.fileUrl || sched.url!, `Schedule_${campus}_${niveau}.pdf`, sched.id);
+        } catch (e) {}
+     }
   }
 
   private async syncAll() {
@@ -135,8 +201,19 @@ class GSIStoreClass {
        this.fetchCollection('assignments', 'assignments'),
        this.fetchCollection('announcements', 'announcements'),
        this.fetchCollection('grades', 'grades'),
-       this.fetchCollection('schedules', 'schedules')
+       this.fetchCollection('schedules', 'schedules'),
+       this.fetchChatMessages()
      ]);
+  }
+
+  private async fetchChatMessages() {
+    if (!this.state.currentUser) return;
+    const { filiere, niveau } = this.state.currentUser;
+    const data = await this.apiCall(`/db/messages?q={"filiere":"${filiere}","niveau":"${niveau}"}&s={"timestamp":-1}&l=50`);
+    if (data && Array.isArray(data)) {
+      this.state.messages = data.reverse();
+      this.notify('messages', this.state.messages);
+    }
   }
 
   // --- API HELPERS ---
@@ -212,10 +289,12 @@ class GSIStoreClass {
   }
 
   async register(user: User): Promise<User | null> {
+    // Ensure photo is handled if present
     const res = await this.apiCall('/db/users', 'POST', user);
     if (res) {
-       this.setCurrentUser(res);
-       return res;
+       const finalUser = { ...user, ...res };
+       this.setCurrentUser(finalUser);
+       return finalUser;
     }
     return null;
   }
@@ -305,20 +384,35 @@ class GSIStoreClass {
     return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
   }
 
-  subscribeLatestSchedule(campus: string, niveau: string, cb: (s: any) => void) {
+  subscribeLatestSchedule(campus: string, niveau: string, cb: (s: StructuredSchedule | null) => void) {
     const sKey = campus && niveau ? `${campus}_${niveau}` : 'all';
     const subKey = `schedule_${sKey}`;
     if (!this.listeners[subKey]) this.listeners[subKey] = [];
     this.listeners[subKey].push(cb);
 
     if (sKey === 'all') {
-       cb(this.state.schedules);
+       cb(this.state.schedules as any);
        this.fetchCollection('schedules', 'schedules');
     } else {
        cb(this.state.schedules[sKey] || null);
        this.fetchCollection('schedules', 'schedules', `?q={"campus":"${campus}","niveau":"${niveau}"}`);
     }
     return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
+  }
+
+  subscribeMessages(cb: (ms: ChatMessage[]) => void) {
+    if (!this.listeners['messages']) this.listeners['messages'] = [];
+    this.listeners['messages'].push(cb);
+    cb(this.state.messages);
+    this.fetchChatMessages();
+    return () => { this.listeners['messages'] = this.listeners['messages']?.filter(l => l !== cb); };
+  }
+
+  subscribeReminders(cb: (rs: Reminder[]) => void) {
+    if (!this.listeners['reminders']) this.listeners['reminders'] = [];
+    this.listeners['reminders'].push(cb);
+    cb(this.state.reminders);
+    return () => { this.listeners['reminders'] = this.listeners['reminders']?.filter(l => l !== cb); };
   }
 
   // --- ACTIONS ---
@@ -431,6 +525,8 @@ class GSIStoreClass {
     this.save();
     this.notify('users', this.state.users);
     this.notify('auth', this.state.currentUser);
+
+    // Also update cloud immediately if _id exists
     const targetId = user._id;
     if (targetId) {
        await this.apiCall(`/db/users/${targetId}`, 'PATCH', user);
@@ -461,12 +557,86 @@ class GSIStoreClass {
     await this.apiCall('/db/submissions', 'POST', s);
   }
 
-  async addSchedule(schedule: any) {
-    await this.apiCall('/db/schedules', 'POST', schedule);
+  async addSchedule(schedule: StructuredSchedule) {
+    const existing = await this.apiCall(`/db/schedules?q={"campus":"${schedule.campus}","niveau":"${schedule.niveau}"}`);
+    if (existing && Array.isArray(existing) && existing.length > 0) {
+       await this.apiCall(`/db/schedules/${existing[0]._id}`, 'PATCH', schedule);
+    } else {
+       await this.apiCall('/db/schedules', 'POST', schedule);
+    }
+    this.state.schedules[`${schedule.campus}_${schedule.niveau}`] = schedule;
+    this.save();
+    this.notify('schedules', this.state.schedules);
   }
 
   async deleteSchedule(id: string) {
     await this.apiCall(`/db/schedules/${id}`, 'DELETE');
+    this.fetchCollection('schedules', 'schedules');
+  }
+
+  // --- CHAT ---
+  async sendMessage(text: string) {
+    if (!this.state.currentUser) return;
+    const msg: ChatMessage = {
+      id: Math.random().toString(36).substr(2, 9),
+      senderId: this.state.currentUser.id,
+      senderName: this.state.currentUser.fullName,
+      senderPhoto: this.state.currentUser.photo,
+      text,
+      timestamp: new Date().toISOString(),
+      filiere: this.state.currentUser.filiere,
+      niveau: this.state.currentUser.niveau
+    };
+    this.state.messages = [...this.state.messages, msg];
+    this.notify('messages', this.state.messages);
+    await this.apiCall('/db/messages', 'POST', msg);
+  }
+
+  // --- REMINDERS & NOTIFICATIONS ---
+  async addReminder(r: Reminder) {
+    this.state.reminders = [...this.state.reminders, r];
+    this.save();
+    this.notify('reminders', this.state.reminders);
+    this.scheduleNotification(r);
+  }
+
+  async updateReminder(r: Reminder) {
+    this.state.reminders = this.state.reminders.map(it => it.id === r.id ? r : it);
+    this.save();
+    this.notify('reminders', this.state.reminders);
+    if (!r.completed) this.scheduleNotification(r);
+    else this.cancelNotification(r.id);
+  }
+
+  async deleteReminder(id: string) {
+    this.state.reminders = this.state.reminders.filter(it => it.id !== id);
+    this.save();
+    this.notify('reminders', this.state.reminders);
+    this.cancelNotification(id);
+  }
+
+  private async scheduleNotification(r: Reminder) {
+    if (Capacitor.isNativePlatform()) {
+      const scheduleDate = new Date(`${r.date}T${r.time}`);
+      if (scheduleDate > new Date()) {
+        await LocalNotifications.schedule({
+          notifications: [{
+            id: parseInt(r.id.replace(/\D/g, '').substr(0, 9)) || Math.floor(Math.random() * 1000000),
+            title: `Rappel GSI : ${r.subject}`,
+            body: r.title,
+            schedule: { at: scheduleDate },
+            sound: 'default'
+          }]
+        });
+      }
+    }
+  }
+
+  private async cancelNotification(id: string) {
+     if (Capacitor.isNativePlatform()) {
+        const nid = parseInt(id.replace(/\D/g, '').substr(0, 9));
+        if (nid) await LocalNotifications.cancel({ notifications: [{ id: nid }] });
+     }
   }
 
   // --- FILES ENGINE ---
@@ -536,27 +706,27 @@ class GSIStoreClass {
   async openPackFile(lessonId: string, fallbackUrl: string) {
     try {
       const progress = this.getProgress(lessonId);
+      let targetUrl = fallbackUrl;
+
       if (progress?.localPath) {
-         const stat = await Filesystem.stat({
+         const fileUri = await Filesystem.getUri({
            path: progress.localPath,
            directory: Directory.Data
          });
-         if (stat) {
-            const fileUri = await Filesystem.getUri({
-              path: progress.localPath,
-              directory: Directory.Data
-            });
-            const finalUrl = Capacitor.convertFileSrc(fileUri.uri);
-            await Browser.open({ url: finalUrl });
-            return;
-         }
+         targetUrl = Capacitor.convertFileSrc(fileUri.uri);
       }
-      if (fallbackUrl) {
-         if (typeof window !== 'undefined') window.open(fallbackUrl, '_blank');
+
+      if (targetUrl) {
+         // Open in Capacitor Browser (In-app)
+         await Browser.open({
+            url: targetUrl,
+            windowName: '_self', // Try to keep it inside if possible
+            toolbarColor: '#3F51B5'
+         });
       }
     } catch (e) {
-      console.warn("Could not open local pack, falling back to cloud.");
-      if (fallbackUrl && typeof window !== 'undefined') window.open(fallbackUrl, '_blank');
+      console.error("Open pack failed", e);
+      if (fallbackUrl) window.open(fallbackUrl, '_blank');
     }
   }
 

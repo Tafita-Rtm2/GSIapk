@@ -334,49 +334,12 @@ export default function AdminPage() {
         {activeTab === "schedule" && (
           <div className="space-y-6">
              <PageHeader title="Emploi du temps" onBack={() => setActiveTab("dashboard")} />
-             <form onSubmit={async (e: any) => {
-                e.preventDefault();
-                const file = e.target.file.files[0];
-                if (!file) return toast.error("Veuillez choisir un fichier JSON ou PDF");
 
-                const toastId = toast.loading("Publication de l'emploi du temps...");
-                try {
-                  let scheduleData: any = {
-                    id: Math.random().toString(36).substr(2, 9),
-                    campus: e.target.campus.value,
-                    niveau: e.target.niveau.value,
-                    lastUpdated: new Date().toISOString()
-                  };
-
-                  if (file.name.endsWith('.json')) {
-                     const text = await file.text();
-                     scheduleData.data = JSON.parse(text);
-                  } else {
-                     const url = await GSIStore.uploadFile(file, `schedules/${scheduleData.id}_${file.name}`);
-                     scheduleData.fileUrl = url;
-                  }
-
-                  await GSIStore.addSchedule(scheduleData);
-                  toast.success("Emploi du temps publié avec succès !", { id: toastId });
-                  setActiveTab("dashboard");
-                } catch (err: any) {
-                  toast.error("Erreur: " + err.message, { id: toastId });
-                }
-             }} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
-                <div className="grid grid-cols-2 gap-2">
-                   <select name="campus" className="p-3 bg-gray-50 rounded-xl text-xs font-bold border-none outline-none">
-                      {CAMPUSES.map(c => <option key={c}>{c}</option>)}
-                   </select>
-                   <select name="niveau" className="p-3 bg-gray-50 rounded-xl text-xs font-bold border-none outline-none">
-                      <option>L1</option><option>L2</option><option>L3</option><option>M1</option><option>M2</option>
-                   </select>
-                </div>
-                <div className="p-4 border-2 border-dashed border-gray-100 rounded-2xl text-center">
-                   <input name="file" type="file" required className="text-[10px] font-bold text-gray-400" />
-                   <p className="text-[9px] text-gray-400 mt-2 font-medium">Format supporté: .json (interactif) ou .pdf / .png</p>
-                </div>
-                <button type="submit" className="w-full bg-violet-600 text-white py-4 rounded-xl font-black uppercase tracking-widest active:scale-95 shadow-lg shadow-violet-100">Publier l'emploi du temps</button>
-             </form>
+             <ScheduleEditor campuses={CAMPUSES} onSave={(s) => {
+                GSIStore.addSchedule(s);
+                toast.success("Emploi du temps mis à jour !");
+                setActiveTab("dashboard");
+             }} />
 
              <div className="space-y-3">
                <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 px-2">Emplois du temps actifs</h3>
@@ -486,3 +449,64 @@ const StatCard = memo(({ label, value, change, color }: { label: string, value: 
     </div>
   );
 });
+
+function ScheduleEditor({ campuses, onSave }: { campuses: string[], onSave: (s: any) => void }) {
+  const [campus, setCampus] = useState(campuses[0]);
+  const [niveau, setNiveau] = useState("L1");
+  const [slots, setSlots] = useState<any[]>([]);
+
+  const days = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+
+  const addSlot = () => {
+    setSlots([...slots, { day: "Lundi", startTime: "08:00", endTime: "10:00", subject: "", room: "", instructor: "" }]);
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+       <div className="grid grid-cols-2 gap-2">
+          <select value={campus} onChange={(e) => setCampus(e.target.value)} className="p-4 bg-gray-50 rounded-2xl font-bold text-xs border-none outline-none">
+             {campuses.map(c => <option key={c}>{c}</option>)}
+          </select>
+          <select value={niveau} onChange={(e) => setNiveau(e.target.value)} className="p-4 bg-gray-50 rounded-2xl font-bold text-xs border-none outline-none">
+             {["L1", "L2", "L3", "M1", "M2"].map(n => <option key={n}>{n}</option>)}
+          </select>
+       </div>
+
+       <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+          {slots.map((slot, i) => (
+            <div key={i} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 relative group animate-in slide-in-from-right-2">
+               <button onClick={() => setSlots(slots.filter((_, idx) => idx !== i))} className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"><X size={12} /></button>
+               <div className="grid grid-cols-2 gap-2 mb-2">
+                  <select value={slot.day} onChange={e => {
+                    const n = [...slots]; n[i].day = e.target.value; setSlots(n);
+                  }} className="p-2 bg-white rounded-lg text-[10px] font-bold">
+                    {days.map(d => <option key={d}>{d}</option>)}
+                  </select>
+                  <div className="flex gap-1">
+                     <input type="time" value={slot.startTime} onChange={e => { const n = [...slots]; n[i].startTime = e.target.value; setSlots(n); }} className="flex-1 p-2 bg-white rounded-lg text-[10px] font-bold" />
+                     <input type="time" value={slot.endTime} onChange={e => { const n = [...slots]; n[i].endTime = e.target.value; setSlots(n); }} className="flex-1 p-2 bg-white rounded-lg text-[10px] font-bold" />
+                  </div>
+               </div>
+               <input placeholder="Matière" value={slot.subject} onChange={e => { const n = [...slots]; n[i].subject = e.target.value; setSlots(n); }} className="w-full p-3 bg-white rounded-xl text-xs font-bold mb-2 outline-none" />
+               <div className="grid grid-cols-2 gap-2">
+                  <input placeholder="Salle" value={slot.room} onChange={e => { const n = [...slots]; n[i].room = e.target.value; setSlots(n); }} className="p-3 bg-white rounded-xl text-[10px] font-bold outline-none" />
+                  <input placeholder="Professeur" value={slot.instructor} onChange={e => { const n = [...slots]; n[i].instructor = e.target.value; setSlots(n); }} className="p-3 bg-white rounded-xl text-[10px] font-bold outline-none" />
+               </div>
+            </div>
+          ))}
+          {slots.length === 0 && <p className="text-center py-10 text-[10px] font-bold text-gray-300 uppercase italic">Aucun créneau ajouté</p>}
+       </div>
+
+       <button onClick={addSlot} className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-indigo-100 text-indigo-400 rounded-2xl text-[10px] font-black uppercase hover:bg-indigo-50 transition-all">
+          <Plus size={16} /> Ajouter un créneau
+       </button>
+
+       <button
+          onClick={() => onSave({ id: Math.random().toString(36).substr(2, 9), campus, niveau, lastUpdated: new Date().toISOString(), slots })}
+          className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-indigo-100 active:scale-95 transition-all"
+       >
+          Enregistrer le tableau
+       </button>
+    </div>
+  );
+}

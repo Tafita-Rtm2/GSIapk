@@ -3,13 +3,12 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, BookOpen, Library, User, MessageCircle, Briefcase } from "lucide-react";
+import { Home, Calendar, BookOpen, Library, User, MessageCircle, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n";
 import { useState, useEffect } from "react";
 import { GSIStore, User as GSIUser } from "@/lib/store";
 import { toast } from "sonner";
-import { BellRing } from "lucide-react";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();
@@ -25,7 +24,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { icon: Calendar, label: t("planning"), href: "/schedule" },
     { icon: BookOpen, label: t("matieres"), href: "/subjects" },
     { icon: Library, label: t("biblio"), href: "/library" },
-    { icon: Briefcase, label: t("career"), href: "/career" },
+    { icon: Users, label: t("community"), href: "/community" },
     { icon: User, label: t("profil"), href: "/profile" },
   ];
 

@@ -2,109 +2,191 @@
 
 import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
-import { Search, BookOpen, FileText, Video, Award, ChevronRight } from "lucide-react";
+import { Search, BookOpen, FileText, Video, Award, ChevronRight, Play, Download, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { useState, useEffect, memo } from "react";
 import { GSIStore, Lesson, Assignment } from "@/lib/store";
+import { toast } from "sonner";
 
 export default function SubjectsPage() {
   const { t } = useLanguage();
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
 
   useEffect(() => {
     const user = GSIStore.getCurrentUser();
+    if (!user) return;
 
-    const cached = GSIStore.getCache<any[]>("subjects_list");
-    if (cached) setSubjects(cached);
+    const unsubLessons = GSIStore.subscribeLessons({ niveau: user.niveau }, (all) => {
+      const filtered = all.filter(l => (l.filiere.includes(user.filiere) || l.filiere.length === 0));
+      setLessons(filtered);
 
-    const unsub = GSIStore.subscribeLessons({ niveau: user?.niveau }, (lessons) => {
-      const studentLessons = lessons.filter(l =>
-        !user || (l.filiere.includes(user.filiere) || l.filiere.length === 0)
-      );
-
-      const subjectNames = Array.from(new Set(studentLessons.map(l => l.subject)));
-      const mappedSubjects = subjectNames.map((name, i) => {
-        const count = studentLessons.filter(l => l.subject === name).length;
-        const colors = ["bg-pink-500", "bg-indigo-500", "bg-orange-400", "bg-blue-500", "bg-cyan-500"];
-        const icons = ["📐", "⚛️", "🧪", "💻", "🌍", "📖", "📊"];
+      const subjectNames = Array.from(new Set(filtered.map(l => l.subject)));
+      const mapped = subjectNames.map((name, i) => {
+        const count = filtered.filter(l => l.subject === name).length;
         return {
           id: i,
           title: name,
-          progress: Math.floor(Math.random() * 40) + 60,
-          icon: icons[i % icons.length],
-          color: colors[i % colors.length],
+          progress: 0,
+          icon: "📖",
+          color: "bg-indigo-500",
           items: count
         };
       });
-      setSubjects(mappedSubjects);
-      GSIStore.setCache("subjects_list", mappedSubjects);
+      setSubjects(mapped);
     });
 
-    return () => unsub();
+    const unsubAssignments = GSIStore.subscribeAssignments({ niveau: user.niveau }, (all) => {
+      const filtered = all.filter(a => (a.filiere.includes(user.filiere) || a.filiere.length === 0));
+      setAssignments(filtered);
+    });
+
+    return () => {
+      unsubLessons();
+      unsubAssignments();
+    };
   }, []);
+
+  const subjectLessons = lessons.filter(l => l.subject === selectedSubject);
+  const subjectAssignments = assignments.filter(a => a.subject === selectedSubject);
 
   return (
     <AppLayout>
-      <div className="p-6">
-        <PageHeader title={t("matieres")} />
+      <div className="p-6 pb-24 bg-[#F8FAFC] min-h-full">
+        <PageHeader
+          title={selectedSubject || t("matieres")}
+          onBack={selectedSubject ? () => setSelectedSubject(null) : undefined}
+        />
 
-        <div className="relative mb-8">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
-            placeholder="Rechercher une matière..."
-            className="w-full bg-gray-100 rounded-2xl py-3 pl-12 pr-4 outline-none text-sm focus:ring-2 ring-primary/20 transition-all"
-          />
-        </div>
+        {!selectedSubject ? (
+          <>
+            <div className="relative mb-8">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="text"
+                placeholder="Rechercher une matière..."
+                className="w-full bg-white border border-gray-100 rounded-2xl py-4 pl-12 pr-4 outline-none text-sm shadow-sm focus:ring-2 ring-indigo-500/10 transition-all"
+              />
+            </div>
 
-        <div className="grid grid-cols-1 gap-4 mb-8">
-          {subjects.map((s) => (
-            <SubjectCard key={s.id} {...s} />
-          ))}
-        </div>
+            <div className="grid grid-cols-1 gap-4">
+              {subjects.map((s) => (
+                <div
+                  key={s.id}
+                  onClick={() => setSelectedSubject(s.title)}
+                  className="bg-white p-5 rounded-[32px] shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-all cursor-pointer group"
+                >
+                  <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-2xl text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                    {s.icon}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-black text-gray-900 text-sm uppercase tracking-tight">{s.title}</h4>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">{s.items} Ressources</p>
+                  </div>
+                  <ChevronRight size={20} className="text-gray-300" />
+                </div>
+              ))}
+              {subjects.length === 0 && (
+                <div className="text-center py-20 opacity-20">
+                   <BookOpen size={48} className="mx-auto mb-4" />
+                   <p className="text-xs font-black uppercase">Aucune matière trouvée</p>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
+             {/* Section Leçons */}
+             <div>
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 mb-4 ml-2">Leçons & Supports</h3>
+                <div className="space-y-3">
+                   {subjectLessons.map(l => (
+                     <div key={l.id} className="bg-white p-4 rounded-[28px] border border-gray-100 shadow-sm flex items-center gap-4">
+                        <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
+                           <FileText size={20} />
+                        </div>
+                        <div className="flex-1">
+                           <h4 className="font-bold text-xs uppercase tracking-tight">{l.title}</h4>
+                           <p className="text-[10px] text-gray-400 font-medium">{new Date(l.date).toLocaleDateString()}</p>
+                        </div>
+                        <div className="flex gap-2">
+                           <button
+                             onClick={() => l.files?.[0] && GSIStore.downloadPackFile(l.files[0], l.title, l.id)}
+                             className={cn("p-3 rounded-xl transition-all", GSIStore.isDownloaded(l.id) ? "bg-emerald-100 text-emerald-600" : "bg-gray-50 text-gray-400")}
+                           >
+                              <Download size={16} />
+                           </button>
+                           <button
+                             onClick={() => l.files?.[0] && GSIStore.openPackFile(l.id, l.files[0])}
+                             className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100"
+                           >
+                              <Play size={16} />
+                           </button>
+                        </div>
+                     </div>
+                   ))}
+                   {subjectLessons.length === 0 && <p className="text-[10px] font-bold text-gray-300 uppercase ml-4">Pas de leçons</p>}
+                </div>
+             </div>
 
-        {/* Categories / Types */}
-        <h3 className="text-lg font-bold mb-4">Ressources par type</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <ResourceCategory icon={BookOpen} label="Syllabus" color="text-blue-500" bg="bg-blue-50" />
-          <ResourceCategory icon={FileText} label="Supports" color="text-green-500" bg="bg-green-50" />
-          <ResourceCategory icon={Video} label="Vidéos" color="text-red-500" bg="bg-red-50" />
-          <ResourceCategory icon={Award} label="Devoirs" color="text-purple-500" bg="bg-purple-50" />
-        </div>
+             {/* Section Devoirs */}
+             <div>
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 mb-4 ml-2">Devoirs à rendre</h3>
+                <div className="space-y-3">
+                   {subjectAssignments.map(a => (
+                     <div key={a.id} className="bg-white p-5 rounded-[32px] border border-gray-100 shadow-sm">
+                        <div className="flex justify-between items-center mb-4">
+                           <span className="bg-orange-50 text-orange-600 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">Échéance : {a.deadline}</span>
+                           <Award size={16} className="text-orange-400" />
+                        </div>
+                        <h4 className="font-black text-xs uppercase tracking-tight mb-4">{a.title}</h4>
+                        <div className="flex gap-2">
+                           {a.files?.[0] && (
+                             <button
+                               onClick={() => GSIStore.openPackFile(a.id, a.files![0])}
+                               className="flex-1 py-3 bg-gray-50 text-gray-600 rounded-xl text-[9px] font-black uppercase tracking-widest"
+                             >
+                               Consulter
+                             </button>
+                           )}
+                           <button
+                              onClick={() => {
+                                 const input = document.createElement('input');
+                                 input.type = 'file';
+                                 input.onchange = (e: any) => {
+                                    if(e.target.files[0]) toast.success("Devoir prêt pour l'envoi !");
+                                 };
+                                 input.click();
+                              }}
+                              className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100"
+                           >
+                              Déposer
+                           </button>
+                        </div>
+                     </div>
+                   ))}
+                   {subjectAssignments.length === 0 && <p className="text-[10px] font-bold text-gray-300 uppercase ml-4">Pas de devoirs</p>}
+                </div>
+             </div>
+
+             {/* Section Vidéos */}
+             <div>
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 mb-4 ml-2">Cours Vidéo</h3>
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="bg-white p-4 rounded-[32px] border border-gray-100 shadow-sm opacity-40">
+                      <div className="aspect-video bg-gray-100 rounded-2xl mb-3 flex items-center justify-center">
+                         <Video size={24} className="text-gray-300" />
+                      </div>
+                      <p className="text-[10px] font-black uppercase text-center">Bientôt disponible</p>
+                   </div>
+                </div>
+             </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   );
 }
-
-const SubjectCard = memo(({ title, progress, icon, color, items }: any) => {
-  return (
-    <div className="bg-white p-4 rounded-[28px] shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-all cursor-pointer">
-      <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-2xl text-white shadow-inner", color)}>
-        {icon}
-      </div>
-      <div className="flex-1">
-        <h4 className="font-bold text-gray-800 text-sm mb-1">{title}</h4>
-        <div className="flex items-center gap-3">
-          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className={cn("h-full rounded-full transition-all duration-1000", color)} style={{ width: `${progress}%` }}></div>
-          </div>
-          <span className="text-[10px] font-bold text-gray-400">{progress}%</span>
-        </div>
-        <p className="text-[10px] text-gray-500 mt-1 font-medium">{items} documents disponibles</p>
-      </div>
-      <ChevronRight size={20} className="text-gray-300" />
-    </div>
-  );
-});
-
-const ResourceCategory = memo(({ icon: Icon, label, color, bg }: any) => {
-  return (
-    <div className={cn("p-6 rounded-[32px] flex flex-col items-center gap-2 cursor-pointer transition-transform hover:scale-105", bg)}>
-      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center bg-white shadow-sm mb-1", color)}>
-        <Icon size={24} />
-      </div>
-      <span className="text-xs font-bold text-gray-700">{label}</span>
-    </div>
-  );
-});

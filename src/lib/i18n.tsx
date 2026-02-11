@@ -16,7 +16,7 @@ export const translations: Translations = {
   planning: { fr: "Planning", en: "Schedule" },
   matieres: { fr: "Matières", en: "Subjects" },
   biblio: { fr: "Biblio", en: "Library" },
-  career: { fr: "Career", en: "Career" },
+  community: { fr: "Communauté", en: "Community" },
   profil: { fr: "Profil", en: "Profile" },
   mon_profil: { fr: "Mon Profil", en: "My Profile" },
   reussites: { fr: "Réussites", en: "Achievements" },

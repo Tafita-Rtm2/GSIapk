@@ -153,15 +153,18 @@ export default function ProfilePage() {
             <ProfileLink icon={FileCheck} label="Documents Administratifs" color="text-green-500" />
           </Link>
 
-          <div className="bg-gradient-to-r from-purple-500 to-indigo-600 rounded-3xl p-6 text-white mb-4 mt-4 shadow-lg">
-              <div className="flex justify-between items-center mb-4">
-                <h4 className="font-bold text-lg">Career Insight</h4>
-                <Award size={24} />
+          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-[32px] p-6 text-white mb-4 mt-4 shadow-lg relative overflow-hidden">
+              <div className="relative z-10">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="font-black text-lg uppercase tracking-tight">Espace Étudiant</h4>
+                  <Award size={24} />
+                </div>
+                <p className="text-xs font-medium opacity-90 mb-4">Accédez à vos ressources pédagogiques et discutez avec vos camarades.</p>
+                <Link href="/community" className="inline-block bg-white text-indigo-600 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform">
+                  Accéder au Chat
+                </Link>
               </div>
-              <p className="text-xs opacity-90 mb-4">Nouvelles opportunités de stage disponibles chez les partenaires GSI !</p>
-              <button className="bg-white text-primary px-4 py-2 rounded-xl text-xs font-bold active:scale-95 transition-transform">
-                Voir les opportunités
-              </button>
+              <div className="absolute right-[-10px] bottom-[-10px] w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
           </div>
 
           <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 mt-4">
