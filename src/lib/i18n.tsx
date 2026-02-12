@@ -50,6 +50,13 @@ export const translations: Translations = {
   tous: { fr: "Tous", en: "All" },
   favoris: { fr: "Favoris", en: "Favorites" },
   recents: { fr: "Récents", en: "Recent" },
+  ajouter_programme: { fr: "Ajouter un programme", en: "Add Program" },
+  titre: { fr: "Titre", en: "Title" },
+  heure: { fr: "Heure", en: "Time" },
+  duree: { fr: "Durée (min)", en: "Duration (min)" },
+  enregistrer: { fr: "Enregistrer", en: "Save" },
+  rappel_cours: { fr: "Rappel de cours", en: "Class Reminder" },
+  cours_commence: { fr: "Votre programme commence maintenant !", en: "Your program is starting now!" },
 };
 
 interface LanguageContextType {

@@ -2,19 +2,21 @@
 
 import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
-import { Search, Filter, Download, Star, FileText, Bookmark, Clock, ArrowRight } from "lucide-react";
+import { Search, Filter, Download, Star, FileText, Bookmark, Clock, ArrowRight, Video, Image as ImageIcon, FileCode, X, PlayCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
 export default function LibraryPage() {
   const { t } = useLanguage();
   const [filter, setFilter] = useState("all");
+  const [previewItem, setPreviewItem] = useState<any>(null);
 
   const books = [
     { id: 1, title: "Algèbre Moderne", author: "Pr. Bernard", type: "PDF", size: "4.2 MB", favorite: true },
-    { id: 2, title: "Mécanique des Fluides", author: "Dr. Liana", type: "PDF", size: "12.8 MB", favorite: false },
-    { id: 3, title: "Génie Logiciel V2", author: "GSI Internationale", type: "EPUB", size: "2.1 MB", favorite: true },
-    { id: 4, title: "Base de Données SQL", author: "Lab GSI", type: "PDF", size: "8.5 MB", favorite: false },
+    { id: 2, title: "Rapport de Stage", author: "GSI Internationale", type: "DOCX", size: "1.5 MB", favorite: false },
+    { id: 3, title: "Introduction au Cloud", author: "Dr. Kamga", type: "VIDEO", size: "45 MB", favorite: true },
+    { id: 4, title: "Schéma Réseau", author: "Lab GSI", type: "IMAGE", size: "2.8 MB", favorite: false },
+    { id: 5, title: "Base de Données SQL", author: "Lab GSI", type: "PDF", size: "8.5 MB", favorite: false },
   ];
 
   return (
@@ -60,15 +62,22 @@ export default function LibraryPage() {
 
         {/* Book List */}
         <h3 className="text-lg font-bold mb-4">Mes documents</h3>
-        <div className="space-y-4">
+        <div className="space-y-4 mb-20">
           {books.map((book) => (
-            <div key={book.id} className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 hover:border-primary/20 transition-all group">
+            <div
+              key={book.id}
+              onClick={() => setPreviewItem(book)}
+              className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 hover:border-primary/20 transition-all group cursor-pointer"
+            >
               <div className="w-12 h-16 bg-gray-50 rounded-xl flex items-center justify-center border border-gray-100 group-hover:bg-primary/5 transition-colors">
-                <FileText className="text-primary opacity-40" size={24} />
+                {book.type === "PDF" && <FileText className="text-red-500 opacity-60" size={24} />}
+                {book.type === "DOCX" && <FileCode className="text-blue-500 opacity-60" size={24} />}
+                {book.type === "VIDEO" && <Video className="text-purple-500 opacity-60" size={24} />}
+                {book.type === "IMAGE" && <ImageIcon className="text-green-500 opacity-60" size={24} />}
               </div>
               <div className="flex-1">
                 <h4 className="font-bold text-gray-800 text-sm">{book.title}</h4>
-                <p className="text-[10px] text-gray-400 font-medium">{book.author} • {book.size}</p>
+                <p className="text-[10px] text-gray-400 font-medium">{book.author} • {book.type} • {book.size}</p>
               </div>
               <div className="flex gap-2">
                 <button className={cn(
@@ -85,6 +94,73 @@ export default function LibraryPage() {
           ))}
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {previewItem && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-6 backdrop-blur-md">
+          <div className="bg-white rounded-[40px] w-full max-w-sm overflow-hidden flex flex-col relative animate-in zoom-in duration-300">
+            <button
+              onClick={() => setPreviewItem(null)}
+              className="absolute top-4 right-4 p-2 bg-gray-100/50 backdrop-blur rounded-full text-gray-800 z-10"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="p-8">
+              <div className="flex flex-col items-center text-center">
+                 <div className="w-20 h-20 rounded-3xl bg-gray-50 flex items-center justify-center mb-6 shadow-inner">
+                    {previewItem.type === "PDF" && <FileText className="text-red-500" size={40} />}
+                    {previewItem.type === "DOCX" && <FileCode className="text-blue-500" size={40} />}
+                    {previewItem.type === "VIDEO" && <PlayCircle className="text-purple-500" size={40} />}
+                    {previewItem.type === "IMAGE" && <ImageIcon className="text-green-500" size={40} />}
+                 </div>
+                 <h3 className="text-xl font-bold text-gray-800 mb-2">{previewItem.title}</h3>
+                 <p className="text-sm text-gray-500 mb-8">{previewItem.author} • {previewItem.size}</p>
+
+                 {previewItem.type === "VIDEO" && (
+                   <div className="w-full aspect-video bg-black rounded-2xl flex items-center justify-center mb-8 relative">
+                      <video
+                        className="w-full h-full rounded-2xl"
+                        poster="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=60"
+                      />
+                      <PlayCircle className="absolute text-white opacity-80" size={48} />
+                   </div>
+                 )}
+
+                 {previewItem.type === "IMAGE" && (
+                   <div className="w-full aspect-square bg-gray-100 rounded-2xl mb-8 overflow-hidden">
+                      <img
+                        src="https://images.unsplash.com/photo-1581291518633-83b4ebd1d83e?w=800&auto=format&fit=crop&q=60"
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                   </div>
+                 )}
+
+                 {previewItem.type === "DOCX" && (
+                   <div className="w-full p-6 bg-blue-50 rounded-2xl mb-8 text-left border border-blue-100">
+                      <div className="w-8 h-1 bg-blue-200 rounded-full mb-4"></div>
+                      <div className="w-full h-2 bg-blue-100 rounded-full mb-2"></div>
+                      <div className="w-full h-2 bg-blue-100 rounded-full mb-2"></div>
+                      <div className="w-2/3 h-2 bg-blue-100 rounded-full"></div>
+                   </div>
+                 )}
+
+                 <div className="flex gap-4 w-full">
+                    <button className="flex-1 py-4 bg-gray-100 rounded-2xl font-bold text-gray-700 flex items-center justify-center gap-2">
+                       <Star size={18} />
+                       {t("favoris")}
+                    </button>
+                    <button className="flex-1 py-4 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2">
+                       <Download size={18} />
+                       Download
+                    </button>
+                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

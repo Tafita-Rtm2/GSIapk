@@ -2,20 +2,66 @@
 
 import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
-import { useState } from "react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, X } from "lucide-react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { LocalNotifications } from "@capacitor/local-notifications";
 
 export default function SchedulePage() {
   const { t } = useLanguage();
   const [view, setView] = useState<"week" | "month">("week");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [customItems, setCustomItems] = useState<any[]>([]);
+  const [newItem, setNewItem] = useState({ title: "", time: "", duration: "60" });
 
   const days = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
   const currentDay = 2; // Mercredi
 
+  useEffect(() => {
+    const saved = localStorage.getItem("custom_schedule");
+    if (saved) {
+      setCustomItems(JSON.parse(saved));
+    }
+  }, []);
+
+  const handleAddItem = async () => {
+    if (!newItem.title || !newItem.time) return;
+
+    const items = [...customItems, { ...newItem, id: Date.now() }];
+    setCustomItems(items);
+    localStorage.setItem("custom_schedule", JSON.stringify(items));
+
+    // Schedule Notification
+    try {
+      const [hours, minutes] = newItem.time.split(":").map(Number);
+      const scheduleDate = new Date();
+      scheduleDate.setHours(hours, minutes, 0, 0);
+
+      // Only schedule if it's in the future
+      if (scheduleDate > new Date()) {
+        await LocalNotifications.schedule({
+          notifications: [
+            {
+              title: t("rappel_cours"),
+              body: `${newItem.title} - ${t("cours_commence")}`,
+              id: Math.floor(Math.random() * 10000),
+              schedule: { at: scheduleDate },
+              sound: 'beep.wav', // Basic sound attempt
+            }
+          ]
+        });
+      }
+    } catch (e) {
+      console.error("Failed to schedule notification", e);
+    }
+
+    setNewItem({ title: "", time: "", duration: "60" });
+    setShowAddModal(false);
+  };
+
   return (
     <AppLayout>
-      <div className="p-6">
+      <div className="p-6 relative">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">{t("planning")}</h1>
           <div className="bg-gray-100 p-1 rounded-xl flex">
@@ -71,7 +117,7 @@ export default function SchedulePage() {
         </div>
 
         {/* Schedule Items */}
-        <div className="space-y-6">
+        <div className="space-y-6 mb-20">
           <ScheduleCard
             time="08:00"
             duration="90 min"
@@ -89,6 +135,19 @@ export default function SchedulePage() {
             color="border-l-indigo-500"
             isCurrent
           />
+
+          {customItems.map((item) => (
+             <ScheduleCard
+                key={item.id}
+                time={item.time}
+                duration={`${item.duration} min`}
+                title={item.title}
+                room="Personnel"
+                instructor="Moi"
+                color="border-l-accent"
+              />
+          ))}
+
           <ScheduleCard
             time="14:00"
             duration="90 min"
@@ -97,8 +156,71 @@ export default function SchedulePage() {
             instructor="Mrs. Smith"
             color="border-l-orange-400"
           />
+
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="w-full py-4 border-2 border-dashed border-gray-200 rounded-[24px] text-gray-400 flex items-center justify-center gap-2 hover:border-primary/20 hover:text-primary transition-all"
+          >
+            <Plus size={20} />
+            <span className="font-bold text-sm">{t("ajouter_programme")}</span>
+          </button>
         </div>
       </div>
+
+      {/* Add Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
+          <div className="bg-white rounded-[40px] w-full max-w-xs p-8 flex flex-col relative animate-in fade-in zoom-in duration-200">
+            <button
+              onClick={() => setShowAddModal(false)}
+              className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full text-gray-500"
+            >
+              <X size={20} />
+            </button>
+            <h3 className="text-xl font-bold mb-6">{t("ajouter_programme")}</h3>
+
+            <div className="space-y-4 mb-8">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">{t("titre")}</label>
+                <input
+                  type="text"
+                  value={newItem.title}
+                  onChange={(e) => setNewItem({...newItem, title: e.target.value})}
+                  className="w-full bg-gray-50 rounded-2xl p-4 text-sm outline-none border border-transparent focus:border-primary/20"
+                  placeholder="Ex: Révision Math"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">{t("heure")}</label>
+                  <input
+                    type="time"
+                    value={newItem.time}
+                    onChange={(e) => setNewItem({...newItem, time: e.target.value})}
+                    className="w-full bg-gray-50 rounded-2xl p-4 text-sm outline-none border border-transparent focus:border-primary/20"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">{t("duree")}</label>
+                  <input
+                    type="number"
+                    value={newItem.duration}
+                    onChange={(e) => setNewItem({...newItem, duration: e.target.value})}
+                    className="w-full bg-gray-50 rounded-2xl p-4 text-sm outline-none border border-transparent focus:border-primary/20"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleAddItem}
+              className="w-full bg-primary text-white py-4 rounded-2xl font-bold shadow-lg shadow-primary/20 active:scale-95 transition-transform"
+            >
+              {t("enregistrer")}
+            </button>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }
