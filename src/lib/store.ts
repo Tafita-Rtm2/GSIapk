@@ -23,6 +23,8 @@ export interface User {
   filiere: string;
   niveau: string;
   photo?: string;
+  matricule?: string;
+  contact?: string;
   _id?: string; // API internal ID
 }
 
@@ -56,6 +58,7 @@ export interface Reminder {
   subject: string;
   notes?: string;
   completed: boolean;
+  isAlarm?: boolean;
 }
 
 export interface ScheduleSlot {
@@ -735,10 +738,11 @@ class GSIStoreClass {
         await LocalNotifications.schedule({
           notifications: [{
             id: parseInt(r.id.replace(/\D/g, '').substr(0, 9)) || Math.floor(Math.random() * 1000000),
-            title: `Rappel GSI : ${r.subject}`,
+            title: r.isAlarm ? `ALERTE PROGRAMME : ${r.subject}` : `Rappel GSI : ${r.subject}`,
             body: r.title,
             schedule: { at: scheduleDate },
-            sound: 'default'
+            sound: r.isAlarm ? 'alarm.wav' : 'default',
+            extra: { reminderId: r.id }
           }]
         });
       }
@@ -891,6 +895,15 @@ class GSIStoreClass {
         try {
           const path = progress.localPath;
           await Filesystem.stat({ path, directory: Directory.Data });
+
+          // FOR MULTIMEDIA: Use file URI directly (better for large videos/images)
+          if (type === 'video' || type === 'image') {
+             const fileUri = await Filesystem.getUri({ path, directory: Directory.Data });
+             dispatchViewer(Capacitor.convertFileSrc(fileUri.uri));
+             return;
+          }
+
+          // FOR DOCUMENTS: Use Blob (better for Render Engines like PDF.js/Mammoth)
           const file = await Filesystem.readFile({ path, directory: Directory.Data });
           const dataStr = typeof file.data === 'string' ? file.data : '';
 
@@ -910,20 +923,16 @@ class GSIStoreClass {
         }
       }
 
-      // 2. If not cached, download or stream
+      // 2. If not cached, download then open
       if (window.navigator.onLine) {
         const fileName = absoluteUrl.split('/').pop() || (type === 'pdf' ? 'doc.pdf' : type === 'docx' ? 'doc.docx' : 'video.mp4');
         const path = await this.downloadPackFile(absoluteUrl, fileName, lessonId);
 
-        // After download, re-read progress to get the correct mimeType
-        const updatedProgress = this.getProgress(lessonId);
-        const file = await Filesystem.readFile({ path, directory: Directory.Data });
-        const dataStr = typeof file.data === 'string' ? file.data : '';
-        const blob = this.b64toBlob(dataStr, updatedProgress?.mimeType || mime || 'application/pdf');
-        const blobUrl = URL.createObjectURL(blob);
-        dispatchViewer(blobUrl);
+        // RECURSIVE CALL to use the newly cached logic
+        return this.openPackFile(lessonId, url);
       } else {
-        toast.error("Connexion requise pour lire ce fichier.");
+        // Stream directly if online (fallback)
+        dispatchViewer(absoluteUrl);
       }
     } catch (e: any) {
       console.error("Open pack failed:", e);
@@ -975,8 +984,14 @@ class GSIStoreClass {
 
   saveProgress(id: string, p: any) {
     const all = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
-    all[id] = { ...p, ts: Date.now() };
+    all[id] = { ...(all[id] || {}), ...p, ts: Date.now() };
     localStorage.setItem('gsi_progress', JSON.stringify(all));
+    this.notify('progress', all);
+  }
+
+  toggleLessonCompleted(id: string) {
+     const p = this.getProgress(id) || {};
+     this.saveProgress(id, { completed: !p.completed });
   }
   getProgress(id: string) { return JSON.parse(localStorage.getItem('gsi_progress') || '{}')[id] || null; }
   setDownloaded(id: string, s = true) {

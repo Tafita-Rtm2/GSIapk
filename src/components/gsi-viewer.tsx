@@ -85,11 +85,27 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
 
   const renderDocx = async () => {
     try {
+      console.log("GSIViewer: Rendering DOCX from", url);
       const response = await fetch(url);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const arrayBuffer = await response.arrayBuffer();
-      const result = await mammoth.convertToHtml({ arrayBuffer });
+
+      // Conversion options for Mammoth
+      const options = {
+        styleMap: [
+          "p[style-name='Title'] => h1:fresh",
+          "p[style-name='Heading 1'] => h2:fresh",
+          "p[style-name='Heading 2'] => h3:fresh"
+        ]
+      };
+
+      const result = await mammoth.convertToHtml({ arrayBuffer }, options);
       setDocxHtml(result.value);
+
+      if (result.messages.length > 0) {
+        console.warn("Mammoth messages:", result.messages);
+      }
+
       setLoading(false);
       onLoadComplete?.();
     } catch (err: any) {

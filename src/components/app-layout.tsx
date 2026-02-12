@@ -23,6 +23,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setUser(GSIStore.getCurrentUser());
+
+    // Request permissions for notifications
+    if (typeof window !== 'undefined' && 'Capacitor' in window) {
+       import('@capacitor/local-notifications').then(ln => {
+          ln.LocalNotifications.requestPermissions();
+       });
+    }
+
     const handleOpen = (e: any) => {
       setViewerLoading(true);
       setViewerData(e.detail);

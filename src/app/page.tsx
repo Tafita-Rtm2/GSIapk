@@ -83,6 +83,35 @@ export default function Home() {
   const firstName = user.fullName.split(' ')[0];
   const convocations = announcements.filter(a => a.type === 'convocation');
 
+  // --- CALCULATION LOGIC ---
+  const [schedule, setSchedule] = useState<StructuredSchedule | null>(null);
+  useEffect(() => {
+     if (user) {
+        return GSIStore.subscribeLatestSchedule(user.campus, user.niveau, (s) => setSchedule(s));
+     }
+  }, [user]);
+
+  const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+  const currentDay = days[new Date().getDay()];
+  const currentTime = new Date().getHours() * 60 + new Date().getMinutes();
+
+  const nextClass = schedule?.slots
+    ?.filter(s => s.day === currentDay)
+    ?.map(s => {
+       const [h, m] = s.startTime.split(':').map(Number);
+       return { ...s, totalMinutes: h * 60 + m };
+    })
+    ?.filter(s => s.totalMinutes > currentTime)
+    ?.sort((a, b) => a.totalMinutes - b.totalMinutes)[0];
+
+  const subjects = Array.from(new Set(lessons.map(l => l.subject)));
+
+  const [progressData, setProgressData] = useState<Record<string, any>>({});
+  useEffect(() => {
+     const saved = localStorage.getItem('gsi_progress');
+     if (saved) setProgressData(JSON.parse(saved));
+  }, [lessons]);
+
   return (
     <AppLayout>
       <div className="p-6 pb-24 max-w-md mx-auto bg-[#F8FAFC] min-h-screen">
@@ -124,12 +153,96 @@ export default function Home() {
           <div className="flex items-center gap-3">
              <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-3 bg-white shadow-sm border border-gray-100 rounded-2xl text-gray-400">
                 <Bell size={20} />
-                {announcements.length > 0 && <div className="absolute top-3 right-3 w-2 h-2 bg-rose-500 border-2 border-white rounded-full"></div>}
+                {(announcements.length > 0 || assignments.length > 0) && <div className="absolute top-3 right-3 w-2 h-2 bg-rose-500 border-2 border-white rounded-full"></div>}
              </button>
              <Link href="/profile" className="w-11 h-11 rounded-2xl bg-indigo-50 overflow-hidden border-2 border-white shadow-md">
-                <img src={user.photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`} alt="Avatar" className="w-full h-full object-cover" />
+                <img src={user.photo ? GSIStore.getAbsoluteUrl(user.photo) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`} alt="Avatar" className="w-full h-full object-cover" />
              </Link>
           </div>
+        </div>
+
+        {/* --- NEW: Votre journée en un coup d’œil --- */}
+        <div className="mb-8">
+           <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-4 px-1">Votre journée en un coup d’œil</h3>
+
+           <div className="grid grid-cols-1 gap-4">
+              {/* Next Class Card */}
+              <div className="bg-white p-5 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden group">
+                 <div className="flex justify-between items-start mb-4">
+                    <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
+                       <Clock size={20} />
+                    </div>
+                    <span className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">Suivant</span>
+                 </div>
+                 {nextClass ? (
+                    <>
+                       <h4 className="font-black text-sm uppercase mb-1">{nextClass.subject}</h4>
+                       <p className="text-[10px] font-bold text-gray-500 mb-2">{nextClass.startTime} — Salle {nextClass.room}</p>
+                       <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-gray-100 overflow-hidden">
+                             <img src={`https://api.dicebear.com/7.x/initials/svg?seed=${nextClass.instructor}`} />
+                          </div>
+                          <span className="text-[9px] font-black text-gray-400 uppercase">{nextClass.instructor}</span>
+                       </div>
+                    </>
+                 ) : (
+                    <p className="text-[10px] font-black text-gray-300 uppercase italic">Aucun cours à venir aujourd'hui</p>
+                 )}
+                 <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors"></div>
+              </div>
+
+              {/* Alerts Section */}
+              {(assignments.length > 0 || announcements.length > 0) && (
+                 <div className="bg-orange-50/50 p-5 rounded-[32px] border border-orange-100">
+                    <div className="flex items-center gap-2 mb-3">
+                       <AlertCircle size={16} className="text-orange-500" />
+                       <span className="text-[9px] font-black uppercase tracking-widest text-orange-600">Alertes Actives</span>
+                    </div>
+                    <div className="space-y-2">
+                       {assignments.slice(0, 1).map((a, i) => (
+                          <div key={i} className="flex justify-between items-center text-[10px]">
+                             <span className="font-bold text-gray-700 truncate mr-2">Devoir: {a.title}</span>
+                             <span className="font-black text-orange-600 whitespace-nowrap">{a.deadline}</span>
+                          </div>
+                       ))}
+                       {announcements.filter(a => a.type !== 'convocation').slice(0, 1).map((a, i) => (
+                          <div key={i} className="text-[10px] font-bold text-gray-500 truncate italic">
+                             Annonce: {a.title}
+                          </div>
+                       ))}
+                    </div>
+                 </div>
+              )}
+
+              {/* Progress Bars */}
+              <div className="bg-white p-5 rounded-[32px] border border-gray-100 shadow-sm">
+                 <div className="flex justify-between items-center mb-4">
+                    <span className="text-[9px] font-black uppercase text-gray-400">Progression par matière</span>
+                    <TrendingUp size={14} className="text-emerald-500" />
+                 </div>
+                 <div className="space-y-4">
+                    {subjects.slice(0, 4).map((sub, i) => {
+                       const subLessons = lessons.filter(l => l.subject === sub);
+                       const completedCount = subLessons.filter(l => progressData[l.id]?.completed).length;
+                       const prog = subLessons.length > 0 ? Math.round((completedCount / subLessons.length) * 100) : 0;
+
+                       const colors = ["bg-indigo-500", "bg-emerald-500", "bg-orange-500", "bg-rose-500"];
+                       return (
+                          <div key={sub}>
+                             <div className="flex justify-between text-[8px] font-black uppercase mb-1">
+                                <span className="text-gray-600 truncate mr-4">{sub}</span>
+                                <span>{prog}%</span>
+                             </div>
+                             <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                                <div className={cn("h-full rounded-full transition-all duration-1000", colors[i % 4])} style={{ width: `${prog}%` }}></div>
+                             </div>
+                          </div>
+                       );
+                    })}
+                    {subjects.length === 0 && <p className="text-[9px] text-center text-gray-300 uppercase italic">Aucune donnée disponible</p>}
+                 </div>
+              </div>
+           </div>
         </div>
 
         {/* AI Card */}
@@ -155,19 +268,40 @@ export default function Home() {
             <Link href="/library" className="text-[10px] font-bold text-primary uppercase tracking-widest hover:underline">Voir tout</Link>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-            {lessons.map((l, i) => (
-              <div
-                key={i}
-                onClick={() => l.files?.[0] && GSIStore.openPackFile(l.id, l.files[0])}
-                className="min-w-[200px] p-5 bg-white rounded-[32px] border border-gray-100 shadow-sm active:scale-95 transition-all cursor-pointer group"
-              >
-                <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-white transition-colors">
-                  <BookOpen size={20} />
+            {lessons.map((l, i) => {
+              const isCompleted = progressData[l.id]?.completed;
+              return (
+                <div
+                  key={i}
+                  className="min-w-[200px] p-5 bg-white rounded-[32px] border border-gray-100 shadow-sm active:scale-95 transition-all cursor-pointer group relative"
+                  onClick={() => l.files?.[0] && GSIStore.openPackFile(l.id, l.files[0])}
+                >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      GSIStore.toggleLessonCompleted(l.id);
+                      const saved = localStorage.getItem('gsi_progress');
+                      if (saved) setProgressData(JSON.parse(saved));
+                      toast.success(isCompleted ? "Marqué comme non lu" : "Félicitations ! Cours terminé.");
+                    }}
+                    className={cn(
+                      "absolute top-4 right-4 w-6 h-6 rounded-full border flex items-center justify-center transition-all",
+                      isCompleted ? "bg-emerald-500 border-emerald-500 text-white" : "bg-gray-50 border-gray-200 text-gray-300"
+                    )}
+                  >
+                    <CheckCircle2 size={12} />
+                  </button>
+                  <div className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors",
+                    isCompleted ? "bg-emerald-50 text-emerald-500" : "bg-indigo-50 text-indigo-500 group-hover:bg-primary group-hover:text-white"
+                  )}>
+                    <BookOpen size={20} />
+                  </div>
+                  <h3 className="font-black text-xs text-gray-800 mb-1 line-clamp-1 uppercase">{l.title}</h3>
+                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{l.subject}</p>
                 </div>
-                <h3 className="font-black text-xs text-gray-800 mb-1 line-clamp-1 uppercase">{l.title}</h3>
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{l.subject}</p>
-              </div>
-            ))}
+              );
+            })}
             {lessons.length === 0 && <p className="text-gray-300 text-[10px] font-black uppercase py-10 px-4 border-2 border-dashed border-gray-100 rounded-[32px] text-center w-full">Aucun contenu pédagogique</p>}
           </div>
         </div>
