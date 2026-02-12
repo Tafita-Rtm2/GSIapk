@@ -7,13 +7,13 @@
    - Network:      http://192.168.0.2:9002
 
  ✓ Starting...
- ✓ Ready in 2.2s
+ ✓ Ready in 4.2s
  ○ Compiling /login ...
- ✓ Compiled /login in 5.6s
- GET /login 200 in 6360ms
+ ✓ Compiled /login in 11.5s
+ GET /login 200 in 12682ms
  ○ Compiling / ...
- ✓ Compiled / in 3.1s
- GET / 200 in 3741ms
- GET /login 200 in 143ms
- GET /login 200 in 116ms
- GET /login 200 in 104ms
+ ✓ Compiled / in 4.8s
+ GET / 200 in 5509ms
+ GET /login 200 in 162ms
+ GET /login 200 in 140ms
+ GET /login 200 in 108ms

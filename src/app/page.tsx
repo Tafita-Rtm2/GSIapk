@@ -1,13 +1,13 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
-import { Bell, Search, Sparkles, BookOpen, FileText, Calendar as CalendarIcon, X, Info, Download, Clock, Wifi, WifiOff, CheckCircle2, RefreshCcw, AlertCircle } from "lucide-react";
+import { Bell, Search, Sparkles, BookOpen, FileText, Calendar as CalendarIcon, X, Info, Download, Clock, Wifi, WifiOff, CheckCircle2, RefreshCcw, AlertCircle, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, memo } from "react";
 import { useRouter } from "next/navigation";
-import { GSIStore, User, Lesson, Assignment, Announcement } from "@/lib/store";
+import { GSIStore, User, Lesson, Assignment, Announcement, StructuredSchedule } from "@/lib/store";
 import { toast } from "sonner";
 
 export default function Home() {

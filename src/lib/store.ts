@@ -865,7 +865,7 @@ class GSIStoreClass {
     }
   }
 
-  async openPackFile(lessonId: string, url: string) {
+  async openPackFile(lessonId: string, url: string): Promise<void> {
     const absoluteUrl = this.getAbsoluteUrl(url);
     const lowUrl = absoluteUrl.toLowerCase().split('?')[0];
     const progress = this.getProgress(lessonId);
