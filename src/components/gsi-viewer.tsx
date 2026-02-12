@@ -2,13 +2,15 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
-import mammoth from 'mammoth';
+import * as mammoth from 'mammoth';
 import { Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Configure PDF.js worker
-// Pointing to the local worker copied during build for offline support
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+// Use a check to ensure we are in a browser environment
+if (typeof window !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+}
 
 interface GSIViewerProps {
   url: string;
@@ -43,6 +45,7 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
   const renderPdf = async (pageNum = 1) => {
     try {
       const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const arrayBuffer = await response.arrayBuffer();
 
       // Basic PDF magic number check (%PDF-)
@@ -87,8 +90,12 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
     try {
       console.log("GSIViewer: Rendering DOCX from", url);
       const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status} - Échec du chargement du fichier.`);
       const arrayBuffer = await response.arrayBuffer();
+
+      if (arrayBuffer.byteLength === 0) {
+         throw new Error("Fichier vide ou corrompu.");
+      }
 
       // Conversion options for Mammoth
       const options = {
@@ -99,7 +106,14 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
         ]
       };
 
-      const result = await mammoth.convertToHtml({ arrayBuffer }, options);
+      // Handle both ES module and CommonJS exports
+      const converter = (mammoth as any).convertToHtml || (mammoth as any).default?.convertToHtml || mammoth.convertToHtml;
+
+      if (typeof converter !== 'function') {
+         throw new Error("Moteur de rendu DOCX non disponible.");
+      }
+
+      const result = await converter({ arrayBuffer }, options);
       setDocxHtml(result.value);
 
       if (result.messages.length > 0) {
@@ -173,7 +187,13 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
         )}
 
         {type === 'image' && (
-          <img src={url} className="max-w-full h-auto rounded-2xl shadow-xl" alt="Document" />
+          <img
+            src={url}
+            className="max-w-full h-auto rounded-2xl shadow-xl"
+            alt="Document"
+            onLoad={() => { setLoading(false); onLoadComplete?.(); }}
+            onError={() => { setLoading(false); onError?.("Échec du chargement de l'image."); }}
+          />
         )}
       </div>
     </div>

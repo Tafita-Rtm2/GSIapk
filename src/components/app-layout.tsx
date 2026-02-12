@@ -9,7 +9,17 @@ import { useLanguage } from "@/lib/i18n";
 import { useState, useEffect } from "react";
 import { GSIStore, User as GSIUser } from "@/lib/store";
 import { toast } from "sonner";
-import { GSIViewer } from "./gsi-viewer";
+import dynamic from "next/dynamic";
+
+// Dynamic import for the viewer to avoid SSR issues with pdfjs and mammoth
+const GSIViewer = dynamic(() => import("./gsi-viewer").then(mod => mod.GSIViewer), {
+  ssr: false,
+  loading: () => (
+    <div className="flex-1 flex flex-col items-center justify-center bg-gray-50">
+       <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  )
+});
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();

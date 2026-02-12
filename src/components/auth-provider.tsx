@@ -15,22 +15,23 @@ const AuthContext = createContext<AuthContextType>({ user: null, loading: true }
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const initialCachedUser = typeof window !== 'undefined' ? GSIStore.getCurrentUser() : null;
-  const [user, setUser] = useState<User | null>(initialCachedUser);
-  const [loading, setLoading] = useState(!initialCachedUser);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
+    // Hydrate state from store on mount (client-side only)
+    const initialUser = GSIStore.getCurrentUser();
+    setUser(initialUser);
+    setLoading(false);
+
     // Store Listener (Handles all session updates)
     const unsubscribeStore = GSIStore.subscribe((newUser) => {
       setUser(newUser);
       setLoading(false);
     });
-
-    // Initial check
-    if (initialCachedUser) setLoading(false);
 
     // Final safety to avoid stuck loading
     const timer = setTimeout(() => setLoading(false), 1500);

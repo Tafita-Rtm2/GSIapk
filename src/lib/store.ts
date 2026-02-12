@@ -119,7 +119,8 @@ class GSIStoreClass {
   constructor() {
     if (typeof window !== 'undefined') {
       this.hydrate();
-      this.startGlobalSync();
+      // Wait a bit before syncing to let UI render first
+      setTimeout(() => this.startGlobalSync(), 2000);
       window.addEventListener('beforeunload', () => this.saveImmediate());
     }
   }
@@ -128,10 +129,14 @@ class GSIStoreClass {
     try {
       const saved = localStorage.getItem('gsi_v8_master');
       if (saved) {
-        this.state = { ...initialState, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        // Deep merge to preserve structure if interface changes
+        this.state = { ...initialState, ...parsed };
       }
       if (this.state.users.length === 0) this.generateMockData();
-    } catch (e) {}
+    } catch (e) {
+      console.error("Hydration failed", e);
+    }
   }
 
   private generateMockData() {
@@ -253,8 +258,12 @@ class GSIStoreClass {
   private async apiCall(endpoint: string, method = 'GET', body?: any, redirectCount = 0): Promise<any> {
     if (redirectCount > 3) return null;
 
-    // Performance: Fast cache for GET requests (15s)
-    if (method === 'GET' && this.apiCache[endpoint] && (Date.now() - this.apiCache[endpoint].ts < 15000)) {
+    // SMART CACHING:
+    // - 5 seconds for messages/chat
+    // - 2 minutes for academic data
+    const cacheTime = endpoint.includes('messages') ? 5000 : 120000;
+
+    if (method === 'GET' && this.apiCache[endpoint] && (Date.now() - this.apiCache[endpoint].ts < cacheTime)) {
        return this.apiCache[endpoint].data;
     }
 
@@ -884,9 +893,11 @@ class GSIStoreClass {
     }
 
     const dispatchViewer = (targetUrl: string) => {
-      window.dispatchEvent(new CustomEvent('gsi-open-viewer', {
-        detail: { url: targetUrl, type, originalUrl: absoluteUrl }
-      }));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('gsi-open-viewer', {
+          detail: { url: targetUrl, type, originalUrl: absoluteUrl }
+        }));
+      }
     };
 
     try {
@@ -894,7 +905,10 @@ class GSIStoreClass {
       if (progress?.localPath) {
         try {
           const path = progress.localPath;
-          await Filesystem.stat({ path, directory: Directory.Data });
+          const stats = await Filesystem.stat({ path, directory: Directory.Data });
+
+          // Debug trace for local file
+          console.log(`GSIStore: Found local file at ${path}, size: ${stats.size}`);
 
           // FOR MULTIMEDIA: Use file URI directly (better for large videos/images)
           if (type === 'video' || type === 'image') {
@@ -907,7 +921,7 @@ class GSIStoreClass {
           const file = await Filesystem.readFile({ path, directory: Directory.Data });
           const dataStr = typeof file.data === 'string' ? file.data : '';
 
-          let actualMime = mime;
+          let actualMime = progress.mimeType || mime;
           if (!actualMime) {
              actualMime = type === 'pdf' ? 'application/pdf' :
                           type === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' :
@@ -916,9 +930,11 @@ class GSIStoreClass {
 
           const blob = this.b64toBlob(dataStr, actualMime);
           const blobUrl = URL.createObjectURL(blob);
+          console.log(`GSIStore: Dispatched Blob URL for ${type}`);
           dispatchViewer(blobUrl);
           return;
         } catch (e) {
+          console.warn("GSIStore: Local file check failed, re-downloading...", e);
           this.setDownloaded(lessonId, false);
         }
       }

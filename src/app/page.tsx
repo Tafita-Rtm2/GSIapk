@@ -13,13 +13,16 @@ import { toast } from "sonner";
 export default function Home() {
   const { t } = useLanguage();
   const router = useRouter();
+
+  // --- ALL HOOKS AT TOP ---
   const [user, setUser] = useState<User | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [showInfo, setShowInfo] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'syncing' | 'offline' | 'ready'>('syncing');
+  const [schedule, setSchedule] = useState<StructuredSchedule | null>(null);
+  const [progressData, setProgressData] = useState<Record<string, any>>({});
 
   useEffect(() => {
     const initialUser = GSIStore.getCurrentUser();
@@ -78,39 +81,41 @@ export default function Home() {
     };
   }, [router]);
 
-  if (!user) return null;
-
-  const firstName = user.fullName.split(' ')[0];
-  const convocations = announcements.filter(a => a.type === 'convocation');
-
-  // --- CALCULATION LOGIC ---
-  const [schedule, setSchedule] = useState<StructuredSchedule | null>(null);
   useEffect(() => {
      if (user) {
         return GSIStore.subscribeLatestSchedule(user.campus, user.niveau, (s) => setSchedule(s));
      }
   }, [user]);
 
+  useEffect(() => {
+     const saved = localStorage.getItem('gsi_progress');
+     if (saved) setProgressData(JSON.parse(saved));
+  }, [lessons]);
+
+  // --- CONDITIONAL RENDERING AFTER HOOKS ---
+  if (!user) return null;
+
+  const firstName = user.fullName.split(' ')[0];
+  const convocations = announcements.filter(a => a.type === 'convocation');
+
   const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
   const currentDay = days[new Date().getDay()];
   const currentTime = new Date().getHours() * 60 + new Date().getMinutes();
 
   const nextClass = schedule?.slots
-    ?.filter(s => s.day === currentDay)
+    ?.filter(s => s.day === currentDay && s.startTime && s.startTime.includes(':'))
     ?.map(s => {
-       const [h, m] = s.startTime.split(':').map(Number);
-       return { ...s, totalMinutes: h * 60 + m };
+       try {
+         const [h, m] = s.startTime.split(':').map(Number);
+         return { ...s, totalMinutes: (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m) };
+       } catch (e) {
+         return { ...s, totalMinutes: 0 };
+       }
     })
     ?.filter(s => s.totalMinutes > currentTime)
     ?.sort((a, b) => a.totalMinutes - b.totalMinutes)[0];
 
   const subjects = Array.from(new Set(lessons.map(l => l.subject)));
-
-  const [progressData, setProgressData] = useState<Record<string, any>>({});
-  useEffect(() => {
-     const saved = localStorage.getItem('gsi_progress');
-     if (saved) setProgressData(JSON.parse(saved));
-  }, [lessons]);
 
   return (
     <AppLayout>
