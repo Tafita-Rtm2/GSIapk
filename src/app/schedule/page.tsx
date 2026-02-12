@@ -2,17 +2,18 @@
 
 import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, X, Bell } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { LocalNotifications } from "@capacitor/local-notifications";
+import { toast } from "sonner";
 
 export default function SchedulePage() {
   const { t } = useLanguage();
   const [view, setView] = useState<"week" | "month">("week");
   const [showAddModal, setShowAddModal] = useState(false);
   const [customItems, setCustomItems] = useState<any[]>([]);
-  const [newItem, setNewItem] = useState({ title: "", time: "", duration: "60" });
+  const [newItem, setNewItem] = useState({ title: "", time: "", date: "", duration: "60" });
 
   const days = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
   const currentDay = 2; // Mercredi
@@ -22,40 +23,54 @@ export default function SchedulePage() {
     if (saved) {
       setCustomItems(JSON.parse(saved));
     }
+
+    // Request permissions for notifications
+    LocalNotifications.requestPermissions();
   }, []);
 
   const handleAddItem = async () => {
-    if (!newItem.title || !newItem.time) return;
+    if (!newItem.title || !newItem.time || !newItem.date) {
+        toast.error("Veuillez remplir tous les champs");
+        return;
+    }
 
-    const items = [...customItems, { ...newItem, id: Date.now() }];
+    const item = { ...newItem, id: Date.now() };
+    const items = [...customItems, item];
     setCustomItems(items);
     localStorage.setItem("custom_schedule", JSON.stringify(items));
 
     // Schedule Notification
     try {
       const [hours, minutes] = newItem.time.split(":").map(Number);
-      const scheduleDate = new Date();
-      scheduleDate.setHours(hours, minutes, 0, 0);
+      const [year, month, day] = newItem.date.split("-").map(Number);
+      const scheduleDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
 
-      // Only schedule if it's in the future
       if (scheduleDate > new Date()) {
         await LocalNotifications.schedule({
           notifications: [
             {
-              title: t("rappel_cours"),
-              body: `${newItem.title} - ${t("cours_commence")}`,
-              id: Math.floor(Math.random() * 10000),
+              title: "Rappel GSI Insight",
+              body: `C'est l'heure de : ${newItem.title}`,
+              id: item.id % 100000,
               schedule: { at: scheduleDate },
-              sound: 'beep.wav', // Basic sound attempt
+              sound: 'beep.wav',
+              actionTypeId: 'OPEN_APP',
+              extra: {
+                task: newItem.title
+              }
             }
           ]
         });
+        toast.success("Rappel programmé avec succès !");
+      } else {
+        toast.warning("L'heure est déjà passée, pas de notification programmée.");
       }
     } catch (e) {
       console.error("Failed to schedule notification", e);
+      toast.error("Erreur lors de la programmation de la notification");
     }
 
-    setNewItem({ title: "", time: "", duration: "60" });
+    setNewItem({ title: "", time: "", date: "", duration: "60" });
     setShowAddModal(false);
   };
 
@@ -117,7 +132,9 @@ export default function SchedulePage() {
         </div>
 
         {/* Schedule Items */}
-        <div className="space-y-6 mb-20">
+        <div className="space-y-6 mb-24">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Matières officielles</h3>
+
           <ScheduleCard
             time="08:00"
             duration="90 min"
@@ -125,88 +142,106 @@ export default function SchedulePage() {
             room="Salle 102"
             instructor="Dr. Kamga"
             color="border-l-pink-500"
+            filiere="Tronc Commun"
           />
           <ScheduleCard
             time="10:00"
             duration="120 min"
-            title="Physique Quantique"
+            title="Intelligence Artificielle"
             room="Amphi B"
-            instructor="Pr. Tagne"
+            instructor="Dr. Razafy"
             color="border-l-indigo-500"
+            filiere="Informatique"
             isCurrent
           />
 
-          {customItems.map((item) => (
-             <ScheduleCard
-                key={item.id}
-                time={item.time}
-                duration={`${item.duration} min`}
-                title={item.title}
-                room="Personnel"
-                instructor="Moi"
-                color="border-l-accent"
-              />
-          ))}
-
-          <ScheduleCard
-            time="14:00"
-            duration="90 min"
-            title="Anglais Technique"
-            room="Labo Langues"
-            instructor="Mrs. Smith"
-            color="border-l-orange-400"
-          />
+          {customItems.length > 0 && (
+            <>
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1 pt-4">Mes programmes</h3>
+              {customItems.map((item) => (
+                 <ScheduleCard
+                    key={item.id}
+                    time={item.time}
+                    duration={`${item.duration} min`}
+                    title={item.title}
+                    room="Rappel programmé"
+                    instructor="Moi"
+                    color="border-l-accent"
+                    filiere="Personnel"
+                    isCustom
+                  />
+              ))}
+            </>
+          )}
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="w-full py-4 border-2 border-dashed border-gray-200 rounded-[24px] text-gray-400 flex items-center justify-center gap-2 hover:border-primary/20 hover:text-primary transition-all"
+            className="w-full py-5 border-2 border-dashed border-gray-200 rounded-[32px] text-gray-400 flex flex-col items-center justify-center gap-1 hover:border-primary/20 hover:text-primary transition-all group"
           >
-            <Plus size={20} />
-            <span className="font-bold text-sm">{t("ajouter_programme")}</span>
+            <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-primary/10 group-hover:text-primary transition-all">
+                <Plus size={20} />
+            </div>
+            <span className="font-bold text-xs">Ajouter un programme personnel</span>
+            <span className="text-[10px] opacity-60">Notification automatique au téléphone</span>
           </button>
         </div>
       </div>
 
       {/* Add Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
-          <div className="bg-white rounded-[40px] w-full max-w-xs p-8 flex flex-col relative animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-6 backdrop-blur-md">
+          <div className="bg-white rounded-[40px] w-full max-w-sm p-8 flex flex-col relative animate-in fade-in zoom-in duration-300 shadow-2xl">
             <button
               onClick={() => setShowAddModal(false)}
-              className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full text-gray-500"
+              className="absolute top-6 right-6 p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors"
             >
               <X size={20} />
             </button>
-            <h3 className="text-xl font-bold mb-6">{t("ajouter_programme")}</h3>
+            <div className="w-16 h-16 bg-primary/10 rounded-3xl flex items-center justify-center text-primary mb-6">
+                <Bell size={32} />
+            </div>
+            <h3 className="text-2xl font-bold mb-2">Nouveau programme</h3>
+            <p className="text-gray-500 text-xs mb-8">Ajoutez une heure et une date pour recevoir une notification automatique.</p>
 
-            <div className="space-y-4 mb-8">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">{t("titre")}</label>
+            <div className="space-y-5 mb-10">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold text-gray-400 uppercase ml-4">Matière ou Activité</label>
                 <input
                   type="text"
                   value={newItem.title}
                   onChange={(e) => setNewItem({...newItem, title: e.target.value})}
-                  className="w-full bg-gray-50 rounded-2xl p-4 text-sm outline-none border border-transparent focus:border-primary/20"
-                  placeholder="Ex: Révision Math"
+                  className="w-full bg-gray-100 rounded-[20px] p-4 text-sm outline-none border-2 border-transparent focus:border-primary/20 focus:bg-white transition-all"
+                  placeholder="Ex: Révision Mathématiques"
                 />
               </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold text-gray-400 uppercase ml-4">Date</label>
+                <input
+                  type="date"
+                  value={newItem.date}
+                  onChange={(e) => setNewItem({...newItem, date: e.target.value})}
+                  className="w-full bg-gray-100 rounded-[20px] p-4 text-sm outline-none border-2 border-transparent focus:border-primary/20 focus:bg-white transition-all"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">{t("heure")}</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-extrabold text-gray-400 uppercase ml-4">Heure</label>
                   <input
                     type="time"
                     value={newItem.time}
                     onChange={(e) => setNewItem({...newItem, time: e.target.value})}
-                    className="w-full bg-gray-50 rounded-2xl p-4 text-sm outline-none border border-transparent focus:border-primary/20"
+                    className="w-full bg-gray-100 rounded-[20px] p-4 text-sm outline-none border-2 border-transparent focus:border-primary/20 focus:bg-white transition-all"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">{t("duree")}</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-extrabold text-gray-400 uppercase ml-4">Durée (min)</label>
                   <input
                     type="number"
                     value={newItem.duration}
                     onChange={(e) => setNewItem({...newItem, duration: e.target.value})}
-                    className="w-full bg-gray-50 rounded-2xl p-4 text-sm outline-none border border-transparent focus:border-primary/20"
+                    className="w-full bg-gray-100 rounded-[20px] p-4 text-sm outline-none border-2 border-transparent focus:border-primary/20 focus:bg-white transition-all"
                   />
                 </div>
               </div>
@@ -214,9 +249,10 @@ export default function SchedulePage() {
 
             <button
               onClick={handleAddItem}
-              className="w-full bg-primary text-white py-4 rounded-2xl font-bold shadow-lg shadow-primary/20 active:scale-95 transition-transform"
+              className="w-full bg-primary text-white py-5 rounded-[24px] font-bold shadow-xl shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2"
             >
-              {t("enregistrer")}
+              <Plus size={20} />
+              Enregistrer le programme
             </button>
           </div>
         </div>
@@ -225,27 +261,34 @@ export default function SchedulePage() {
   );
 }
 
-function ScheduleCard({ time, duration, title, room, instructor, color, isCurrent }: any) {
+function ScheduleCard({ time, duration, title, room, instructor, color, filiere, isCurrent, isCustom }: any) {
   return (
     <div className={cn(
       "flex gap-4 group",
       isCurrent ? "opacity-100" : "opacity-80"
     )}>
-      <div className="flex flex-col items-center py-1">
+      <div className="flex flex-col items-center py-1 min-w-[50px]">
         <span className="text-sm font-bold text-gray-700">{time}</span>
         <span className="text-[10px] text-gray-400">{duration}</span>
       </div>
       <div className={cn(
-        "flex-1 bg-white p-5 rounded-[24px] border-l-4 shadow-sm hover:shadow-md transition-all relative overflow-hidden",
+        "flex-1 bg-white p-5 rounded-[28px] border-l-4 shadow-sm hover:shadow-md transition-all relative overflow-hidden",
         color,
-        isCurrent && "ring-2 ring-primary ring-offset-2"
+        isCurrent && "ring-2 ring-primary ring-offset-2",
+        isCustom && "bg-accent/5 border-l-accent"
       )}>
-        {isCurrent && (
-          <div className="absolute top-4 right-4 bg-green-500 text-white text-[8px] font-bold px-2 py-1 rounded-full animate-pulse">
-            EN COURS
-          </div>
-        )}
-        <h4 className="font-bold text-gray-800 mb-1">{title}</h4>
+        <div className="flex justify-between items-start mb-1">
+            <span className="text-[9px] font-black uppercase tracking-wider text-gray-400">{filiere}</span>
+            {isCurrent && (
+                <div className="bg-green-500 text-white text-[8px] font-bold px-2 py-1 rounded-full animate-pulse">
+                    EN COURS
+                </div>
+            )}
+            {isCustom && (
+                <Bell size={12} className="text-accent animate-bounce" />
+            )}
+        </div>
+        <h4 className="font-bold text-gray-800 mb-2">{title}</h4>
         <div className="flex items-center gap-4 text-[10px] text-gray-500 font-medium">
           <span className="flex items-center gap-1">
             <CalendarIcon size={12} className="text-gray-400" />

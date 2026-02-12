@@ -1,13 +1,31 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
-import { Bell, Search } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
+import { useState, useEffect } from "react";
 
 export default function Home() {
   const { t } = useLanguage();
+  const [nextCourse, setNextCourse] = useState<any>(null);
+  const [userName, setUserName] = useState("Liana");
+
+  useEffect(() => {
+    const profile = localStorage.getItem("user_profile");
+    if (profile) {
+        setUserName(JSON.parse(profile).name || "Liana");
+    }
+
+    const saved = localStorage.getItem("custom_schedule");
+    if (saved) {
+      const items = JSON.parse(saved);
+      if (items.length > 0) {
+        // Simple logic to find the next course based on time
+        setNextCourse(items[0]);
+      }
+    }
+  }, []);
 
   return (
     <AppLayout>
@@ -15,8 +33,8 @@ export default function Home() {
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div>
-            <p className="text-gray-500 text-sm">{t("bonjour")} Liana</p>
-            <h1 className="text-2xl font-bold">Vous avez <span className="text-green-500">4 {t("tasks_today")}</span></h1>
+            <p className="text-gray-500 text-sm">{t("bonjour")} {userName}</p>
+            <h1 className="text-2xl font-bold">“Votre journée en un coup d’œil”</h1>
           </div>
           <Link href="/profile" className="relative">
             <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border-2 border-primary/20">
@@ -26,90 +44,84 @@ export default function Home() {
           </Link>
         </div>
 
-        {/* Progression Section (New) */}
+        {/* Alertes Section */}
         <div className="mb-8">
-           <h2 className="text-lg font-semibold mb-4">{t("votre_progression")}</h2>
-           <div className="space-y-4 bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-medium">
-                  <span>Mathématiques</span>
-                  <span>75%</span>
-                </div>
-                <Progress value={75} className="h-2" />
+           <h2 className="text-lg font-semibold mb-4">Alertes : devoirs, annonces</h2>
+           <div className="grid grid-cols-2 gap-4">
+              <div className="bg-red-50 p-4 rounded-2xl border border-red-100">
+                <p className="text-red-600 font-bold text-lg">2</p>
+                <p className="text-xs text-red-500 font-medium italic">Devoirs à rendre</p>
               </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-medium">
-                  <span>Physique</span>
-                  <span>60%</span>
-                </div>
-                <Progress value={60} className="h-2" />
+              <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                <p className="text-blue-600 font-bold text-lg">3</p>
+                <p className="text-xs text-blue-500 font-medium italic">Nouvelles annonces</p>
               </div>
            </div>
         </div>
 
-        {/* Courses Section */}
+        {/* Prochain cours Section */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">{t("cours_en_cours")}</h2>
-            <button className="text-primary text-xs font-medium italic">GSI Insight — “Where data meets your future.”</button>
+            <h2 className="text-lg font-semibold">Prochain cours</h2>
+            <button className="text-primary text-xs font-medium italic">GSI Insight — SUCCESS</button>
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-            <CourseCard
-              title="Mathématiques"
-              icon="📐"
-              color="bg-pink-500"
-            />
-            <CourseCard
-              title="Chimie"
-              icon="🧪"
-              color="bg-orange-400"
-            />
-            <CourseCard
-              title="Physique"
-              icon="⚛️"
-              color="bg-blue-500"
-            />
+          <div className="space-y-4">
+            {nextCourse ? (
+               <ScheduleItem
+                time={nextCourse.time}
+                title={nextCourse.title}
+                subtitle={`${nextCourse.date} • Personnel`}
+                instructor="Moi"
+                location="Rappel"
+                color="bg-accent"
+              />
+            ) : (
+              <ScheduleItem
+                time="08:30 - 11:45"
+                title="Intelligence Artificielle"
+                subtitle="Salle B10 • Dr. Razafy"
+                instructor="Dr. Razafy"
+                location="Salle B10"
+                color="bg-indigo-600"
+              />
+            )}
           </div>
         </div>
 
-        {/* Schedule Section */}
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">{t("votre_emploi_du_temps")}</h2>
-          </div>
+        {/* Progression Section */}
+        <div className="mb-8">
+           <h2 className="text-lg font-semibold mb-4">Progression par matière</h2>
+           <div className="space-y-4 bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
+              <div className="space-y-3">
+                <div className="flex justify-between text-xs font-medium">
+                  <span>Informatique de gestion</span>
+                  <span>85%</span>
+                </div>
+                <Progress value={85} className="h-2 bg-gray-100" />
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between text-xs font-medium">
+                  <span>Anglais Technique</span>
+                  <span>45%</span>
+                </div>
+                <Progress value={45} className="h-2 bg-gray-100" />
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between text-xs font-medium">
+                  <span>Marketing Digital</span>
+                  <span>70%</span>
+                </div>
+                <Progress value={70} className="h-2 bg-gray-100" />
+              </div>
+           </div>
+        </div>
 
-          <div className="space-y-4">
-            <ScheduleItem
-              time="09:30 - 10:20"
-              title="Physique"
-              subtitle="Chapitre 3: Force"
-              instructor="Alex Jesus"
-              location="Google Meet"
-              color="bg-indigo-500"
-            />
-             <ScheduleItem
-              time="11:00 - 11:50"
-              title="Géographie"
-              subtitle="Chapitre 12: Profil du sol"
-              instructor="Jenifer Clark"
-              location="Zoom"
-              color="bg-cyan-500"
-            />
-          </div>
+        {/* Mission Statement */}
+        <div className="text-center p-6 bg-primary/5 rounded-3xl border border-dashed border-primary/20">
+            <p className="text-primary font-medium italic text-sm">GSI Insight — “Where data meets your future.”</p>
         </div>
       </div>
     </AppLayout>
-  );
-}
-
-function CourseCard({ title, icon, color }: { title: string, icon: string, color: string }) {
-  return (
-    <div className={`${color} min-w-[140px] p-4 rounded-3xl text-white shadow-lg`}>
-      <div className="bg-white/20 w-10 h-10 rounded-xl flex items-center justify-center text-xl mb-4">
-        {icon}
-      </div>
-      <h3 className="font-semibold">{title}</h3>
-    </div>
   );
 }
 
