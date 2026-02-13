@@ -30,10 +30,7 @@ import { GSIStore, User, Lesson, Assignment, Grade, Announcement } from "@/lib/s
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
-
-const CAMPUSES = ["Antananarivo", "Antsirabe", "Bypass", "Tamatave"];
-const FILIERES = ["Informatique", "Gestion", "Commerce International", "Marketing Digital", "Comptabilité", "Finance", "Ressources Humaines", "Logistique", "Tourisme", "Communication", "Management", "Droit des Affaires", "Entrepreneuriat"];
-const NIVEAUX = ["L1", "L2", "L3", "M1", "M2"];
+import { CAMPUSES, ALL_FILIERES as FILIERES, NIVEAUX } from "@/lib/constants";
 
 export default function ProfessorPage() {
   const { t } = useLanguage();
@@ -250,9 +247,9 @@ export default function ProfessorPage() {
                 <textarea name="description" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none min-h-[100px]" placeholder="Description"></textarea>
 
                 <div className="p-4 bg-gray-50 rounded-2xl space-y-3">
-                   <p className="text-[10px] font-black uppercase text-gray-400">Ciblage</p>
-                   <div className="grid grid-cols-2 gap-2">
-                     {FILIERES.slice(0, 6).map(f => (
+                   <p className="text-[10px] font-black uppercase text-gray-400">Ciblage (Filières)</p>
+                   <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
+                     {FILIERES.map(f => (
                        <label key={f} className="flex items-center gap-2 text-[10px] font-bold">
                          <input type="checkbox" checked={selectedFilieres.includes(f)} onChange={e => e.target.checked ? setSelectedFilieres([...selectedFilieres, f]) : setSelectedFilieres(selectedFilieres.filter(x => x !== f))} /> {f}
                        </label>
@@ -358,9 +355,9 @@ export default function ProfessorPage() {
                 <textarea name="message" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none min-h-[100px]" placeholder="Votre message aux étudiants..."></textarea>
 
                 <div className="p-4 bg-gray-50 rounded-2xl space-y-3">
-                   <p className="text-[10px] font-black uppercase text-gray-400">Ciblage</p>
-                   <div className="grid grid-cols-2 gap-2">
-                     {FILIERES.slice(0, 6).map(f => (
+                   <p className="text-[10px] font-black uppercase text-gray-400">Ciblage (Filières)</p>
+                   <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
+                     {FILIERES.map(f => (
                        <label key={f} className="flex items-center gap-2 text-[10px] font-bold">
                          <input type="checkbox" checked={selectedFilieres.includes(f)} onChange={e => e.target.checked ? setSelectedFilieres([...selectedFilieres, f]) : setSelectedFilieres(selectedFilieres.filter(x => x !== f))} /> {f}
                        </label>

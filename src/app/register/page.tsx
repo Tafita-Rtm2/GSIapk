@@ -7,21 +7,7 @@ import { useLanguage } from "@/lib/i18n";
 import Link from "next/link";
 import { GSIStore, User } from "@/lib/store";
 import { toast } from "sonner";
-
-const CAMPUSES = [
-  "Antananarivo",
-  "Antsirabe",
-  "Bypass",
-  "Tamatave"
-];
-
-const FILIERES = [
-  "Informatique", "Gestion", "Commerce International", "Marketing Digital",
-  "Comptabilité", "Finance", "Ressources Humaines", "Logistique",
-  "Tourisme", "Communication", "Management", "Droit des Affaires", "Entrepreneuriat"
-];
-
-const NIVEAUX = ["L1", "L2", "L3", "M1", "M2"];
+import { CAMPUSES, CAMPUS_FILIERES, NIVEAUX } from "@/lib/constants";
 
 export default function RegisterPage() {
   const { t } = useLanguage();
@@ -32,7 +18,7 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
     campus: CAMPUSES[0],
-    filiere: FILIERES[0],
+    filiere: CAMPUS_FILIERES[CAMPUSES[0]][0],
     niveau: NIVEAUX[0],
     matricule: "",
     contact: "",
@@ -206,7 +192,14 @@ export default function RegisterPage() {
             <select
               className="w-full bg-gray-50 border-none rounded-2xl p-4 outline-none focus:ring-2 ring-primary/20 appearance-none"
               value={formData.campus}
-              onChange={(e) => setFormData({...formData, campus: e.target.value})}
+              onChange={(e) => {
+                const newCampus = e.target.value;
+                setFormData({
+                  ...formData,
+                  campus: newCampus,
+                  filiere: CAMPUS_FILIERES[newCampus][0]
+                });
+              }}
             >
               {CAMPUSES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -219,7 +212,7 @@ export default function RegisterPage() {
               value={formData.filiere}
               onChange={(e) => setFormData({...formData, filiere: e.target.value})}
             >
-              {FILIERES.map(f => <option key={f} value={f}>{f}</option>)}
+              {CAMPUS_FILIERES[formData.campus].map(f => <option key={f} value={f}>{f}</option>)}
             </select>
           </div>
 

@@ -29,8 +29,7 @@ import { GSIStore, User, Lesson, Assignment } from "@/lib/store";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
-
-const CAMPUSES = ["Antananarivo", "Antsirabe", "Bypass", "Tamatave"];
+import { CAMPUSES, ALL_FILIERES as FILIERES } from "@/lib/constants";
 
 export default function AdminPage() {
   const { t } = useLanguage();
@@ -252,9 +251,9 @@ export default function AdminPage() {
 
                    <div className="space-y-2">
                       <p className="text-[9px] font-bold text-gray-400 uppercase">Filières</p>
-                      <div className="flex flex-wrap gap-2">
-                        {["Informatique", "Gestion", "Marketing"].map(f => (
-                          <button type="button" key={f} onClick={() => selectedAnncFilieres.includes(f) ? setSelectedAnncFilieres(selectedAnncFilieres.filter(x => x !== f)) : setSelectedAnncFilieres([...selectedAnncFilieres, f])} className={cn("px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all", selectedAnncFilieres.includes(f) ? "bg-orange-500 text-white" : "bg-white text-gray-400 border border-gray-100")}>{f}</button>
+                      <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 bg-white rounded-xl border border-gray-100">
+                        {FILIERES.map(f => (
+                          <button type="button" key={f} onClick={() => selectedAnncFilieres.includes(f) ? setSelectedAnncFilieres(selectedAnncFilieres.filter(x => x !== f)) : setSelectedAnncFilieres([...selectedAnncFilieres, f])} className={cn("px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all mb-1", selectedAnncFilieres.includes(f) ? "bg-orange-500 text-white" : "bg-gray-50 text-gray-400 border border-gray-100")}>{f}</button>
                         ))}
                       </div>
                    </div>

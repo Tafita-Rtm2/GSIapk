@@ -54,7 +54,7 @@ export default function LoginPage() {
             fullName: 'Nina GSI',
             email: 'admin@gsi.mg',
             role: 'admin',
-            campus: 'Antananarivo',
+            campus: 'Antananarivo (Analakely)',
             filiere: 'Administration',
             niveau: 'N/A'
           });
@@ -79,7 +79,7 @@ export default function LoginPage() {
             fullName: 'Professeur GSI',
             email: 'prof@gsi.mg',
             role: 'professor',
-            campus: 'Antananarivo',
+            campus: 'Antananarivo (Analakely)',
             filiere: 'Multiple',
             niveau: 'Multiple'
           });
