@@ -2,203 +2,192 @@
 
 import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Download, FileText } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Download, FileText, Clock, MapPin, User as UserIcon, Plus, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { GSIStore } from "@/lib/store";
+import { GSIStore, StructuredSchedule, ScheduleSlot, Reminder } from "@/lib/store";
 import { PageHeader } from "@/components/page-header";
 import { toast } from "sonner";
 
 export default function SchedulePage() {
   const { t } = useLanguage();
-  const [view, setView] = useState<"week" | "month">("week");
-  const [selectedDay, setSelectedDay] = useState(2);
-  const [latestSchedule, setLatestSchedule] = useState<any>(null);
-  const [customData, setCustomData] = useState<any>(null);
+  const [selectedDay, setSelectedDay] = useState("Lundi");
+  const [schedule, setSchedule] = useState<StructuredSchedule | null>(null);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+
+  const days = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 
   useEffect(() => {
     const user = GSIStore.getCurrentUser();
     if (!user) return;
 
-    // Cache
-    const cached = GSIStore.getCache<any>("latest_schedule");
-    if (cached) setLatestSchedule(cached);
+    const unsubs = [
+      GSIStore.subscribeLatestSchedule(user.campus, user.niveau, (s) => {
+         if (schedule && JSON.stringify(s) !== JSON.stringify(schedule)) {
+            toast.info("L'emploi du temps a été mis à jour par l'administration.");
+         }
+         setSchedule(s);
+      }),
+      GSIStore.subscribeReminders((rs) => setReminders(rs.filter(r => r.isAlarm)))
+    ];
 
-    const unsub = GSIStore.subscribeLatestSchedule(user.campus, user.niveau, async (schedule) => {
-      setLatestSchedule(schedule);
-      GSIStore.setCache("latest_schedule", schedule);
+    return () => unsubs.forEach(u => u());
+  }, [schedule]);
 
-      if (schedule?.url && schedule.url.includes('.json')) {
-        try {
-          const res = await fetch(schedule.url);
-          const data = await res.json();
-          setCustomData(data);
-        } catch (e) { console.error("JSON parsing failed", e); }
-      }
-    });
+  const dailySlots = schedule?.slots?.filter(s => s.day === selectedDay) || [];
 
-    return () => unsub();
-  }, []);
+  const addPersonalProgram = () => {
+     const title = prompt("Titre de votre session d'étude :");
+     const time = prompt("Heure (HH:mm) :", "18:00");
+     const subject = prompt("Matière :");
+     if (title && time && subject) {
+        GSIStore.addReminder({
+           id: Math.random().toString(36).substr(2, 9),
+           title,
+           date: new Date().toISOString().split('T')[0],
+           time,
+           subject,
+           completed: false,
+           isAlarm: true
+        });
+        toast.success("Programme ajouté avec alarme !");
+     }
+  };
 
-  const days = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
-
-  const defaultData: any = {
-    0: [
-      { time: "08:00", duration: "120 min", title: "Mathématiques", room: "Salle 101", instructor: "Dr. Rakoto", color: "border-l-blue-500" },
-      { time: "10:30", duration: "90 min", title: "Gestion", room: "Salle 204", instructor: "Mme. Perle", color: "border-l-emerald-500" }
-    ],
-    1: [
-      { time: "09:00", duration: "180 min", title: "Informatique", room: "Labo 1", instructor: "M. Jean", color: "border-l-purple-500" }
-    ],
-    2: [
-      { time: "08:00", duration: "90 min", title: "Algèbre Linéaire", room: "Salle 102", instructor: "Dr. Kamga", color: "border-l-pink-500" },
-      { time: "10:00", duration: "120 min", title: "Physique Quantique", room: "Amphi B", instructor: "Pr. Tagne", color: "border-l-indigo-500", isCurrent: true },
-      { time: "14:00", duration: "90 min", title: "Anglais Technique", room: "Labo Langues", instructor: "Mrs. Smith", color: "border-l-orange-400" }
-    ],
-    3: [
-      { time: "08:30", duration: "90 min", title: "Marketing Digital", room: "Salle 302", instructor: "M. Solo", color: "border-l-amber-500" }
-    ],
-    4: [
-      { time: "10:00", duration: "120 min", title: "Comptabilité", room: "Salle 105", instructor: "Mme. Rova", color: "border-l-teal-500" }
-    ],
-    5: [
-      { time: "08:00", duration: "240 min", title: "Projet Fin d'Études", room: "Bibliothèque", instructor: "Equipe GSI", color: "border-l-rose-500" }
-    ]
+  const getFiliereColor = (subject: string) => {
+     const hash = subject.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+     const colors = ["bg-indigo-600", "bg-emerald-600", "bg-orange-600", "bg-rose-600", "bg-violet-600", "bg-sky-600"];
+     return colors[hash % colors.length];
   };
 
   return (
     <AppLayout>
-      <div className="p-6">
-        <PageHeader
-          title={t("planning")}
-          rightElement={
-            <div className="bg-gray-100 p-1 rounded-xl flex">
-              <button
-                onClick={() => setView("week")}
-                className={cn(
-                  "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
-                  view === "week" ? "bg-white shadow-sm text-primary" : "text-gray-500"
-                )}
-              >
-                Semaine
-              </button>
-              <button
-                onClick={() => setView("month")}
-                className={cn(
-                  "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
-                  view === "month" ? "bg-white shadow-sm text-primary" : "text-gray-500"
-                )}
-              >
-                Mois
-              </button>
-            </div>
-          }
-        />
+      <div className="p-6 pb-24 bg-[#F8FAFC] min-h-full">
+        <PageHeader title={t("planning")} />
 
-        {/* Date Selector */}
-        <div className="flex justify-between items-center mb-8 bg-primary/5 p-4 rounded-3xl border border-primary/10">
-          <button className="p-2 bg-white rounded-full shadow-sm">
-            <ChevronLeft size={20} className="text-primary" />
-          </button>
-          <div className="text-center">
-            <p className="text-sm font-bold">12 - 17 Octobre 2025</p>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Semestre 1 • Semaine 4</p>
-          </div>
-          <button className="p-2 bg-white rounded-full shadow-sm">
-            <ChevronRight size={20} className="text-primary" />
-          </button>
+        {/* Days Selector */}
+        <div className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">
+           {days.map((day) => (
+             <button
+               key={day}
+               onClick={() => setSelectedDay(day)}
+               className={cn(
+                 "px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap",
+                 selectedDay === day
+                   ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100 scale-105"
+                   : "bg-white text-gray-400 border border-gray-100"
+               )}
+             >
+               {day}
+             </button>
+           ))}
         </div>
 
-        {/* Latest Uploaded Schedule */}
-        {latestSchedule && (
-          <div className="mb-8 bg-emerald-50 p-6 rounded-[32px] border border-emerald-100 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="bg-emerald-100 p-3 rounded-2xl text-emerald-600">
-                <FileText size={24} />
+        {/* View Mode Switch */}
+        <div className="flex bg-white/50 p-1 rounded-2xl mb-6 border border-gray-100 self-center max-w-fit mx-auto">
+           <button onClick={() => setViewMode('day')} className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", viewMode === 'day' ? "bg-white text-primary shadow-sm" : "text-gray-400")}>Jour</button>
+           <button onClick={() => setViewMode('week')} className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", viewMode === 'week' ? "bg-white text-primary shadow-sm" : "text-gray-400")}>Semaine</button>
+        </div>
+
+        {/* Schedule Grid */}
+        <div className="space-y-4 mb-12">
+           {viewMode === 'day' ? (
+              dailySlots.sort((a,b) => a.startTime.localeCompare(b.startTime)).map((slot, i) => (
+                <div key={i} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm flex gap-6 relative overflow-hidden group hover:shadow-md transition-all">
+                   <div className="flex flex-col items-center justify-center border-r border-gray-100 pr-6 min-w-[80px]">
+                      <span className="text-sm font-black text-gray-900">{slot.startTime}</span>
+                      <div className="w-0.5 h-4 bg-gray-100 my-1"></div>
+                      <span className="text-[10px] font-bold text-gray-400">{slot.endTime}</span>
+                   </div>
+
+                   <div className="flex-1 py-1">
+                      <h3 className="font-black text-sm text-gray-900 uppercase tracking-tight mb-3">{slot.subject}</h3>
+                      <div className="flex flex-wrap gap-4">
+                         <div className="flex items-center gap-1.5">
+                            <MapPin size={12} className="text-gray-400" />
+                            <span className="text-[10px] font-bold text-gray-500">{slot.room}</span>
+                         </div>
+                         <div className="flex items-center gap-1.5">
+                            <UserIcon size={12} className="text-gray-400" />
+                            <span className="text-[10px] font-bold text-gray-500">{slot.instructor}</span>
+                         </div>
+                      </div>
+                   </div>
+
+                   <div className={cn("absolute right-0 top-0 bottom-0 w-1.5 transition-opacity", getFiliereColor(slot.subject))}></div>
+                </div>
+              ))
+           ) : (
+              <div className="space-y-6">
+                 {days.map(d => {
+                    const slots = schedule?.slots?.filter(s => s.day === d) || [];
+                    if (slots.length === 0) return null;
+                    return (
+                       <div key={d} className="space-y-2">
+                          <h4 className="text-[10px] font-black uppercase text-gray-400 px-2 tracking-[0.2em]">{d}</h4>
+                          {slots.sort((a,b) => a.startTime.localeCompare(b.startTime)).map((slot, i) => (
+                             <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                                <div>
+                                   <p className="text-[11px] font-black uppercase text-gray-800">{slot.subject}</p>
+                                   <p className="text-[9px] font-bold text-gray-400">{slot.startTime} — {slot.room}</p>
+                                </div>
+                                <div className={cn("w-2 h-2 rounded-full", getFiliereColor(slot.subject))}></div>
+                             </div>
+                          ))}
+                       </div>
+                    );
+                 })}
               </div>
-              <div>
-                <h4 className="font-bold text-emerald-900 text-sm">Nouvel emploi du temps</h4>
-                <p className="text-[10px] text-emerald-600 font-medium">Mis à jour le {new Date(latestSchedule.date).toLocaleDateString()}</p>
-              </div>
-            </div>
-            <a
-              href={latestSchedule.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-white text-emerald-600 p-3 rounded-2xl shadow-sm hover:scale-110 transition-transform active:scale-95"
-            >
-              <Download size={20} />
-            </a>
-          </div>
+           )}
+
+           {dailySlots.length === 0 && (
+             <div className="flex flex-col items-center justify-center py-20 opacity-20">
+                <CalendarIcon size={64} className="mb-4" />
+                <p className="font-black uppercase text-xs tracking-widest">Aucun cours prévu</p>
+             </div>
+           )}
+        </div>
+
+        {/* --- PERSONAL PROGRAMS SECTION --- */}
+        <div className="space-y-6 pt-6 border-t border-gray-200">
+           <div className="flex justify-between items-center">
+              <h3 className="text-xs font-black uppercase tracking-widest text-indigo-600">Mon Programme Personnel</h3>
+              <button onClick={addPersonalProgram} className="p-2 bg-indigo-600 text-white rounded-xl active:scale-90 transition-all shadow-lg shadow-indigo-100">
+                 <Plus size={20} />
+              </button>
+           </div>
+
+           <div className="space-y-3">
+              {reminders.map((r) => (
+                 <div key={r.id} className="bg-indigo-50/50 p-5 rounded-[28px] border border-indigo-100 flex items-center gap-4 group animate-in slide-in-from-bottom-2">
+                    <div className="w-12 h-12 bg-white rounded-2xl flex flex-col items-center justify-center shadow-sm text-indigo-600">
+                       <Clock size={16} />
+                       <span className="text-[8px] font-black mt-1">{r.time}</span>
+                    </div>
+                    <div className="flex-1">
+                       <h4 className="text-xs font-black uppercase text-indigo-900">{r.subject}</h4>
+                       <p className="text-[10px] font-bold text-indigo-400">{r.title}</p>
+                    </div>
+                    <button onClick={() => GSIStore.deleteReminder(r.id)} className="p-2 text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                       <Trash2 size={16} />
+                    </button>
+                 </div>
+              ))}
+              {reminders.length === 0 && (
+                 <div className="p-8 border-2 border-dashed border-gray-100 rounded-[32px] text-center">
+                    <p className="text-[10px] font-black text-gray-300 uppercase">Aucun programme personnel</p>
+                 </div>
+              )}
+           </div>
+        </div>
+
+        {schedule && (
+           <p className="text-center text-[8px] font-black text-gray-300 uppercase tracking-[0.2em] mt-12">
+              Dernière mise à jour : {new Date(schedule.lastUpdated).toLocaleString()}
+           </p>
         )}
-
-        {/* Days Row */}
-        <div className="flex justify-between mb-8">
-          {days.map((day, i) => (
-            <button key={day} onClick={() => setSelectedDay(i)} className="flex flex-col items-center">
-              <span className="text-[10px] text-gray-400 font-bold mb-2 uppercase">{day}</span>
-              <div className={cn(
-                "w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm transition-all",
-                i === selectedDay ? "bg-primary text-white shadow-lg scale-110" : "bg-white text-gray-700 border border-gray-100"
-              )}>
-                {12 + i}
-              </div>
-              {i === 2 && <div className="w-1.5 h-1.5 bg-accent rounded-full mt-2"></div>}
-            </button>
-          ))}
-        </div>
-
-        {/* Schedule Items */}
-        <div className="space-y-6">
-          {(customData || defaultData)[selectedDay]?.map((item: any, i: number) => (
-            <ScheduleCard
-              key={i}
-              {...item}
-            />
-          ))}
-          {(!(customData || defaultData)[selectedDay] || (customData || defaultData)[selectedDay].length === 0) && (
-            <p className="text-center text-gray-400 italic">Aucun cours prévu pour ce jour.</p>
-          )}
-        </div>
       </div>
     </AppLayout>
-  );
-}
-
-function ScheduleCard({ time, duration, title, room, instructor, color, isCurrent }: any) {
-  return (
-    <div className={cn(
-      "flex gap-4 group",
-      isCurrent ? "opacity-100" : "opacity-80"
-    )}>
-      <div className="flex flex-col items-center py-1">
-        <span className="text-sm font-bold text-gray-700">{time}</span>
-        <span className="text-[10px] text-gray-400">{duration}</span>
-      </div>
-      <div className={cn(
-        "flex-1 bg-white p-5 rounded-[24px] border-l-4 shadow-sm hover:shadow-md transition-all relative overflow-hidden",
-        color,
-        isCurrent && "ring-2 ring-primary ring-offset-2"
-      )}>
-        {isCurrent && (
-          <div className="absolute top-4 right-4 bg-green-500 text-white text-[8px] font-bold px-2 py-1 rounded-full animate-pulse">
-            EN COURS
-          </div>
-        )}
-        <h4 className="font-bold text-gray-800 mb-1">{title}</h4>
-        <div className="flex items-center gap-4 text-[10px] text-gray-500 font-medium">
-          <span className="flex items-center gap-1">
-            <CalendarIcon size={12} className="text-gray-400" />
-            {room}
-          </span>
-          <span className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded-full bg-gray-200 overflow-hidden">
-              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${instructor}`} alt="" />
-            </div>
-            {instructor}
-          </span>
-        </div>
-      </div>
-    </div>
   );
 }

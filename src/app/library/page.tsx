@@ -2,7 +2,7 @@
 
 import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
-import { Search, Filter, Download, Star, FileText, Bookmark, Clock, ArrowRight, BookOpen, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Search, Filter, Download, Star, FileText, Bookmark, Clock, ArrowRight, BookOpen, RefreshCw, CheckCircle2, RefreshCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, memo } from "react";
 import { GSIStore, Lesson, Assignment } from "@/lib/store";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 export default function LibraryPage() {
   const { t } = useLanguage();
   const [filter, setFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [books, setBooks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -27,7 +28,7 @@ export default function LibraryPage() {
 
     const updateLibrary = (lessons: Lesson[], assignments: Assignment[]) => {
       const lessonItems = lessons.filter(l =>
-        !user || (l.niveau === user.niveau && (l.filiere.includes(user.filiere) || l.filiere.length === 0))
+        !user || user.role === 'admin' || (l.niveau === user.niveau && (l.filiere.includes(user.filiere) || l.filiere.length === 0))
       ).map(l => ({
         id: l.id,
         title: l.title,
@@ -39,7 +40,7 @@ export default function LibraryPage() {
       }));
 
       const assignmentItems = assignments.filter(a =>
-        !user || (a.niveau === user.niveau && (a.filiere.includes(user.filiere) || a.filiere.length === 0))
+        !user || user.role === 'admin' || (a.niveau === user.niveau && (a.filiere.includes(user.filiere) || a.filiere.length === 0))
       ).map(a => ({
         id: a.id,
         title: a.title,
@@ -75,22 +76,18 @@ export default function LibraryPage() {
     };
   }, []);
 
-  const handleDownload = (url: string, id: string) => {
+  const handleDownload = (url: string, id: string, title: string) => {
     if (!url) return toast.error("Pas de fichier joint.");
 
     toast.promise(
-      new Promise((resolve) => {
-        window.open(url, '_blank');
-        GSIStore.setDownloaded(id);
-        setTimeout(() => {
-          setBooks(prev => prev.map(b => b.id === id ? { ...b, downloaded: true } : b));
-          resolve(true);
-        }, 1000);
-      }),
+      GSIStore.downloadPackFile(url, title, id),
       {
-        loading: 'Préparation du document...',
-        success: 'Document prêt pour consultation hors-ligne !',
-        error: 'Erreur lors du téléchargement.',
+        loading: `Téléchargement de "${title}"...`,
+        success: (path) => {
+          setBooks(prev => prev.map(b => b.id === id ? { ...b, downloaded: true } : b));
+          return 'Document enregistré hors-ligne !';
+        },
+        error: (err) => `Échec: ${err.message || 'Erreur inconnue'}`,
       }
     );
   };
@@ -110,6 +107,15 @@ export default function LibraryPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={() => {
+                 setIsRefreshing(true);
+                 setTimeout(() => { setIsRefreshing(false); toast.success("Bibliothèque synchronisée"); }, 1500);
+              }}
+              className={cn("bg-gray-100 p-2 rounded-xl text-gray-500", isRefreshing && "animate-spin")}
+            >
+              <RefreshCcw size={20} />
+            </button>
             <button className="bg-gray-100 p-2 rounded-xl text-gray-500">
               <Filter size={20} />
             </button>
@@ -120,17 +126,20 @@ export default function LibraryPage() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
-            placeholder="Rechercher un livre, un auteur..."
+            placeholder="Rechercher un cours ou devoir..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-gray-100 rounded-2xl py-3 pl-12 pr-4 outline-none text-sm focus:ring-2 ring-primary/20 transition-all"
           />
         </div>
 
-        {/* Categories */}
+        {/* Categories / Tabs */}
         <div className="flex gap-4 overflow-x-auto pb-4 mb-6 scrollbar-hide">
           <CategoryBadge label="Tous" active={filter === "all"} onClick={() => setFilter("all")} />
           <CategoryBadge label="Favoris" icon={Star} active={filter === "fav"} onClick={() => setFilter("fav")} />
-          <CategoryBadge label="Récents" icon={Clock} active={filter === "recent"} onClick={() => setFilter("recent")} />
           <CategoryBadge label="Cours" active={filter === "cours"} onClick={() => setFilter("cours")} />
+          <CategoryBadge label="Devoirs" active={filter === "devoir"} onClick={() => setFilter("devoir")} />
+          <CategoryBadge label="Récents" icon={Clock} active={filter === "recent"} onClick={() => setFilter("recent")} />
         </div>
 
         {/* Featured Section */}
@@ -148,15 +157,29 @@ export default function LibraryPage() {
         </div>
 
         {/* Book List */}
-        <h3 className="text-lg font-bold mb-4">Mes documents</h3>
+        <h3 className="text-lg font-bold mb-4">
+          {filter === "cours" ? "Mes Cours" : filter === "devoir" ? "Mes Devoirs" : "Mes documents"}
+        </h3>
         <div className="space-y-4">
-          {books.map((book) => (
+          {books
+            .filter(b => {
+              if (filter === "fav") return b.favorite;
+              if (filter === "cours") return b.type === "Leçon";
+              if (filter === "devoir") return b.type === "Devoir";
+              if (filter === "recent") return GSIStore.getProgress(b.id);
+              return true;
+            })
+            .filter(b =>
+              b.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              b.author.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+            .map((book) => (
             <div
               key={book.id}
               onClick={() => {
                 if(book.url) {
                   GSIStore.saveProgress(book.id, { lastOpened: Date.now() });
-                  window.open(book.url, '_blank');
+                  GSIStore.openPackFile(book.id, book.url);
                 }
               }}
               className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 hover:border-primary/20 transition-all group cursor-pointer"
@@ -165,10 +188,13 @@ export default function LibraryPage() {
                 <FileText className="text-primary opacity-40" size={24} />
               </div>
               <div className="flex-1">
-                <h4 className="font-bold text-gray-800 text-sm">{book.title}</h4>
+                <div className="flex items-center gap-2">
+                   <h4 className="font-bold text-gray-800 text-sm line-clamp-1">{book.title}</h4>
+                   {book.downloaded && <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></div>}
+                </div>
                 <p className="text-[10px] text-gray-400 font-medium">{book.author}</p>
                 {GSIStore.getProgress(book.id) && (
-                   <span className="text-[8px] text-indigo-500 font-bold uppercase tracking-tighter">Déjà lu</span>
+                   <span className="text-[8px] text-indigo-500 font-bold uppercase tracking-tighter">Lu le {new Date(GSIStore.getProgress(book.id).ts).toLocaleDateString()}</span>
                 )}
               </div>
               <div className="flex gap-2">
@@ -181,7 +207,7 @@ export default function LibraryPage() {
                   <Star size={16} fill={book.favorite ? "currentColor" : "none"} />
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleDownload(book.url, book.id); }}
+                  onClick={(e) => { e.stopPropagation(); handleDownload(book.url, book.id, book.title); }}
                   className={cn(
                     "p-2 rounded-xl transition-colors",
                     book.downloaded ? "bg-green-100 text-green-600" : "bg-gray-50 text-primary hover:bg-primary/10"

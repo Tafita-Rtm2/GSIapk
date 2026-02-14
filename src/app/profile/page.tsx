@@ -1,17 +1,15 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
-import { Settings, ChevronRight, CreditCard, FileCheck, Award, LogOut, QrCode, X } from "lucide-react";
+import { Settings, ChevronRight, FileCheck, Award, LogOut, QrCode, X, Camera, ShieldCheck, MapPin, GraduationCap, TrendingUp, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { QRCodeCanvas } from "qrcode.react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
 import { GSIStore, User } from "@/lib/store";
 import { toast } from "sonner";
-import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
-import { Camera } from "lucide-react";
 
 export default function ProfilePage() {
   const { t, language, setLanguage } = useLanguage();
@@ -31,18 +29,10 @@ export default function ProfilePage() {
     }
   }, [router]);
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      GSIStore.setCurrentUser(null);
-      toast.success("Déconnexion réussie");
-      router.push("/login");
-    } catch (err: any) {
-      toast.error("Erreur de déconnexion");
-      // Fallback
-      GSIStore.setCurrentUser(null);
-      router.push("/login");
-    }
+  const handleLogout = () => {
+    GSIStore.logout();
+    toast.success("Déconnexion réussie");
+    router.push("/login");
   };
 
   if (!user) return null;
@@ -72,9 +62,12 @@ export default function ProfilePage() {
           <div className="relative mb-4">
             <div className="w-24 h-24 rounded-full border-4 border-white overflow-hidden shadow-lg bg-white/20 flex items-center justify-center">
               <img
-                src={user.photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
+                src={GSIStore.getAbsoluteUrl(user.photo) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
                 alt="Profile"
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`;
+                }}
               />
             </div>
             {isEditing && (
@@ -91,7 +84,6 @@ export default function ProfilePage() {
                       setUploadProgress(0);
                       try {
                         setIsUploading(true);
-                        // Optimistic Preview
                         const previewUrl = URL.createObjectURL(file);
                         setUser({ ...user, photo: previewUrl });
 
@@ -105,7 +97,6 @@ export default function ProfilePage() {
                         toast.success("Photo mise à jour avec succès !", { id: toastId });
                       } catch (err: any) {
                         toast.error("Erreur: " + err.message, { id: toastId });
-                        // Revert preview on error
                         const original = GSIStore.getCurrentUser();
                         setUser(original);
                       } finally {
@@ -148,41 +139,48 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="px-6 -mt-16 pb-24">
+      <div className="px-6 -mt-16 pb-32">
         <div className="bg-white rounded-[32px] p-6 shadow-xl mb-6 grid grid-cols-2 gap-4">
-          <div className="flex flex-col items-center p-4 bg-gray-50 rounded-2xl">
+          <Link href="/performance" className="flex flex-col items-center p-4 bg-gray-50 rounded-2xl hover:bg-indigo-50 transition-colors active:scale-95">
             <Award className="text-primary mb-2" size={24} />
-            <span className="text-xs font-bold">{t("reussites")}</span>
-          </div>
-          <div className="flex flex-col items-center p-4 bg-gray-50 rounded-2xl">
+            <span className="text-[10px] font-black uppercase tracking-widest">{t("reussites")}</span>
+          </Link>
+          <Link href="/services" className="flex flex-col items-center p-4 bg-gray-50 rounded-2xl hover:bg-violet-50 transition-colors active:scale-95">
             <FileCheck className="text-accent mb-2" size={24} />
-            <span className="text-xs font-bold">{t("demandes")}</span>
-          </div>
+            <span className="text-[10px] font-black uppercase tracking-widest">{t("demandes")}</span>
+          </Link>
         </div>
 
         <div className="space-y-2 mb-8">
-          <h3 className="text-lg font-bold px-2 mb-4">Paramètres du compte</h3>
-          <Link href="/services">
-            <ProfileLink icon={CreditCard} label="Paiements & Reçus" color="text-blue-500" />
+          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 px-2 mb-4">Espace Personnel</h3>
+
+          <Link href="/performance">
+             <ProfileLink icon={TrendingUp} label="Mes Notes & Performance" color="text-indigo-500" />
+          </Link>
+          <Link href="/program">
+             <ProfileLink icon={Clock} label="Mon Programme d'étude" color="text-emerald-500" />
           </Link>
           <Link href="/services">
-            <ProfileLink icon={FileCheck} label="Documents Administratifs" color="text-green-500" />
+            <ProfileLink icon={FileCheck} label="Documents Administratifs" color="text-orange-500" />
           </Link>
 
-          <div className="bg-gradient-to-r from-purple-500 to-indigo-600 rounded-3xl p-6 text-white mb-4 mt-4 shadow-lg">
-              <div className="flex justify-between items-center mb-4">
-                <h4 className="font-bold text-lg">Career Insight</h4>
-                <Award size={24} />
+          <div className="bg-gradient-to-br from-indigo-600 to-violet-800 rounded-[40px] p-7 text-white mb-6 mt-6 shadow-xl relative overflow-hidden group">
+              <div className="relative z-10">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="font-black text-lg uppercase tracking-tight">Espace Étudiant</h4>
+                  <Award size={24} />
+                </div>
+                <p className="text-xs font-medium opacity-90 mb-4">Accédez à vos ressources pédagogiques et discutez avec vos camarades.</p>
+                <Link href="/community" className="inline-block bg-white text-indigo-600 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform">
+                  Accéder au Chat
+                </Link>
               </div>
-              <p className="text-xs opacity-90 mb-4">Nouvelles opportunités de stage disponibles chez les partenaires GSI !</p>
-              <button className="bg-white text-primary px-4 py-2 rounded-xl text-xs font-bold active:scale-95 transition-transform">
-                Voir les opportunités
-              </button>
+              <div className="absolute right-[-10px] bottom-[-10px] w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
           </div>
 
-          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 mt-4">
-            <h4 className="text-sm font-bold mb-3">Langue / Language</h4>
-            <div className="flex gap-2">
+          <div className="p-6 bg-gray-50 rounded-[32px] border border-gray-100 mt-4">
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4 ml-2">Préférences Langue</h4>
+            <div className="flex gap-3">
               <button
                 onClick={() => setLanguage("fr")}
                 className={cn(
@@ -203,34 +201,101 @@ export default function ProfilePage() {
               </button>
             </div>
           </div>
-          <ProfileLink icon={Settings} label="Préférences" color="text-gray-500" />
+          <ProfileLink icon={Settings} label="Paramètres Avancés" color="text-gray-400" />
         </div>
 
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 py-4 text-red-500 font-bold bg-red-50 p-4 rounded-2xl mb-8 active:scale-95 transition-transform"
+          className="w-full flex items-center justify-center gap-3 py-5 text-red-500 font-black uppercase tracking-widest bg-red-50 rounded-[28px] mb-12 active:scale-95 transition-all border border-red-100 shadow-sm"
         >
           <LogOut size={20} />
-          <span>Déconnexion</span>
+          <span>Déconnexion du compte</span>
         </button>
       </div>
 
-      {/* QR Code Modal */}
       {showQr && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
-          <div className="bg-white rounded-[40px] w-full max-w-xs p-8 flex flex-col items-center relative">
-            <button
-              onClick={() => setShowQr(false)}
-              className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full text-gray-500"
-            >
-              <X size={20} />
-            </button>
-            <h3 className="text-xl font-bold mb-2">Carte Étudiant</h3>
-            <p className="text-gray-500 text-sm mb-8">{user.fullName}</p>
-            <div className="bg-gray-50 p-6 rounded-[32px] border-4 border-primary/10 mb-8">
-              <QrCode size={180} className="text-primary" />
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white rounded-[48px] w-full max-w-sm overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-300">
+            {/* Header of the Card */}
+            <div className="bg-primary p-8 text-white relative">
+              <button
+                onClick={() => setShowQr(false)}
+                className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-2xl text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center p-2">
+                   <img src="/logo.png" alt="GSI" className="w-full h-full object-contain" onError={(e) => (e.currentTarget.src = "https://groupegsi.mg/favicon.ico")} />
+                </div>
+                <div>
+                   <h3 className="text-lg font-black uppercase tracking-tighter">Carte Étudiant</h3>
+                   <p className="text-[10px] font-bold opacity-60 uppercase tracking-[0.2em]">Groupe GSI Internationale</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                 <div className="w-16 h-16 rounded-2xl border-2 border-white/30 overflow-hidden shadow-lg bg-white/10">
+                    <img
+                      src={GSIStore.getAbsoluteUrl(user.photo) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`;
+                      }}
+                    />
+                 </div>
+                 <div>
+                    <h4 className="font-black text-sm uppercase leading-none mb-1">{user.fullName}</h4>
+                    <p className="text-[9px] font-black text-accent uppercase tracking-widest">{user.matricule || "MAT-PENDING"}</p>
+                 </div>
+              </div>
             </div>
-            <p className="text-center text-[10px] text-gray-400 font-medium">Scannez ce code à l'entrée du campus ou pour les services de la bibliothèque.</p>
+
+            {/* QR Code Section */}
+            <div className="p-10 flex flex-col items-center">
+              <div className="relative group">
+                <div className="absolute -inset-4 bg-primary/5 rounded-[40px] blur-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="bg-white p-6 rounded-[40px] shadow-[0_0_50px_rgba(63,81,181,0.1)] border border-gray-100 relative z-10">
+                  <QRCodeCanvas
+                    value={GSIStore.getStudentQrData(user)}
+                    size={200}
+                    level="H"
+                    includeMargin={false}
+                    imageSettings={{
+                      src: "https://groupegsi.mg/favicon.ico",
+                      x: undefined,
+                      y: undefined,
+                      height: 40,
+                      width: 40,
+                      excavate: true,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-8 w-full space-y-3">
+                 <div className="flex items-center gap-3 text-[10px] font-bold text-gray-500 uppercase px-4 py-2 bg-gray-50 rounded-2xl">
+                    <MapPin size={14} className="text-primary" />
+                    <span>Campus: {user.campus}</span>
+                 </div>
+                 <div className="flex items-center gap-3 text-[10px] font-bold text-gray-500 uppercase px-4 py-2 bg-gray-50 rounded-2xl">
+                    <GraduationCap size={14} className="text-primary" />
+                    <span>{user.filiere} — {user.niveau}</span>
+                 </div>
+              </div>
+
+              <div className="mt-8 flex items-center gap-2 text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-6 py-2 rounded-full border border-emerald-100">
+                 <ShieldCheck size={12} />
+                 <span>Identité Vérifiée par GSI Cloud</span>
+              </div>
+
+              <p className="mt-6 text-center text-[8px] text-gray-400 font-bold uppercase tracking-widest leading-loose max-w-[200px]">
+                Présentez ce code pour la validation de présence ou l'accès aux services.
+              </p>
+            </div>
+
+            <div className="h-2 bg-primary w-full"></div>
           </div>
         </div>
       )}

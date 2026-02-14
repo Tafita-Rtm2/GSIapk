@@ -5,25 +5,9 @@ import { useRouter } from "next/navigation";
 import { Sparkles, ArrowLeft, Camera } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import Link from "next/link";
-import { GSIStore } from "@/lib/store";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { GSIStore, User } from "@/lib/store";
 import { toast } from "sonner";
-
-const CAMPUSES = [
-  "Campus Antananarivo",
-  "Campus Antsirabe",
-  "Campus Bypass",
-  "Campus Tamatave"
-];
-
-const FILIERES = [
-  "Informatique", "Gestion", "Commerce International", "Marketing Digital",
-  "Comptabilité", "Finance", "Ressources Humaines", "Logistique",
-  "Tourisme", "Communication", "Management", "Droit des Affaires", "Entrepreneuriat"
-];
-
-const NIVEAUX = ["L1", "L2", "L3", "M1", "M2"];
+import { CAMPUSES, CAMPUS_FILIERES, NIVEAUX } from "@/lib/constants";
 
 export default function RegisterPage() {
   const { t } = useLanguage();
@@ -34,11 +18,15 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
     campus: CAMPUSES[0],
-    filiere: FILIERES[0],
-    niveau: NIVEAUX[0]
+    filiere: CAMPUS_FILIERES[CAMPUSES[0]][0],
+    niveau: NIVEAUX[0],
+    matricule: "",
+    contact: "",
+    photo: ""
   });
 
   const [loading, setLoading] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,31 +38,29 @@ export default function RegisterPage() {
     setLoading(true);
     const toastId = toast.loading("Création de votre compte...");
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-
-      const newUser: any = {
-        id: userCredential.user.uid,
+      const newUser: User = {
+        id: Math.random().toString(36).substr(2, 9),
         fullName: formData.fullName,
         email: formData.email,
-        role: 'student' as const,
+        password: formData.password,
+        role: 'student',
         campus: formData.campus,
         filiere: formData.filiere,
-        niveau: formData.niveau
+        niveau: formData.niveau,
+        matricule: formData.matricule,
+        contact: formData.contact,
+        photo: formData.photo
       };
 
-      await GSIStore.addUser(newUser);
-      GSIStore.setCurrentUser(newUser);
-
-      toast.success("Bienvenue chez GSI Insight !", { id: toastId });
-      router.push("/");
-    } catch (error: any) {
-      if (error.code === 'auth/configuration-not-found') {
-        toast.error("Veuillez activer l'email/mot de passe dans Firebase.", { id: toastId });
-      } else if (error.code === 'auth/email-already-in-use') {
-        toast.error("Cet email est déjà utilisé.", { id: toastId });
+      const result = await GSIStore.register(newUser);
+      if (result) {
+        toast.success("Bienvenue chez GSI Insight !", { id: toastId });
+        router.push("/");
       } else {
-        toast.error("Erreur: " + error.message, { id: toastId });
+        toast.error("Erreur lors de la création du compte.", { id: toastId });
       }
+    } catch (error: any) {
+      toast.error("Erreur: " + error.message, { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -90,13 +76,36 @@ export default function RegisterPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5 pb-10">
-        {/* Profile Photo Mockup */}
         <div className="flex justify-center mb-8">
           <div className="relative">
-            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center border-2 border-dashed border-gray-300">
-              <Camera size={32} className="text-gray-400" />
+            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center border-2 border-dashed border-gray-300 overflow-hidden">
+              {photoPreview ? (
+                <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+              ) : (
+                <Camera size={32} className="text-gray-400" />
+              )}
             </div>
-            <button type="button" className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full shadow-lg">
+            <button
+              type="button"
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.onchange = async (e: any) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (re) => setPhotoPreview(re.target?.result as string);
+                    reader.readAsDataURL(file);
+
+                    const url = await GSIStore.uploadFile(file, `profiles/${file.name}`);
+                    setFormData({...formData, photo: url});
+                  }
+                };
+                input.click();
+              }}
+              className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full shadow-lg active:scale-90 transition-transform"
+            >
               <Sparkles size={16} />
             </button>
           </div>
@@ -125,6 +134,31 @@ export default function RegisterPage() {
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Matricule</label>
+              <input
+                type="text"
+                required
+                className="w-full bg-gray-50 border-none rounded-2xl p-4 outline-none focus:ring-2 ring-primary/20"
+                placeholder="Ex: 123456"
+                value={formData.matricule}
+                onChange={(e) => setFormData({...formData, matricule: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Contact</label>
+              <input
+                type="tel"
+                required
+                className="w-full bg-gray-50 border-none rounded-2xl p-4 outline-none focus:ring-2 ring-primary/20"
+                placeholder="034 XX XXX XX"
+                value={formData.contact}
+                onChange={(e) => setFormData({...formData, contact: e.target.value})}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -158,7 +192,14 @@ export default function RegisterPage() {
             <select
               className="w-full bg-gray-50 border-none rounded-2xl p-4 outline-none focus:ring-2 ring-primary/20 appearance-none"
               value={formData.campus}
-              onChange={(e) => setFormData({...formData, campus: e.target.value})}
+              onChange={(e) => {
+                const newCampus = e.target.value;
+                setFormData({
+                  ...formData,
+                  campus: newCampus,
+                  filiere: CAMPUS_FILIERES[newCampus][0]
+                });
+              }}
             >
               {CAMPUSES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -171,7 +212,7 @@ export default function RegisterPage() {
               value={formData.filiere}
               onChange={(e) => setFormData({...formData, filiere: e.target.value})}
             >
-              {FILIERES.map(f => <option key={f} value={f}>{f}</option>)}
+              {CAMPUS_FILIERES[formData.campus].map(f => <option key={f} value={f}>{f}</option>)}
             </select>
           </div>
 
