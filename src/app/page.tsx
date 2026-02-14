@@ -1,11 +1,11 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
-import { Bell, Search, Sparkles, BookOpen, FileText, Calendar as CalendarIcon, X, Info, Download, Clock, Wifi, WifiOff, CheckCircle2, RefreshCcw, AlertCircle, TrendingUp } from "lucide-react";
+import { Bell, Sparkles, BookOpen, FileText, Clock, X, CheckCircle2, RefreshCcw, AlertCircle, TrendingUp, WifiOff } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { GSIStore, User, Lesson, Assignment, Announcement, StructuredSchedule } from "@/lib/store";
 import { toast } from "sonner";
@@ -14,7 +14,6 @@ export default function Home() {
   const { t } = useLanguage();
   const router = useRouter();
 
-  // --- ALL HOOKS AT TOP ---
   const [user, setUser] = useState<User | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [readNotifications, setReadNotifications] = useState<string[]>([]);
@@ -102,7 +101,6 @@ export default function Home() {
     localStorage.setItem('gsi_read_notifications', JSON.stringify(updated));
   };
 
-  // --- CONDITIONAL RENDERING AFTER HOOKS ---
   if (!user) return null;
 
   const firstName = user.fullName.split(' ')[0];
@@ -158,37 +156,38 @@ export default function Home() {
         )}
 
         {/* Header */}
-        <div className="flex justify-between items-center mb-6 pt-4">
-          <div>
-            <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Bonjour {firstName}</p>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight leading-tight">
-               Prêt pour <span className="text-primary">{t("success_today")}</span> ?
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-             <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-3 bg-white shadow-sm border border-gray-100 rounded-2xl text-gray-400">
-                <Bell size={20} />
-                {(announcements.length > 0 || assignments.length > 0) && <div className="absolute top-3 right-3 w-2 h-2 bg-rose-500 border-2 border-white rounded-full"></div>}
-             </button>
-             <Link href="/profile" className="w-11 h-11 rounded-2xl bg-indigo-50 overflow-hidden border-2 border-white shadow-md">
+        <div className="flex justify-between items-center mb-8 pt-6">
+          <div className="flex items-center gap-4">
+             <Link href="/profile" className="w-14 h-14 rounded-[22px] bg-white p-0.5 shadow-xl shadow-indigo-100/50 border border-indigo-50 rotate-[-3deg] hover:rotate-0 transition-all duration-500 overflow-hidden">
                 <img
                   src={user.photo ? GSIStore.getAbsoluteUrl(user.photo) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
                   alt="Avatar"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover rounded-[20px]"
                   onError={(e) => {
                     e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`;
                   }}
                 />
              </Link>
+             <div>
+               <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mb-0.5">Bonjour {firstName}</p>
+               <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">
+                  GSI Insight <span className="text-primary">Plus</span>
+               </h1>
+             </div>
+          </div>
+          <div className="flex items-center gap-3">
+             <button onClick={() => setShowNotifications(!showNotifications)} className="relative w-12 h-12 flex items-center justify-center bg-white shadow-xl shadow-indigo-100/30 border border-gray-100 rounded-2xl text-gray-400 hover:text-primary transition-all active:scale-90">
+                <Bell size={22} />
+                {(announcements.length > 0 || assignments.length > 0) && <div className="absolute top-3.5 right-3.5 w-2.5 h-2.5 bg-rose-500 border-[3px] border-white rounded-full shadow-sm"></div>}
+             </button>
           </div>
         </div>
 
-        {/* --- NEW: Votre journée en un coup d’œil --- */}
+        {/* Day Summary */}
         <div className="mb-8">
            <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-4 px-1">Votre journée en un coup d’œil</h3>
 
            <div className="grid grid-cols-1 gap-4">
-              {/* Next Class Card */}
               <div className="bg-white p-5 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden group">
                  <div className="flex justify-between items-start mb-4">
                     <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
@@ -213,7 +212,6 @@ export default function Home() {
                  <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors"></div>
               </div>
 
-              {/* Alerts Section */}
               {(assignments.length > 0 || announcements.length > 0) && (
                  <div className="bg-orange-50/50 p-5 rounded-[32px] border border-orange-100">
                     <div className="flex items-center gap-2 mb-3">
@@ -236,7 +234,6 @@ export default function Home() {
                  </div>
               )}
 
-              {/* Progress Bars */}
               <div className="bg-white p-5 rounded-[32px] border border-gray-100 shadow-sm">
                  <div className="flex justify-between items-center mb-4">
                     <span className="text-[9px] font-black uppercase text-gray-400">Progression par matière</span>
@@ -247,7 +244,6 @@ export default function Home() {
                        const subLessons = lessons.filter(l => l.subject === sub);
                        const completedCount = subLessons.filter(l => progressData[l.id]?.completed).length;
                        const prog = subLessons.length > 0 ? Math.round((completedCount / subLessons.length) * 100) : 0;
-
                        const colors = ["bg-indigo-500", "bg-emerald-500", "bg-orange-500", "bg-rose-500"];
                        return (
                           <div key={sub}>
@@ -268,8 +264,8 @@ export default function Home() {
         </div>
 
         {/* AI Card */}
-        <Link href="/chat" className="block mb-8 group active:scale-[0.98] transition-all">
-           <div className="bg-gradient-to-r from-violet-600 to-indigo-800 p-6 rounded-[40px] text-white shadow-2xl relative overflow-hidden">
+        <Link href="/chat" className="block mb-10 group active:scale-[0.98] transition-all">
+           <div className="bg-gradient-to-br from-[#3F51B5] via-[#5C6BC0] to-[#7986CB] p-7 rounded-[44px] text-white shadow-2xl shadow-indigo-200 relative overflow-hidden">
               <div className="relative z-10">
                  <div className="flex items-center gap-2 mb-2">
                     <Sparkles size={18} className="text-violet-200" />
@@ -436,11 +432,6 @@ export default function Home() {
                            </div>
                            <h4 className="text-[11px] font-black uppercase mb-1 text-gray-800">{a.title}</h4>
                            <p className="text-[11px] text-gray-500 font-medium leading-relaxed">{a.message}</p>
-                           {!isRead && (
-                              <div className="mt-3 flex justify-end">
-                                 <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
-                              </div>
-                           )}
                         </div>
                      );
                    })}

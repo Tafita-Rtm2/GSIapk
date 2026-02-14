@@ -20,6 +20,7 @@ import {
   X,
   Wifi,
   WifiOff,
+  FileSpreadsheet,
   CheckCircle2,
   TrendingUp
 } from "lucide-react";
@@ -29,6 +30,7 @@ import { GSIStore, User, Lesson, Assignment } from "@/lib/store";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
+import * as XLSX from 'xlsx';
 import { CAMPUSES, ALL_FILIERES as FILIERES } from "@/lib/constants";
 
 export default function AdminPage() {
@@ -118,13 +120,13 @@ export default function AdminPage() {
   );
 
   const menuItems = [
-    { id: "dashboard", icon: ShieldCheck, label: t("dashboard"), color: "bg-indigo-500" },
-    { id: "users", icon: Users, label: t("gestion_utilisateurs"), color: "bg-blue-500" },
-    { id: "communication", icon: Megaphone, label: t("communication"), color: "bg-orange-500" },
-    { id: "academic", icon: GraduationCap, label: t("gestion_academique"), color: "bg-purple-500" },
-    { id: "schedule", icon: RefreshCcw, label: "Emploi du temps", color: "bg-violet-500" },
-    { id: "media", icon: BookOpen, label: "Médiathèque", color: "bg-emerald-500" },
-    { id: "stats", icon: BarChart3, label: t("stats_rapports"), color: "bg-pink-500" },
+    { id: "dashboard", icon: ShieldCheck, label: t("dashboard"), color: "bg-indigo-600" },
+    { id: "users", icon: Users, label: t("gestion_utilisateurs"), color: "bg-blue-600" },
+    { id: "communication", icon: Megaphone, label: t("communication"), color: "bg-orange-600" },
+    { id: "academic", icon: GraduationCap, label: t("gestion_academique"), color: "bg-purple-600" },
+    { id: "schedule", icon: RefreshCcw, label: "Emploi du temps", color: "bg-violet-600" },
+    { id: "media", icon: BookOpen, label: "Médiathèque", color: "bg-emerald-600" },
+    { id: "stats", icon: BarChart3, label: t("stats_rapports"), color: "bg-pink-600" },
   ];
 
   return (
@@ -144,14 +146,14 @@ export default function AdminPage() {
 
       {/* Header */}
       <div className="bg-white p-6 rounded-b-[40px] shadow-sm mb-6">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
-              <ShieldCheck size={28} />
+        <div className="flex justify-between items-center mb-8">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-indigo-600 rounded-[22px] flex items-center justify-center text-white shadow-xl shadow-indigo-100/50 border border-indigo-50 rotate-[-3deg]">
+              <ShieldCheck size={32} />
             </div>
             <div>
-              <h1 className="text-xl font-bold">Admin Portal</h1>
-              <p className="text-xs text-gray-500 font-medium italic">Nina GSI — Principal</p>
+              <h1 className="text-xl font-black tracking-tight leading-none text-gray-900">Admin <span className="text-indigo-600">Portal</span></h1>
+              <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">Nina GSI — Principal</p>
             </div>
           </div>
           <button
@@ -546,8 +548,56 @@ function ScheduleEditor({ campuses, onSave }: { campuses: string[], onSave: (s: 
     setSlots([...slots, { day: "Lundi", startTime: "08:00", endTime: "10:00", subject: "", room: "", instructor: "" }]);
   };
 
+  const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+     const file = e.target.files?.[0];
+     if (!file) return;
+
+     const reader = new FileReader();
+     reader.onload = (evt) => {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        // Expected columns: Jour, Debut, Fin, Matiere, Salle, Professeur
+        const importedSlots = data.map((row: any) => ({
+           day: row.Jour || row.Day || "Lundi",
+           startTime: row.Debut || row.Start || "08:00",
+           endTime: row.Fin || row.End || "10:00",
+           subject: row.Matiere || row.Subject || "",
+           room: row.Salle || row.Room || "",
+           instructor: row.Professeur || row.Instructor || ""
+        }));
+
+        setSlots([...slots, ...importedSlots]);
+        toast.success(`${importedSlots.length} créneaux importés avec succès !`);
+     };
+     reader.readAsBinaryString(file);
+  };
+
   return (
     <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+       <div className="flex justify-between items-center mb-2">
+          <h3 className="text-sm font-bold">Configuration</h3>
+          <div className="flex gap-2">
+             <input
+                type="file"
+                id="excel-schedule"
+                className="hidden"
+                accept=".xlsx, .xls, .csv"
+                onChange={handleExcelImport}
+             />
+             <button
+                onClick={() => document.getElementById('excel-schedule')?.click()}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl text-[10px] font-black uppercase active:scale-95 transition-all"
+             >
+                <FileSpreadsheet size={14} />
+                Import Excel
+             </button>
+          </div>
+       </div>
+
        <div className="grid grid-cols-2 gap-2">
           <select value={campus} onChange={(e) => setCampus(e.target.value)} className="p-4 bg-gray-50 rounded-2xl font-bold text-xs border-none outline-none">
              {campuses.map(c => <option key={c}>{c}</option>)}
