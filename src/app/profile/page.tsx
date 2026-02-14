@@ -65,6 +65,9 @@ export default function ProfilePage() {
                 src={GSIStore.getAbsoluteUrl(user.photo) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
                 alt="Profile"
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`;
+                }}
               />
             </div>
             {isEditing && (
@@ -230,6 +233,9 @@ export default function ProfilePage() {
                     <img
                       src={GSIStore.getAbsoluteUrl(user.photo) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`;
+                      }}
                     />
                  </div>
                  <div>

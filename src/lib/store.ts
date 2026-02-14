@@ -451,27 +451,31 @@ class GSIStoreClass {
   subscribeLessons(filter: { niveau?: string }, cb: (ls: Lesson[]) => void) {
     const subKey = filter.niveau ? `lessons_${filter.niveau}` : 'lessons';
     if (!this.listeners[subKey]) this.listeners[subKey] = [];
-    this.listeners[subKey].push(cb);
-    const applyFilter = (data: Lesson[]) => {
+
+    const wrapper = (data: Lesson[]) => {
       const filtered = filter.niveau ? data.filter((l: any) => l.niveau === filter.niveau) : data;
       cb(filtered);
     };
-    applyFilter(this.state.lessons);
+
+    this.listeners[subKey].push(wrapper);
+    wrapper(this.state.lessons);
     this.fetchCollection('lessons', 'lessons');
-    return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
+    return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== wrapper); };
   }
 
   subscribeAssignments(filter: { niveau?: string }, cb: (as: Assignment[]) => void) {
     const subKey = filter.niveau ? `assignments_${filter.niveau}` : 'assignments';
     if (!this.listeners[subKey]) this.listeners[subKey] = [];
-    this.listeners[subKey].push(cb);
-    const applyFilter = (data: Assignment[]) => {
+
+    const wrapper = (data: Assignment[]) => {
       const filtered = filter.niveau ? data.filter((a: any) => a.niveau === filter.niveau) : data;
       cb(filtered);
     };
-    applyFilter(this.state.assignments);
+
+    this.listeners[subKey].push(wrapper);
+    wrapper(this.state.assignments);
     this.fetchCollection('assignments', 'assignments');
-    return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
+    return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== wrapper); };
   }
 
   subscribeAnnouncements(cb: (as: Announcement[]) => void) {
@@ -797,14 +801,15 @@ class GSIStoreClass {
   // --- FILES ENGINE ---
 
   getAbsoluteUrl(url: string | undefined): string {
-    if (!url) return "";
+    if (!url || url === "undefined" || url === "null") return "";
     // Robust URL handling: if it's already absolute, return as is.
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
        return url;
     }
     // Handle special case for files/view if it's a short relative path
-    if (url.startsWith('files/view/') || url.startsWith('api/files/view/')) {
-       return `${MEDIA_BASE}/${url.replace('api/', '')}`;
+    if (url.startsWith('files/view/') || url.startsWith('api/files/view/') || url.startsWith('/api/files/view/')) {
+       let path = url.replace('api/', '').replace('/api/', '');
+       return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
     }
     // For relative paths from the custom API
     const base = MEDIA_BASE;

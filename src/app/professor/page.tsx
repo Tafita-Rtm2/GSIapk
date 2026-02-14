@@ -19,6 +19,7 @@ import {
   Clock,
   RefreshCw,
   FileSpreadsheet,
+  Trash2,
   Zap,
   Wifi,
   WifiOff,
@@ -279,6 +280,35 @@ export default function ProfessorPage() {
 
                 <button type="submit" disabled={isUploading} className="w-full bg-violet-600 text-white py-5 rounded-2xl font-black uppercase shadow-lg active:scale-95">Publier Maintenant</button>
             </form>
+
+            <div className="space-y-3 mt-8">
+               <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 px-2">
+                 {activeTab === 'lessons' ? "Vos Leçons" : "Vos Devoirs"}
+               </h3>
+               {(activeTab === 'lessons' ? lessons : assignments).map((item: any, i) => (
+                 <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-between shadow-sm group">
+                    <div className="flex-1 pr-4">
+                       <h4 className="font-bold text-[11px] uppercase mb-1 group-hover:text-violet-600 transition-colors">{item.title}</h4>
+                       <p className="text-[9px] text-gray-400 font-bold uppercase">{item.subject} • {item.niveau}</p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if(confirm("Supprimer cet élément ?")) {
+                          if (activeTab === 'lessons') await GSIStore.deleteLesson(item.id);
+                          else await GSIStore.deleteAssignment(item.id);
+                          toast.success("Supprimé");
+                        }
+                      }}
+                      className="p-2 text-red-400 hover:text-red-600 bg-red-50 rounded-xl transition-all active:scale-90"
+                    >
+                       <Trash2 size={16} />
+                    </button>
+                 </div>
+               ))}
+               {(activeTab === 'lessons' ? lessons : assignments).length === 0 && (
+                 <p className="text-center py-10 text-[10px] font-bold text-gray-300 uppercase italic">Aucun contenu publié</p>
+               )}
+            </div>
           </div>
         )}
 
@@ -404,7 +434,15 @@ export default function ProfessorPage() {
             {students.map((s, i) => (
               <div key={i} className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm">
                  <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center font-bold text-indigo-600 overflow-hidden">
-                    {s.photo ? <img src={GSIStore.getAbsoluteUrl(s.photo)} className="w-full h-full object-cover" /> : s.fullName.charAt(0)}
+                    {s.photo ? (
+                      <img
+                        src={GSIStore.getAbsoluteUrl(s.photo)}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src = `https://api.dicebear.com/7.x/initials/svg?seed=${s.fullName}`;
+                        }}
+                      />
+                    ) : s.fullName.charAt(0)}
                  </div>
                  <div className="flex-1"><h4 className="font-bold text-sm">{s.fullName}</h4><p className="text-[10px] text-gray-400 font-bold uppercase">{s.filiere} • {s.niveau}</p></div>
               </div>

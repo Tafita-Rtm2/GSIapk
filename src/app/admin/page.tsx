@@ -37,6 +37,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [viewingStudent, setViewingStudent] = useState<User | null>(null);
   const [showConvocationModal, setShowConvocationModal] = useState(false);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -210,15 +211,23 @@ export default function AdminPage() {
             <PageHeader title={t("gestion_utilisateurs")} onBack={() => setActiveTab("dashboard")} />
             <div className="space-y-3">
               {filteredUsers.map((u, i) => (
-                <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-sm">
+                <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-sm hover:border-indigo-200 transition-all cursor-pointer group" onClick={() => setViewingStudent(u)}>
                   <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center overflow-hidden font-bold">
-                    {u.photo ? <img src={GSIStore.getAbsoluteUrl(u.photo)} className="w-full h-full object-cover" /> : u.fullName.charAt(0)}
+                    {u.photo ? (
+                      <img
+                        src={GSIStore.getAbsoluteUrl(u.photo)}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src = `https://api.dicebear.com/7.x/initials/svg?seed=${u.fullName}`;
+                        }}
+                      />
+                    ) : u.fullName.charAt(0)}
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-bold text-sm">{u.fullName}</h4>
-                    <p className="text-[10px] text-gray-500">{u.role.toUpperCase()} • {u.filiere}</p>
+                    <h4 className="font-bold text-sm group-hover:text-indigo-600 transition-colors">{u.fullName}</h4>
+                    <p className="text-[10px] text-gray-500">{u.role.toUpperCase()} • {u.filiere} • {u.niveau}</p>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => { setSelectedUser(u); setShowConvocationModal(true); }} className="text-orange-500 p-2 hover:bg-orange-50 rounded-xl"><Mail size={16} /></button>
                     <button onClick={() => handleDeleteUser(u.id)} className="text-red-500 p-2 hover:bg-red-50 rounded-xl"><Trash2 size={16} /></button>
                   </div>
@@ -398,6 +407,83 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+
+      {/* Student Detail Modal */}
+      {viewingStudent && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-md rounded-t-[40px] sm:rounded-[40px] overflow-hidden shadow-2xl relative animate-in slide-in-from-bottom-10 duration-300">
+              <div className="bg-indigo-600 p-8 pt-12 text-white relative">
+                 <button onClick={() => setViewingStudent(null)} className="absolute right-6 top-6 p-2 bg-white/10 rounded-2xl hover:bg-white/20 transition-colors">
+                    <X size={20} />
+                 </button>
+
+                 <div className="flex flex-col items-center text-center">
+                    <div className="w-24 h-24 rounded-[32px] border-4 border-white/20 overflow-hidden shadow-2xl bg-white/10 mb-4">
+                       <img
+                         src={GSIStore.getAbsoluteUrl(viewingStudent.photo) || `https://api.dicebear.com/7.x/initials/svg?seed=${viewingStudent.fullName}`}
+                         className="w-full h-full object-cover"
+                         onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/initials/svg?seed=${viewingStudent.fullName}`; }}
+                       />
+                    </div>
+                    <h2 className="text-2xl font-black uppercase tracking-tight">{viewingStudent.fullName}</h2>
+                    <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest mt-1">{viewingStudent.role}</p>
+                 </div>
+              </div>
+
+              <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto">
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-gray-50 rounded-3xl border border-gray-100">
+                       <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Matricule</p>
+                       <p className="text-sm font-black text-indigo-600">{viewingStudent.matricule || "N/A"}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-3xl border border-gray-100">
+                       <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Campus</p>
+                       <p className="text-sm font-black text-gray-800">{viewingStudent.campus || "N/A"}</p>
+                    </div>
+                 </div>
+
+                 <div className="space-y-4">
+                    <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-3xl border border-gray-100">
+                       <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm">
+                          <Mail size={18} />
+                       </div>
+                       <div>
+                          <p className="text-[10px] font-black text-gray-400 uppercase">Email Contact</p>
+                          <p className="text-xs font-bold text-gray-700">{viewingStudent.email}</p>
+                       </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-3xl border border-gray-100">
+                       <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center text-purple-600 shadow-sm">
+                          <GraduationCap size={18} />
+                       </div>
+                       <div>
+                          <p className="text-[10px] font-black text-gray-400 uppercase">Cursus Académique</p>
+                          <p className="text-xs font-bold text-gray-700">{viewingStudent.filiere} — {viewingStudent.niveau}</p>
+                       </div>
+                    </div>
+                 </div>
+
+                 {viewingStudent.role === 'student' && (
+                   <div className="pt-4 border-t border-gray-100">
+                      <button
+                        onClick={() => {
+                           setSelectedUser(viewingStudent);
+                           setViewingStudent(null);
+                           setShowConvocationModal(true);
+                        }}
+                        className="w-full bg-orange-500 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-orange-100 active:scale-95 transition-all flex items-center justify-center gap-2"
+                      >
+                         <Mail size={18} />
+                         Convoquer l'étudiant
+                      </button>
+                   </div>
+                 )}
+              </div>
+              <div className="h-4 bg-gray-50"></div>
+           </div>
+        </div>
+      )}
 
       {/* Convocation Modal */}
       {showConvocationModal && selectedUser && (

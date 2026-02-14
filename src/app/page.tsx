@@ -171,7 +171,14 @@ export default function Home() {
                 {(announcements.length > 0 || assignments.length > 0) && <div className="absolute top-3 right-3 w-2 h-2 bg-rose-500 border-2 border-white rounded-full"></div>}
              </button>
              <Link href="/profile" className="w-11 h-11 rounded-2xl bg-indigo-50 overflow-hidden border-2 border-white shadow-md">
-                <img src={user.photo ? GSIStore.getAbsoluteUrl(user.photo) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`} alt="Avatar" className="w-full h-full object-cover" />
+                <img
+                  src={user.photo ? GSIStore.getAbsoluteUrl(user.photo) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
+                  alt="Avatar"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`;
+                  }}
+                />
              </Link>
           </div>
         </div>
