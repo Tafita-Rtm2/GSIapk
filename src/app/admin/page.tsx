@@ -45,9 +45,15 @@ export default function AdminPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCampus, setFilterCampus] = useState("");
   const [syncStatus, setSyncStatus] = useState<'syncing' | 'ready' | 'offline'>('syncing');
+
+  // Filters for submissions
+  const [subFilterCampus, setSubFilterCampus] = useState("");
+  const [subFilterFiliere, setSubFilterFiliere] = useState("");
+  const [subFilterNiveau, setSubFilterNiveau] = useState("");
 
   useEffect(() => {
     const user = GSIStore.getCurrentUser();
@@ -60,6 +66,7 @@ export default function AdminPage() {
       GSIStore.subscribeUsers((us) => { setUsers(us); setSyncStatus('ready'); }),
       GSIStore.subscribeLessons({}, (ls) => setLessons(ls)),
       GSIStore.subscribeAssignments({}, (as) => setAssignments(as)),
+      GSIStore.subscribeSubmissions(undefined, (ss) => setSubmissions(ss)),
       GSIStore.subscribeAnnouncements((anns) => setAnnouncements(anns)),
       GSIStore.subscribeLatestSchedule("", "", () => {
          // Generic fetch for all schedules
@@ -122,10 +129,11 @@ export default function AdminPage() {
   const menuItems = [
     { id: "dashboard", icon: ShieldCheck, label: t("dashboard"), color: "bg-indigo-600" },
     { id: "users", icon: Users, label: t("gestion_utilisateurs"), color: "bg-blue-600" },
+    { id: "submissions", icon: FileText, label: "Devoirs Reçus", color: "bg-emerald-600" },
     { id: "communication", icon: Megaphone, label: t("communication"), color: "bg-orange-600" },
     { id: "academic", icon: GraduationCap, label: t("gestion_academique"), color: "bg-purple-600" },
     { id: "schedule", icon: RefreshCcw, label: "Emploi du temps", color: "bg-violet-600" },
-    { id: "media", icon: BookOpen, label: "Médiathèque", color: "bg-emerald-600" },
+    { id: "media", icon: BookOpen, label: "Médiathèque", color: "bg-sky-600" },
     { id: "stats", icon: BarChart3, label: t("stats_rapports"), color: "bg-pink-600" },
   ];
 
@@ -379,6 +387,96 @@ export default function AdminPage() {
           </div>
         )}
 
+        {activeTab === "submissions" && (
+          <div className="space-y-4">
+             <PageHeader title="Devoirs Reçus" onBack={() => setActiveTab("dashboard")} />
+
+             {/* Submissions Filters */}
+             <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm space-y-3">
+                <p className="text-[10px] font-black uppercase text-gray-400">Filtrer par destination</p>
+                <div className="grid grid-cols-2 gap-2">
+                   <select
+                     value={subFilterCampus}
+                     onChange={(e) => setSubFilterCampus(e.target.value)}
+                     className="p-3 bg-gray-50 rounded-xl text-[10px] font-bold outline-none"
+                   >
+                      <option value="">Tous les Campus</option>
+                      {CAMPUSES.map(c => <option key={c} value={c}>{c}</option>)}
+                   </select>
+                   <select
+                     value={subFilterNiveau}
+                     onChange={(e) => setSubFilterNiveau(e.target.value)}
+                     className="p-3 bg-gray-50 rounded-xl text-[10px] font-bold outline-none"
+                   >
+                      <option value="">Tous les Niveaux</option>
+                      {["L1", "L2", "L3", "M1", "M2"].map(n => <option key={n} value={n}>{n}</option>)}
+                   </select>
+                </div>
+                <select
+                   value={subFilterFiliere}
+                   onChange={(e) => setSubFilterFiliere(e.target.value)}
+                   className="w-full p-3 bg-gray-50 rounded-xl text-[10px] font-bold outline-none"
+                >
+                   <option value="">Toutes les Filières</option>
+                   {FILIERES.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+             </div>
+
+             <div className="space-y-3">
+                {submissions
+                .filter(s => {
+                   const student = users.find(u => u.id === s.studentId);
+                   if (subFilterCampus && student?.campus !== subFilterCampus) return false;
+                   if (subFilterFiliere && student?.filiere !== subFilterFiliere) return false;
+                   if (subFilterNiveau && student?.niveau !== subFilterNiveau) return false;
+                   return true;
+                })
+                .map((s, i) => {
+                   const assignment = assignments.find(a => a.id === s.assignmentId);
+                   return (
+                      <div key={i} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
+                         <div className="flex justify-between items-start">
+                            <div>
+                               <h4 className="font-black text-xs uppercase text-indigo-600 mb-1">{s.studentName}</h4>
+                               <p className="text-[10px] font-bold text-gray-400 uppercase">{assignment?.title || "Devoir Inconnu"}</p>
+                            </div>
+                            <span className="text-[9px] font-black text-gray-300 uppercase">{new Date(s.date).toLocaleDateString()}</span>
+                         </div>
+
+                         <div className="flex gap-2">
+                            <button
+                               onClick={() => {
+                                  if (s.file.startsWith('http') || s.file.startsWith('/') || s.file.startsWith('files/')) {
+                                     GSIStore.openPackFile(s.id, s.file);
+                                  } else {
+                                     alert(`Travail écrit : \n\n${s.file}`);
+                                  }
+                               }}
+                               className="flex-1 bg-gray-50 py-3 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2"
+                            >
+                               <FileText size={14} /> Voir le travail
+                            </button>
+                            <div className={cn(
+                               "px-4 py-3 rounded-xl text-[10px] font-black uppercase flex-1 flex items-center justify-center",
+                               s.score !== undefined ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-gray-50 text-gray-400"
+                            )}>
+                               {s.score !== undefined ? `Note: ${s.score}/20` : "Non noté"}
+                            </div>
+                         </div>
+                         {s.feedback && (
+                            <div className="p-3 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                               <p className="text-[8px] font-black uppercase text-gray-400 mb-1">Commentaire Prof :</p>
+                               <p className="text-[10px] font-medium text-gray-600 italic">"{s.feedback}"</p>
+                            </div>
+                         )}
+                      </div>
+                   );
+                })}
+                {submissions.length === 0 && <p className="text-center py-20 text-[10px] font-bold text-gray-300 uppercase italic">Aucun devoir rendu trouvé</p>}
+             </div>
+          </div>
+        )}
+
         {activeTab === "media" && (
           <div className="space-y-4">
             <PageHeader title="Médiathèque GSI" onBack={() => setActiveTab("dashboard")} />
@@ -560,15 +658,52 @@ function ScheduleEditor({ campuses, onSave }: { campuses: string[], onSave: (s: 
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
 
-        // Expected columns: Jour, Debut, Fin, Matiere, Salle, Professeur
-        const importedSlots = data.map((row: any) => ({
-           day: row.Jour || row.Day || "Lundi",
-           startTime: row.Debut || row.Start || "08:00",
-           endTime: row.Fin || row.End || "10:00",
-           subject: row.Matiere || row.Subject || "",
-           room: row.Salle || row.Room || "",
-           instructor: row.Professeur || row.Instructor || ""
-        }));
+        // Smarter Excel Parsing
+        const importedSlots = data.map((row: any) => {
+           // Normalize keys to lowercase and remove spaces
+           const normalizedRow: any = {};
+           Object.keys(row).forEach(key => {
+              normalizedRow[key.toLowerCase().replace(/\s/g, '')] = row[key];
+           });
+
+           let start = normalizedRow.debut || normalizedRow.start || "08:00";
+           let end = normalizedRow.fin || normalizedRow.end || "10:00";
+
+           // Handle "8h-10h" or "08:00-10:00" in a single "heure" or "time" column
+           const timeRange = normalizedRow.heure || normalizedRow.time || normalizedRow.creneau;
+           if (timeRange && typeof timeRange === 'string') {
+              const parts = timeRange.split(/[-–—/]/);
+              if (parts.length === 2) {
+                 start = parts[0].trim().replace('h', ':').replace(/[^0-9:]/g, '');
+                 end = parts[1].trim().replace('h', ':').replace(/[^0-9:]/g, '');
+                 if (!start.includes(':')) start += ':00';
+                 if (!end.includes(':')) end += ':00';
+                 // Pad single digit hours
+                 if (start.length === 4 && start.indexOf(':') === 1) start = '0' + start;
+                 if (end.length === 4 && end.indexOf(':') === 1) end = '0' + end;
+              }
+           }
+
+           let day = normalizedRow.jour || normalizedRow.day || "Lundi";
+           // Robust day matching
+           const dayLower = day.toLowerCase();
+           if (dayLower.includes('lun')) day = "Lundi";
+           else if (dayLower.includes('mar')) day = "Mardi";
+           else if (dayLower.includes('mer')) day = "Mercredi";
+           else if (dayLower.includes('jeu')) day = "Jeudi";
+           else if (dayLower.includes('ven')) day = "Vendredi";
+           else if (dayLower.includes('sam')) day = "Samedi";
+           else if (dayLower.includes('dim')) day = "Dimanche";
+
+           return {
+              day: day,
+              startTime: start,
+              endTime: end,
+              subject: normalizedRow.matiere || normalizedRow.subject || normalizedRow.cours || "",
+              room: normalizedRow.salle || normalizedRow.room || normalizedRow.classe || "",
+              instructor: normalizedRow.professeur || normalizedRow.instructor || normalizedRow.prof || ""
+           };
+        });
 
         setSlots([...slots, ...importedSlots]);
         toast.success(`${importedSlots.length} créneaux importés avec succès !`);

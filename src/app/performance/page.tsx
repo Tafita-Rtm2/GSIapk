@@ -14,6 +14,7 @@ export default function PerformancePage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [grades, setGrades] = useState<Grade[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
 
   useEffect(() => {
     const currentUser = GSIStore.getCurrentUser();
@@ -31,7 +32,14 @@ export default function PerformancePage() {
       GSIStore.setCache(`grades_${currentUser.id}`, gs);
     });
 
-    return () => unsub();
+    const unsubSubmissions = GSIStore.subscribeSubmissions(undefined, (ss) => {
+       setSubmissions(ss.filter(s => s.studentId === currentUser.id));
+    });
+
+    return () => {
+       unsub();
+       unsubSubmissions();
+    };
   }, [router]);
 
   if (!user) return null;
@@ -110,6 +118,39 @@ export default function PerformancePage() {
                    <AlertCircle size={32} className="text-gray-300 mx-auto mb-3" />
                    <p className="text-sm text-gray-400 font-medium">Aucune note n'a encore été publiée.</p>
                 </div>
+              )}
+           </div>
+        </div>
+
+        {/* Submissions Feedback Section */}
+        <div className="mb-12">
+           <h2 className="text-lg font-bold mb-4">Retours sur mes devoirs</h2>
+           <div className="space-y-3">
+              {submissions.filter(s => s.feedback || s.score !== undefined).map((s, i) => (
+                 <div key={i} className="bg-white p-5 rounded-[32px] border border-gray-100 shadow-sm">
+                    <div className="flex justify-between items-start mb-3">
+                       <div>
+                          <h4 className="font-bold text-xs uppercase text-gray-400">Devoir rendu</h4>
+                          <p className="text-sm font-black text-gray-800">{s.id.substring(0, 8)}...</p>
+                       </div>
+                       {s.score !== undefined && (
+                          <div className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-xs font-black">
+                             {s.score} / 20
+                          </div>
+                       )}
+                    </div>
+                    {s.feedback ? (
+                       <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50">
+                          <p className="text-[10px] font-black uppercase text-indigo-400 mb-1">Commentaire du Prof :</p>
+                          <p className="text-xs font-medium text-indigo-900 italic">"{s.feedback}"</p>
+                       </div>
+                    ) : (
+                       <p className="text-[10px] text-gray-400 font-bold uppercase italic">En attente de correction détaillée</p>
+                    )}
+                 </div>
+              ))}
+              {submissions.filter(s => s.feedback || s.score !== undefined).length === 0 && (
+                 <p className="text-center py-6 text-[10px] font-black text-gray-300 uppercase italic">Aucun retour pour le moment</p>
               )}
            </div>
         </div>

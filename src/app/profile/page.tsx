@@ -1,7 +1,7 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
-import { Settings, ChevronRight, FileCheck, Award, LogOut, QrCode, X, Camera, ShieldCheck, MapPin, GraduationCap } from "lucide-react";
+import { Settings, ChevronRight, FileCheck, Award, LogOut, QrCode, X, Camera, ShieldCheck, MapPin, GraduationCap, TrendingUp, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { QRCodeCanvas } from "qrcode.react";
@@ -139,25 +139,32 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="px-6 -mt-16 pb-24">
+      <div className="px-6 -mt-16 pb-32">
         <div className="bg-white rounded-[32px] p-6 shadow-xl mb-6 grid grid-cols-2 gap-4">
-          <div className="flex flex-col items-center p-4 bg-gray-50 rounded-2xl">
+          <Link href="/performance" className="flex flex-col items-center p-4 bg-gray-50 rounded-2xl hover:bg-indigo-50 transition-colors active:scale-95">
             <Award className="text-primary mb-2" size={24} />
-            <span className="text-xs font-bold">{t("reussites")}</span>
-          </div>
-          <div className="flex flex-col items-center p-4 bg-gray-50 rounded-2xl">
+            <span className="text-[10px] font-black uppercase tracking-widest">{t("reussites")}</span>
+          </Link>
+          <Link href="/services" className="flex flex-col items-center p-4 bg-gray-50 rounded-2xl hover:bg-violet-50 transition-colors active:scale-95">
             <FileCheck className="text-accent mb-2" size={24} />
-            <span className="text-xs font-bold">{t("demandes")}</span>
-          </div>
+            <span className="text-[10px] font-black uppercase tracking-widest">{t("demandes")}</span>
+          </Link>
         </div>
 
         <div className="space-y-2 mb-8">
-          <h3 className="text-lg font-bold px-2 mb-4">Paramètres du compte</h3>
+          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 px-2 mb-4">Espace Personnel</h3>
+
+          <Link href="/performance">
+             <ProfileLink icon={TrendingUp} label="Mes Notes & Performance" color="text-indigo-500" />
+          </Link>
+          <Link href="/program">
+             <ProfileLink icon={Clock} label="Mon Programme d'étude" color="text-emerald-500" />
+          </Link>
           <Link href="/services">
-            <ProfileLink icon={FileCheck} label="Documents Administratifs" color="text-green-500" />
+            <ProfileLink icon={FileCheck} label="Documents Administratifs" color="text-orange-500" />
           </Link>
 
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-[32px] p-6 text-white mb-4 mt-4 shadow-lg relative overflow-hidden">
+          <div className="bg-gradient-to-br from-indigo-600 to-violet-800 rounded-[40px] p-7 text-white mb-6 mt-6 shadow-xl relative overflow-hidden group">
               <div className="relative z-10">
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="font-black text-lg uppercase tracking-tight">Espace Étudiant</h4>
@@ -171,9 +178,9 @@ export default function ProfilePage() {
               <div className="absolute right-[-10px] bottom-[-10px] w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
           </div>
 
-          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 mt-4">
-            <h4 className="text-sm font-bold mb-3">Langue / Language</h4>
-            <div className="flex gap-2">
+          <div className="p-6 bg-gray-50 rounded-[32px] border border-gray-100 mt-4">
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4 ml-2">Préférences Langue</h4>
+            <div className="flex gap-3">
               <button
                 onClick={() => setLanguage("fr")}
                 className={cn(
@@ -194,15 +201,15 @@ export default function ProfilePage() {
               </button>
             </div>
           </div>
-          <ProfileLink icon={Settings} label="Préférences" color="text-gray-500" />
+          <ProfileLink icon={Settings} label="Paramètres Avancés" color="text-gray-400" />
         </div>
 
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 py-4 text-red-500 font-bold bg-red-50 p-4 rounded-2xl mb-8 active:scale-95 transition-transform"
+          className="w-full flex items-center justify-center gap-3 py-5 text-red-500 font-black uppercase tracking-widest bg-red-50 rounded-[28px] mb-12 active:scale-95 transition-all border border-red-100 shadow-sm"
         >
           <LogOut size={20} />
-          <span>Déconnexion</span>
+          <span>Déconnexion du compte</span>
         </button>
       </div>
 

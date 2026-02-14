@@ -46,6 +46,11 @@ export default function ProfessorPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [syncStatus, setSyncStatus] = useState<'ready' | 'offline' | 'syncing'>('syncing');
 
+  // Filters for submissions
+  const [subFilterCampus, setSubFilterCampus] = useState("");
+  const [subFilterFiliere, setSubFilterFiliere] = useState("");
+  const [subFilterNiveau, setSubFilterNiveau] = useState("");
+
   useEffect(() => {
     const user = GSIStore.getCurrentUser();
     if (!user || user.role !== 'professor') {
@@ -453,8 +458,48 @@ export default function ProfessorPage() {
         {activeTab === "submissions" && (
           <div className="space-y-4">
              <PageHeader title="Devoirs Reçus" onBack={() => setActiveTab("dashboard")} />
+
+             {/* Submissions Filters */}
+             <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm space-y-3">
+                <p className="text-[10px] font-black uppercase text-gray-400">Filtrer les rendus</p>
+                <div className="grid grid-cols-2 gap-2">
+                   <select
+                     value={subFilterCampus}
+                     onChange={(e) => setSubFilterCampus(e.target.value)}
+                     className="p-3 bg-gray-50 rounded-xl text-[10px] font-bold outline-none"
+                   >
+                      <option value="">Tous les Campus</option>
+                      {CAMPUSES.map(c => <option key={c} value={c}>{c}</option>)}
+                   </select>
+                   <select
+                     value={subFilterNiveau}
+                     onChange={(e) => setSubFilterNiveau(e.target.value)}
+                     className="p-3 bg-gray-50 rounded-xl text-[10px] font-bold outline-none"
+                   >
+                      <option value="">Tous les Niveaux</option>
+                      {NIVEAUX.map(n => <option key={n} value={n}>{n}</option>)}
+                   </select>
+                </div>
+                <select
+                   value={subFilterFiliere}
+                   onChange={(e) => setSubFilterFiliere(e.target.value)}
+                   className="w-full p-3 bg-gray-50 rounded-xl text-[10px] font-bold outline-none"
+                >
+                   <option value="">Toutes les Filières</option>
+                   {FILIERES.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+             </div>
+
              <div className="space-y-3">
-                {submissions.map((s, i) => {
+                {submissions
+                .filter(s => {
+                   const student = students.find(u => u.id === s.studentId);
+                   if (subFilterCampus && student?.campus !== subFilterCampus) return false;
+                   if (subFilterFiliere && student?.filiere !== subFilterFiliere) return false;
+                   if (subFilterNiveau && student?.niveau !== subFilterNiveau) return false;
+                   return true;
+                })
+                .map((s, i) => {
                    const assignment = assignments.find(a => a.id === s.assignmentId);
                    return (
                       <div key={i} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
@@ -467,41 +512,44 @@ export default function ProfessorPage() {
                          </div>
 
                          <div className="flex gap-2">
-                            <button onClick={() => GSIStore.openPackFile(s.id, s.file)} className="flex-1 bg-gray-50 py-3 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2">
+                            <button
+                               onClick={() => {
+                                  if (s.file.startsWith('http') || s.file.startsWith('/') || s.file.startsWith('files/')) {
+                                     GSIStore.openPackFile(s.id, s.file);
+                                  } else {
+                                     alert(`Travail écrit : \n\n${s.file}`);
+                                  }
+                               }}
+                               className="flex-1 bg-gray-50 py-3 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2"
+                            >
                                <FileText size={14} /> Voir le travail
                             </button>
-                            {s.score !== undefined ? (
-                               <button
-                                  onClick={() => {
-                                     const score = prompt("Modifier la note (sur 20) :", s.score?.toString());
-                                     if (score !== null && score !== "") {
-                                        const num = parseFloat(score);
-                                        if (isNaN(num)) return toast.error("Note invalide");
-                                        GSIStore.updateSubmission({ ...s, score: num });
-                                        toast.success("Note mise à jour !");
-                                     }
-                                  }}
-                                  className="px-4 py-3 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase border border-emerald-100 flex-1"
-                               >
-                                  Note: {s.score}/20 (Modifier)
-                               </button>
-                            ) : (
-                               <button
-                                  onClick={() => {
-                                     const score = prompt("Entrez la note (sur 20) :");
-                                     if (score !== null && score !== "") {
-                                        const num = parseFloat(score);
-                                        if (isNaN(num)) return toast.error("Note invalide");
-                                        GSIStore.updateSubmission({ ...s, score: num });
-                                        toast.success("Note enregistrée !");
-                                     }
-                                  }}
-                                  className="flex-1 bg-indigo-600 text-white py-3 rounded-xl text-[10px] font-black uppercase"
-                               >
-                                  Noter
-                               </button>
-                            )}
+                            <button
+                               onClick={() => {
+                                  const score = prompt("Note (sur 20) :", s.score?.toString() || "");
+                                  if (score !== null && score !== "") {
+                                     const num = parseFloat(score);
+                                     if (isNaN(num)) return toast.error("Note invalide");
+
+                                     const feedback = prompt("Commentaire pour l'élève :", s.feedback || "");
+                                     GSIStore.updateSubmission({ ...s, score: num, feedback: feedback || undefined });
+                                     toast.success("Note et commentaire envoyés !");
+                                  }
+                               }}
+                               className={cn(
+                                  "px-4 py-3 rounded-xl text-[10px] font-black uppercase flex-1 transition-all",
+                                  s.score !== undefined ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
+                               )}
+                            >
+                               {s.score !== undefined ? `Note: ${s.score}/20` : "Noter"}
+                            </button>
                          </div>
+                         {s.feedback && (
+                            <div className="p-3 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                               <p className="text-[8px] font-black uppercase text-gray-400 mb-1">Votre commentaire :</p>
+                               <p className="text-[10px] font-medium text-gray-600 italic">"{s.feedback}"</p>
+                            </div>
+                         )}
                       </div>
                    );
                 })}
