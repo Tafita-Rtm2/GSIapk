@@ -17,6 +17,7 @@ export default function Home() {
   // --- ALL HOOKS AT TOP ---
   const [user, setUser] = useState<User | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [readNotifications, setReadNotifications] = useState<string[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -90,7 +91,16 @@ export default function Home() {
   useEffect(() => {
      const saved = localStorage.getItem('gsi_progress');
      if (saved) setProgressData(JSON.parse(saved));
+
+     const read = localStorage.getItem('gsi_read_notifications');
+     if (read) setReadNotifications(JSON.parse(read));
   }, [lessons]);
+
+  const markNotificationAsRead = (id: string) => {
+    const updated = Array.from(new Set([...readNotifications, id]));
+    setReadNotifications(updated);
+    localStorage.setItem('gsi_read_notifications', JSON.stringify(updated));
+  };
 
   // --- CONDITIONAL RENDERING AFTER HOOKS ---
   if (!user) return null;
@@ -372,19 +382,83 @@ export default function Home() {
 
         {/* Notifications Modal */}
         {showNotifications && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6 backdrop-blur-sm animate-in fade-in">
-             <div className="bg-white rounded-[40px] w-full max-w-sm p-8 animate-in zoom-in-95">
-                <div className="flex justify-between items-center mb-6">
-                   <h3 className="font-black text-xs uppercase tracking-widest">Centre de Notifications</h3>
-                   <button onClick={() => setShowNotifications(false)}><X size={20} /></button>
+          <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-300">
+             <div className="bg-white rounded-[48px] w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+                <div className="p-8 bg-primary text-white flex justify-between items-center">
+                   <div>
+                      <h3 className="font-black text-sm uppercase tracking-widest">Notifications</h3>
+                      <p className="text-[9px] font-bold opacity-60 uppercase">Flux GSI Internationale</p>
+                   </div>
+                   <button onClick={() => setShowNotifications(false)} className="p-3 bg-white/10 rounded-2xl active:scale-90 transition-all">
+                      <X size={20} />
+                   </button>
                 </div>
-                <div className="space-y-4 max-h-[400px] overflow-y-auto">
-                   {announcements.map((a, i) => (
-                     <div key={i} className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                        <h4 className="text-[10px] font-black uppercase mb-1">{a.title}</h4>
-                        <p className="text-[11px] text-gray-500 font-medium">{a.message}</p>
-                     </div>
+
+                <div className="p-4 space-y-3 max-h-[450px] overflow-y-auto bg-gray-50/50">
+                   {announcements.length === 0 && assignments.length === 0 && (
+                      <div className="py-20 flex flex-col items-center text-center">
+                         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center text-gray-300 mb-4">
+                            <Bell size={24} />
+                         </div>
+                         <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest italic">Aucune notification pour le moment</p>
+                      </div>
+                   )}
+
+                   {announcements.map((a, i) => {
+                     const isRead = readNotifications.includes(a.id);
+                     return (
+                        <div
+                          key={a.id}
+                          className={cn(
+                            "p-5 rounded-[32px] border transition-all duration-300",
+                            isRead ? "bg-white border-gray-100 opacity-60" : "bg-white border-indigo-100 shadow-lg shadow-indigo-500/5 ring-1 ring-indigo-500/10"
+                          )}
+                          onClick={() => markNotificationAsRead(a.id)}
+                        >
+                           <div className="flex justify-between items-start mb-2">
+                              <span className={cn(
+                                "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest",
+                                a.type === 'convocation' ? "bg-rose-500 text-white" : "bg-primary text-white"
+                              )}>
+                                 {a.type === 'convocation' ? 'OFFICIEL' : 'INFO'}
+                              </span>
+                              <span className="text-[8px] font-bold text-gray-300">{new Date(a.date).toLocaleDateString()}</span>
+                           </div>
+                           <h4 className="text-[11px] font-black uppercase mb-1 text-gray-800">{a.title}</h4>
+                           <p className="text-[11px] text-gray-500 font-medium leading-relaxed">{a.message}</p>
+                           {!isRead && (
+                              <div className="mt-3 flex justify-end">
+                                 <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
+                              </div>
+                           )}
+                        </div>
+                     );
+                   })}
+
+                   {assignments.map((a) => (
+                      <div key={a.id} className="p-5 bg-orange-50/50 border border-orange-100 rounded-[32px]">
+                         <div className="flex justify-between items-center mb-2">
+                            <span className="bg-orange-500 text-white px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest">DEVOIR</span>
+                            <span className="text-[8px] font-black text-orange-600 uppercase tracking-widest">À RENDRE</span>
+                         </div>
+                         <h4 className="text-[11px] font-black uppercase mb-1 text-gray-800">{a.title}</h4>
+                         <p className="text-[10px] text-orange-600 font-bold">Date limite : {a.deadline}</p>
+                      </div>
                    ))}
+                </div>
+
+                <div className="p-6 bg-white border-t border-gray-100">
+                   <button
+                     onClick={() => {
+                        const allIds = announcements.map(a => a.id);
+                        setReadNotifications(allIds);
+                        localStorage.setItem('gsi_read_notifications', JSON.stringify(allIds));
+                        toast.success("Tout est marqué comme lu");
+                     }}
+                     className="w-full py-4 bg-gray-50 text-gray-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:text-primary transition-colors"
+                   >
+                      Tout marquer comme lu
+                   </button>
                 </div>
              </div>
           </div>

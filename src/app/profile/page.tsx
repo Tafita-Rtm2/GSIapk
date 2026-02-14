@@ -1,9 +1,10 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
-import { Settings, ChevronRight, FileCheck, Award, LogOut, QrCode, X, Camera } from "lucide-react";
+import { Settings, ChevronRight, FileCheck, Award, LogOut, QrCode, X, Camera, ShieldCheck, MapPin, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { QRCodeCanvas } from "qrcode.react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
@@ -203,20 +204,85 @@ export default function ProfilePage() {
       </div>
 
       {showQr && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
-          <div className="bg-white rounded-[40px] w-full max-w-xs p-8 flex flex-col items-center relative">
-            <button
-              onClick={() => setShowQr(false)}
-              className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full text-gray-500"
-            >
-              <X size={20} />
-            </button>
-            <h3 className="text-xl font-bold mb-2">Carte Étudiant</h3>
-            <p className="text-gray-500 text-sm mb-8">{user.fullName}</p>
-            <div className="bg-gray-50 p-6 rounded-[32px] border-4 border-primary/10 mb-8">
-              <QrCode size={180} className="text-primary" />
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white rounded-[48px] w-full max-w-sm overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-300">
+            {/* Header of the Card */}
+            <div className="bg-primary p-8 text-white relative">
+              <button
+                onClick={() => setShowQr(false)}
+                className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-2xl text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center p-2">
+                   <img src="/logo.png" alt="GSI" className="w-full h-full object-contain" onError={(e) => (e.currentTarget.src = "https://groupegsi.mg/favicon.ico")} />
+                </div>
+                <div>
+                   <h3 className="text-lg font-black uppercase tracking-tighter">Carte Étudiant</h3>
+                   <p className="text-[10px] font-bold opacity-60 uppercase tracking-[0.2em]">Groupe GSI Internationale</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                 <div className="w-16 h-16 rounded-2xl border-2 border-white/30 overflow-hidden shadow-lg bg-white/10">
+                    <img
+                      src={GSIStore.getAbsoluteUrl(user.photo) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
+                      className="w-full h-full object-cover"
+                    />
+                 </div>
+                 <div>
+                    <h4 className="font-black text-sm uppercase leading-none mb-1">{user.fullName}</h4>
+                    <p className="text-[9px] font-black text-accent uppercase tracking-widest">{user.matricule || "MAT-PENDING"}</p>
+                 </div>
+              </div>
             </div>
-            <p className="text-center text-[10px] text-gray-400 font-medium">Scannez ce code à l'entrée du campus ou pour les services de la bibliothèque.</p>
+
+            {/* QR Code Section */}
+            <div className="p-10 flex flex-col items-center">
+              <div className="relative group">
+                <div className="absolute -inset-4 bg-primary/5 rounded-[40px] blur-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="bg-white p-6 rounded-[40px] shadow-[0_0_50px_rgba(63,81,181,0.1)] border border-gray-100 relative z-10">
+                  <QRCodeCanvas
+                    value={GSIStore.getStudentQrData(user)}
+                    size={200}
+                    level="H"
+                    includeMargin={false}
+                    imageSettings={{
+                      src: "https://groupegsi.mg/favicon.ico",
+                      x: undefined,
+                      y: undefined,
+                      height: 40,
+                      width: 40,
+                      excavate: true,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-8 w-full space-y-3">
+                 <div className="flex items-center gap-3 text-[10px] font-bold text-gray-500 uppercase px-4 py-2 bg-gray-50 rounded-2xl">
+                    <MapPin size={14} className="text-primary" />
+                    <span>Campus: {user.campus}</span>
+                 </div>
+                 <div className="flex items-center gap-3 text-[10px] font-bold text-gray-500 uppercase px-4 py-2 bg-gray-50 rounded-2xl">
+                    <GraduationCap size={14} className="text-primary" />
+                    <span>{user.filiere} — {user.niveau}</span>
+                 </div>
+              </div>
+
+              <div className="mt-8 flex items-center gap-2 text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-6 py-2 rounded-full border border-emerald-100">
+                 <ShieldCheck size={12} />
+                 <span>Identité Vérifiée par GSI Cloud</span>
+              </div>
+
+              <p className="mt-6 text-center text-[8px] text-gray-400 font-bold uppercase tracking-widest leading-loose max-w-[200px]">
+                Présentez ce code pour la validation de présence ou l'accès aux services.
+              </p>
+            </div>
+
+            <div className="h-2 bg-primary w-full"></div>
           </div>
         </div>
       )}

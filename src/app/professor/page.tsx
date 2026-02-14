@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
-import { GSIStore, User, Lesson, Assignment, Grade, Announcement } from "@/lib/store";
+import { GSIStore, User, Lesson, Assignment, Grade, Announcement, Submission } from "@/lib/store";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,7 @@ export default function ProfessorPage() {
   const [students, setStudents] = useState<User[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -55,6 +56,7 @@ export default function ProfessorPage() {
       GSIStore.subscribeUsers((us) => { setStudents(us.filter(u => u.role === 'student')); setSyncStatus('ready'); }),
       GSIStore.subscribeLessons({}, (ls) => setLessons(ls)),
       GSIStore.subscribeAssignments({}, (as) => setAssignments(as)),
+      GSIStore.subscribeSubmissions(undefined, (ss) => setSubmissions(ss)),
       GSIStore.subscribeAnnouncements((as) => setAnnouncements(as))
     ];
 
@@ -226,6 +228,7 @@ export default function ProfessorPage() {
           <div className="grid grid-cols-2 gap-4">
             {[{id: "lessons", icon: BookOpen, label: "Publier Leçon", color: "bg-emerald-500"},
               {id: "assignments", icon: FileText, label: "Publier Devoir", color: "bg-orange-500"},
+              {id: "submissions", icon: CheckCircle, label: "Devoirs Reçus", color: "bg-blue-500"},
               {id: "grades", icon: BarChart3, label: "Notes", color: "bg-pink-500"},
               {id: "announcements", icon: Megaphone, label: "Annonce", color: "bg-orange-600"},
               {id: "media", icon: BookOpen, label: "Médiathèque", color: "bg-emerald-600"},
@@ -399,13 +402,73 @@ export default function ProfessorPage() {
           <div className="space-y-4">
             <PageHeader title="Mes Étudiants" onBack={() => setActiveTab("dashboard")} />
             {students.map((s, i) => (
-              <div key={i} className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4">
+              <div key={i} className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm">
                  <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center font-bold text-indigo-600 overflow-hidden">
                     {s.photo ? <img src={GSIStore.getAbsoluteUrl(s.photo)} className="w-full h-full object-cover" /> : s.fullName.charAt(0)}
                  </div>
                  <div className="flex-1"><h4 className="font-bold text-sm">{s.fullName}</h4><p className="text-[10px] text-gray-400 font-bold uppercase">{s.filiere} • {s.niveau}</p></div>
               </div>
             ))}
+          </div>
+        )}
+
+        {activeTab === "submissions" && (
+          <div className="space-y-4">
+             <PageHeader title="Devoirs Reçus" onBack={() => setActiveTab("dashboard")} />
+             <div className="space-y-3">
+                {submissions.map((s, i) => {
+                   const assignment = assignments.find(a => a.id === s.assignmentId);
+                   return (
+                      <div key={i} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
+                         <div className="flex justify-between items-start">
+                            <div>
+                               <h4 className="font-black text-xs uppercase text-indigo-600 mb-1">{s.studentName}</h4>
+                               <p className="text-[10px] font-bold text-gray-400 uppercase">{assignment?.title || "Devoir Inconnu"}</p>
+                            </div>
+                            <span className="text-[9px] font-black text-gray-300 uppercase">{new Date(s.date).toLocaleDateString()}</span>
+                         </div>
+
+                         <div className="flex gap-2">
+                            <button onClick={() => GSIStore.openPackFile(s.id, s.file)} className="flex-1 bg-gray-50 py-3 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2">
+                               <FileText size={14} /> Voir le travail
+                            </button>
+                            {s.score !== undefined ? (
+                               <button
+                                  onClick={() => {
+                                     const score = prompt("Modifier la note (sur 20) :", s.score?.toString());
+                                     if (score !== null && score !== "") {
+                                        const num = parseFloat(score);
+                                        if (isNaN(num)) return toast.error("Note invalide");
+                                        GSIStore.updateSubmission({ ...s, score: num });
+                                        toast.success("Note mise à jour !");
+                                     }
+                                  }}
+                                  className="px-4 py-3 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase border border-emerald-100 flex-1"
+                               >
+                                  Note: {s.score}/20 (Modifier)
+                               </button>
+                            ) : (
+                               <button
+                                  onClick={() => {
+                                     const score = prompt("Entrez la note (sur 20) :");
+                                     if (score !== null && score !== "") {
+                                        const num = parseFloat(score);
+                                        if (isNaN(num)) return toast.error("Note invalide");
+                                        GSIStore.updateSubmission({ ...s, score: num });
+                                        toast.success("Note enregistrée !");
+                                     }
+                                  }}
+                                  className="flex-1 bg-indigo-600 text-white py-3 rounded-xl text-[10px] font-black uppercase"
+                               >
+                                  Noter
+                               </button>
+                            )}
+                         </div>
+                      </div>
+                   );
+                })}
+                {submissions.length === 0 && <p className="text-center py-20 text-[10px] font-bold text-gray-300 uppercase italic">Aucun devoir rendu pour le moment</p>}
+             </div>
           </div>
         )}
       </div>

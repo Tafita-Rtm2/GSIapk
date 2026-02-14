@@ -7,9 +7,21 @@
    - Network:      http://192.168.0.2:9002
 
  ✓ Starting...
- ✓ Ready in 3.4s
- ○ Compiling /register ...
- ✓ Compiled /register in 9.7s
- GET /register 200 in 10623ms
- GET /register 200 in 263ms
-[?25h
+ ✓ Ready in 1982ms
+ ○ Compiling / ...
+ ✓ Compiled / in 11.7s
+ GET / 200 in 12733ms
+ GET / 200 in 647ms
+ ○ Compiling /login ...
+ GET / 200 in 805ms
+ ✓ Compiled /login in 2.7s
+ GET /login 200 in 1511ms
+ GET /login 200 in 157ms
+ GET /login 200 in 206ms
+ GET / 200 in 180ms
+ ○ Compiling /profile ...
+ ✓ Compiled /profile in 1344ms
+ GET /profile 200 in 1577ms
+ ○ Compiling /_not-found/page ...
+ ✓ Compiled /_not-found/page in 647ms
+ GET /logo.png 404 in 861ms

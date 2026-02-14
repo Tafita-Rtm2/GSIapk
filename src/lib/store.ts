@@ -245,7 +245,7 @@ class GSIStoreClass {
     const data = await this.apiCall(`/db/messages?q=${q}&s={"timestamp":-1}&l=60`);
     if (data && Array.isArray(data)) {
       const newMessages = data.reverse();
-      // Only update if something changed (simple length check or deep compare if needed)
+      // Only update if something changed
       if (JSON.stringify(newMessages) !== JSON.stringify(this.state.messages)) {
         this.state.messages = newMessages;
         this.notify('messages', this.state.messages);
@@ -259,9 +259,9 @@ class GSIStoreClass {
     if (redirectCount > 3) return null;
 
     // SMART CACHING:
-    // - 5 seconds for messages/chat
-    // - 2 minutes for academic data
-    const cacheTime = endpoint.includes('messages') ? 5000 : 120000;
+    // - 3 seconds for messages/chat
+    // - 5 minutes (300000ms) for stable academic data to maximize speed
+    const cacheTime = endpoint.includes('messages') ? 3000 : 300000;
 
     if (method === 'GET' && this.apiCache[endpoint] && (Date.now() - this.apiCache[endpoint].ts < cacheTime)) {
        return this.apiCache[endpoint].data;
@@ -532,6 +532,21 @@ class GSIStoreClass {
     return () => { this.listeners['reminders'] = this.listeners['reminders']?.filter(l => l !== cb); };
   }
 
+  subscribeSubmissions(assignmentId?: string, cb?: (ss: Submission[]) => void) {
+    const key = assignmentId ? `submissions_${assignmentId}` : 'submissions';
+    if (!this.listeners[key]) this.listeners[key] = [];
+    if (cb) this.listeners[key].push(cb);
+
+    const filter = (all: Submission[]) => {
+      if (assignmentId) return all.filter(s => s.assignmentId === assignmentId);
+      return all;
+    };
+
+    if (cb) cb(filter(this.state.submissions));
+    this.fetchCollection('submissions', 'submissions');
+    return () => { if (cb) this.listeners[key] = this.listeners[key]?.filter(l => l !== cb); };
+  }
+
   // --- ACTIONS ---
 
   async addUser(user: User) {
@@ -677,7 +692,21 @@ class GSIStoreClass {
   }
 
   async addSubmission(s: Submission) {
+    this.state.submissions = [s, ...this.state.submissions.filter(it => it.id !== s.id)];
+    this.save();
+    this.notify('submissions', this.state.submissions);
     await this.apiCall('/db/submissions', 'POST', s);
+  }
+
+  async updateSubmission(s: Submission) {
+    this.state.submissions = this.state.submissions.map(it => it.id === s.id ? s : it);
+    this.save();
+    this.notify('submissions', this.state.submissions);
+
+    const existing = await this.apiCall(`/db/submissions?q={"id":"${s.id}"}`);
+    if (existing && Array.isArray(existing) && existing.length > 0) {
+       await this.apiCall(`/db/submissions/${existing[0]._id}`, 'PATCH', s);
+    }
   }
 
   async addSchedule(schedule: StructuredSchedule) {
@@ -769,9 +798,29 @@ class GSIStoreClass {
 
   getAbsoluteUrl(url: string | undefined): string {
     if (!url) return "";
-    if (url.startsWith('http') || url.startsWith('data:') || url.startsWith('blob:')) return url;
+    // Robust URL handling: if it's already absolute, return as is.
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+       return url;
+    }
+    // Handle special case for files/view if it's a short relative path
+    if (url.startsWith('files/view/') || url.startsWith('api/files/view/')) {
+       return `${MEDIA_BASE}/${url.replace('api/', '')}`;
+    }
+    // For relative paths from the custom API
     const base = MEDIA_BASE;
     return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+  }
+
+  getStudentQrData(user: User): string {
+    const info = {
+      m: user.matricule || "GSI-TEMP",
+      n: user.fullName,
+      c: user.campus,
+      f: user.filiere,
+      l: user.niveau,
+      v: `https://groupegsi.mg/presence?id=${user.id}`
+    };
+    return JSON.stringify(info);
   }
 
   async uploadFile(file: File, path: string, onProgress?: (p: number) => void): Promise<string> {
