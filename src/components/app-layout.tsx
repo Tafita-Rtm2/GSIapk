@@ -119,7 +119,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Floating Action Button for Ask Insight */}
-      {!pathname.includes('chat') && (
+      {!pathname.includes('chat') && !pathname.includes('community') && (
         <Link
           href="/chat"
           className="absolute bottom-24 right-4 bg-accent text-white p-4 rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all z-20"

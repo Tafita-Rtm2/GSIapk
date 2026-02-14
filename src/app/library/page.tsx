@@ -11,6 +11,7 @@ import { toast } from "sonner";
 export default function LibraryPage() {
   const { t } = useLanguage();
   const [filter, setFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [books, setBooks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -125,17 +126,20 @@ export default function LibraryPage() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
-            placeholder="Rechercher un livre, un auteur..."
+            placeholder="Rechercher un cours ou devoir..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-gray-100 rounded-2xl py-3 pl-12 pr-4 outline-none text-sm focus:ring-2 ring-primary/20 transition-all"
           />
         </div>
 
-        {/* Categories */}
+        {/* Categories / Tabs */}
         <div className="flex gap-4 overflow-x-auto pb-4 mb-6 scrollbar-hide">
           <CategoryBadge label="Tous" active={filter === "all"} onClick={() => setFilter("all")} />
           <CategoryBadge label="Favoris" icon={Star} active={filter === "fav"} onClick={() => setFilter("fav")} />
-          <CategoryBadge label="Récents" icon={Clock} active={filter === "recent"} onClick={() => setFilter("recent")} />
           <CategoryBadge label="Cours" active={filter === "cours"} onClick={() => setFilter("cours")} />
+          <CategoryBadge label="Devoirs" active={filter === "devoir"} onClick={() => setFilter("devoir")} />
+          <CategoryBadge label="Récents" icon={Clock} active={filter === "recent"} onClick={() => setFilter("recent")} />
         </div>
 
         {/* Featured Section */}
@@ -153,9 +157,23 @@ export default function LibraryPage() {
         </div>
 
         {/* Book List */}
-        <h3 className="text-lg font-bold mb-4">Mes documents</h3>
+        <h3 className="text-lg font-bold mb-4">
+          {filter === "cours" ? "Mes Cours" : filter === "devoir" ? "Mes Devoirs" : "Mes documents"}
+        </h3>
         <div className="space-y-4">
-          {books.map((book) => (
+          {books
+            .filter(b => {
+              if (filter === "fav") return b.favorite;
+              if (filter === "cours") return b.type === "Leçon";
+              if (filter === "devoir") return b.type === "Devoir";
+              if (filter === "recent") return GSIStore.getProgress(b.id);
+              return true;
+            })
+            .filter(b =>
+              b.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              b.author.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+            .map((book) => (
             <div
               key={book.id}
               onClick={() => {

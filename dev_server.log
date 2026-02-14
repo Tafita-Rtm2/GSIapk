@@ -1,0 +1,29 @@
+
+> nextn@0.1.0 dev
+> next dev --turbopack -p 9002
+
+   ▲ Next.js 15.5.9 (Turbopack)
+   - Local:        http://localhost:9002
+   - Network:      http://192.168.0.2:9002
+
+ ✓ Starting...
+ ✓ Ready in 3.7s
+ ○ Compiling /login ...
+ ✓ Compiled /login in 10.9s
+ GET /login 200 in 12460ms
+ ○ Compiling /library ...
+ ✓ Compiled /library in 4.5s
+ GET /library 200 in 4771ms
+ GET /login 200 in 206ms
+ ○ Compiling / ...
+ ✓ Compiled / in 783ms
+ GET / 200 in 969ms
+ GET /login 200 in 162ms
+ GET /login 200 in 136ms
+ GET /login 200 in 113ms
+ GET /login 200 in 168ms
+ GET /library 200 in 184ms
+ GET /login 200 in 141ms
+ GET /login 200 in 182ms
+ GET /library 200 in 223ms
+ GET /login 200 in 159ms

@@ -832,7 +832,10 @@ class GSIStoreClass {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
-      formData.append('file', file);
+      // Ensure we pass the intended path if the server supports it
+      formData.append('file', file, file.name);
+      formData.append('path', path);
+
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable && onProgress) {
           onProgress((e.loaded / e.total) * 100);

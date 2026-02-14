@@ -358,21 +358,24 @@ export default function Home() {
                     onClick={() => {
                       const input = document.createElement('input');
                       input.type = 'file';
-                      input.onchange = (e: any) => {
+                      input.onchange = async (e: any) => {
                         const file = e.target.files[0];
                         if (file) {
-                          toast.promise(GSIStore.addSubmission({
-                            id: Math.random().toString(36).substr(2, 9),
-                            assignmentId: a.id,
-                            studentId: user.id,
-                            studentName: user.fullName,
-                            date: new Date().toISOString(),
-                            file: "File Uploaded (Simulated)"
-                          }), {
-                            loading: 'Envoi du devoir...',
-                            success: 'Devoir envoyé avec succès !',
-                            error: 'Erreur lors de l\'envoi'
-                          });
+                          const tid = toast.loading(`Téléversement de "${file.name}"...`);
+                          try {
+                            const fileUrl = await GSIStore.uploadFile(file, `submissions/${a.id}_${user.id}_${file.name}`);
+                            await GSIStore.addSubmission({
+                              id: Math.random().toString(36).substr(2, 9),
+                              assignmentId: a.id,
+                              studentId: user.id,
+                              studentName: user.fullName,
+                              date: new Date().toISOString(),
+                              file: fileUrl
+                            });
+                            toast.success("Devoir envoyé avec succès !", { id: tid });
+                          } catch (err: any) {
+                            toast.error("Échec de l'envoi : " + err.message, { id: tid });
+                          }
                         }
                       };
                       input.click();

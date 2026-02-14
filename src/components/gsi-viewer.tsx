@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as mammoth from 'mammoth';
-import { Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, ZoomIn, ZoomOut } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Configure PDF.js worker
@@ -22,6 +22,7 @@ interface GSIViewerProps {
 export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps) {
   const [loading, setLoading] = useState(true);
   const [pdfData, setPdfData] = useState<{ numPages: number; currentPage: number } | null>(null);
+  const [scale, setScale] = useState(1.5);
   const [docxHtml, setDocxHtml] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -42,7 +43,7 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
     }
   }, [url, type]);
 
-  const renderPdf = async (pageNum = 1) => {
+  const renderPdf = async (pageNum = 1, currentScale = scale) => {
     try {
       const response = await fetch(url);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -60,7 +61,7 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
       setPdfData({ numPages: pdf.numPages, currentPage: pageNum });
 
       const page = await pdf.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 1.5 });
+      const viewport = page.getViewport({ scale: currentScale });
 
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -138,6 +139,15 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
     }
   };
 
+  const handleZoom = (delta: number) => {
+     const newScale = Math.min(Math.max(scale + delta, 0.5), 4);
+     setScale(newScale);
+     if (type === 'pdf') {
+        setLoading(true);
+        renderPdf(pdfData?.currentPage || 1, newScale);
+     }
+  };
+
   return (
     <div className="w-full h-full flex flex-col bg-gray-50 overflow-hidden">
       {loading && (
@@ -150,20 +160,40 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
       <div className="flex-1 overflow-auto flex flex-col items-center p-4">
         {type === 'pdf' && (
           <div className="flex flex-col items-center">
-            <canvas ref={canvasRef} className="shadow-2xl rounded-sm max-w-full h-auto bg-white" />
-            {pdfData && (
-              <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-gray-900/90 text-white px-6 py-3 rounded-full flex items-center gap-6 backdrop-blur-md shadow-2xl border border-white/10 z-30">
-                <button onClick={() => changePage(-1)} disabled={pdfData.currentPage <= 1} className="disabled:opacity-20 active:scale-90 transition-all">
-                  <ChevronLeft size={24} />
+            <div className="overflow-auto max-w-full">
+               <canvas ref={canvasRef} className="shadow-2xl rounded-sm bg-white mx-auto" style={{ width: 'auto', height: 'auto' }} />
+            </div>
+
+            {/* Controls */}
+            <div className="fixed bottom-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-30">
+              {/* Zoom Controls */}
+              <div className="bg-white/90 backdrop-blur-md p-1.5 rounded-2xl flex gap-1 shadow-xl border border-gray-100">
+                <button onClick={() => handleZoom(-0.25)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all">
+                   <ZoomOut size={20} />
                 </button>
-                <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
-                  Page {pdfData.currentPage} / {pdfData.numPages}
-                </span>
-                <button onClick={() => changePage(1)} disabled={pdfData.currentPage >= pdfData.numPages} className="disabled:opacity-20 active:scale-90 transition-all">
-                  <ChevronRight size={24} />
+                <div className="px-3 flex items-center text-[10px] font-bold text-gray-400 border-x border-gray-100">
+                   {Math.round(scale * 100)}%
+                </div>
+                <button onClick={() => handleZoom(0.25)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all">
+                   <ZoomIn size={20} />
                 </button>
               </div>
-            )}
+
+              {/* Page Controls */}
+              {pdfData && (
+                <div className="bg-gray-900/90 text-white px-6 py-3 rounded-full flex items-center gap-6 backdrop-blur-md shadow-2xl border border-white/10">
+                  <button onClick={() => changePage(-1)} disabled={pdfData.currentPage <= 1} className="disabled:opacity-20 active:scale-90 transition-all">
+                    <ChevronLeft size={24} />
+                  </button>
+                  <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
+                    Page {pdfData.currentPage} / {pdfData.numPages}
+                  </span>
+                  <button onClick={() => changePage(1)} disabled={pdfData.currentPage >= pdfData.numPages} className="disabled:opacity-20 active:scale-90 transition-all">
+                    <ChevronRight size={24} />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -187,13 +217,30 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
         )}
 
         {type === 'image' && (
-          <img
-            src={url}
-            className="max-w-full h-auto rounded-2xl shadow-xl"
-            alt="Document"
-            onLoad={() => { setLoading(false); onLoadComplete?.(); }}
-            onError={() => { setLoading(false); onError?.("Échec du chargement de l'image."); }}
-          />
+          <div className="flex flex-col items-center gap-4">
+            <div className="overflow-auto max-w-full rounded-2xl shadow-xl">
+               <img
+                 src={url}
+                 style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }}
+                 className="h-auto transition-transform duration-200"
+                 alt="Document"
+                 onLoad={() => { setLoading(false); onLoadComplete?.(); }}
+                 onError={() => { setLoading(false); onError?.("Échec du chargement de l'image."); }}
+               />
+            </div>
+            {/* Zoom Controls for Image */}
+            <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md p-1.5 rounded-2xl flex gap-1 shadow-xl border border-gray-100 z-30">
+                <button onClick={() => handleZoom(-0.25)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all">
+                   <ZoomOut size={20} />
+                </button>
+                <div className="px-3 flex items-center text-[10px] font-bold text-gray-400 border-x border-gray-100">
+                   {Math.round(scale / 1.5 * 100)}%
+                </div>
+                <button onClick={() => handleZoom(0.25)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all">
+                   <ZoomIn size={20} />
+                </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

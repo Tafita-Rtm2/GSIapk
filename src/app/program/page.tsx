@@ -32,7 +32,8 @@ export default function ProgramPage() {
       time: formData.get('time') as string,
       subject: formData.get('subject') as string,
       notes: formData.get('notes') as string,
-      completed: editingReminder?.completed || false
+      completed: editingReminder?.completed || false,
+      isAlarm: true
     };
 
     if (editingReminder) {

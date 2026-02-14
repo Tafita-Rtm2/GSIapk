@@ -15,6 +15,7 @@ export default function SubjectsPage() {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
 
   useEffect(() => {
     const user = GSIStore.getCurrentUser();
@@ -153,17 +154,47 @@ export default function SubjectsPage() {
                              </button>
                            )}
                            <button
+                              disabled={isSubmitting === a.id}
                               onClick={() => {
                                  const input = document.createElement('input');
                                  input.type = 'file';
-                                 input.onchange = (e: any) => {
-                                    if(e.target.files[0]) toast.success("Devoir prêt pour l'envoi !");
+                                 input.onchange = async (e: any) => {
+                                    const file = e.target.files[0];
+                                    if(!file) return;
+
+                                    const user = GSIStore.getCurrentUser();
+                                    if(!user) return toast.error("Veuillez vous reconnecter.");
+
+                                    setIsSubmitting(a.id);
+                                    const tid = toast.loading(`Téléversement de "${file.name}"...`);
+
+                                    try {
+                                       const fileUrl = await GSIStore.uploadFile(file, `submissions/${a.id}_${user.id}_${file.name}`);
+
+                                       await GSIStore.addSubmission({
+                                          id: Math.random().toString(36).substr(2, 9),
+                                          assignmentId: a.id,
+                                          studentId: user.id,
+                                          studentName: user.fullName,
+                                          date: new Date().toISOString(),
+                                          file: fileUrl
+                                       });
+
+                                       toast.success("Devoir envoyé avec succès !", { id: tid });
+                                    } catch (err: any) {
+                                       toast.error("Échec de l'envoi : " + err.message, { id: tid });
+                                    } finally {
+                                       setIsSubmitting(null);
+                                    }
                                  };
                                  input.click();
                               }}
-                              className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100"
+                              className={cn(
+                                "flex-1 py-3 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 disabled:opacity-50 disabled:animate-pulse",
+                                isSubmitting === a.id && "bg-indigo-400"
+                              )}
                            >
-                              Déposer
+                              {isSubmitting === a.id ? "Envoi..." : "Déposer"}
                            </button>
                         </div>
                      </div>
