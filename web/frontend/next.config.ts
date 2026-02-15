@@ -3,6 +3,8 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   /* config options here */
   output: 'export', // AJOUTÉ : Indispensable pour l'APK
+  basePath: '/web', // AJOUTÉ : Pour que le site fonctionne dans le sous-dossier /web
+  assetPrefix: '/web', // AJOUTÉ : Pour que les assets se chargent correctement
   transpilePackages: ['@genkit-ai/next'],
   typescript: {
     ignoreBuildErrors: false,
