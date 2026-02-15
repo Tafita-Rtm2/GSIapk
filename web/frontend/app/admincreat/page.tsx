@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Camera, ShieldCheck } from "lucide-react";
+import { ShieldCheck, Camera, Sparkles } from "lucide-react";
 import { GSIStore, User } from "@/lib/store";
 import { toast } from "sonner";
 import { CAMPUSES, CAMPUS_FILIERES, NIVEAUX } from "@/lib/constants";
@@ -20,24 +20,30 @@ export default function AdminCreatPage() {
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Use the credentials to set the Authorization header for future calls
+    // We store the credentials in localStorage to be used in GSIStore.adminCreateStudent
+    // The actual verification happens on the server side when the first API call is made.
     localStorage.setItem('gsi_admin_auth', btoa(`${adminAuth.user}:${adminAuth.pass}`));
     setIsAuthorized(true);
-    toast.success("Vérification en cours lors de la création...");
+    toast.success("Mode administrateur activé. La validité sera vérifiée lors de la création.");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await GSIStore.addUser({ ...formData, id: Math.random().toString(36).substr(2, 9), role: 'student' } as User);
+      const res = await GSIStore.adminCreateStudent({
+        ...formData,
+        id: Math.random().toString(36).substr(2, 9),
+        role: 'student'
+      } as User);
+
       if (res && !res.error) {
         toast.success("Compte étudiant créé avec succès !");
         setFormData({ ...formData, fullName: "", email: "", password: "", matricule: "", contact: "", photo: "" });
       } else {
-        toast.error("Erreur: Accès refusé ou données invalides.");
+        toast.error(res.error || "Erreur lors de la création.");
       }
-    } catch (error) { toast.error("Échec de la connexion au serveur."); }
+    } catch (error) { toast.error("Erreur de connexion."); }
     finally { setLoading(false); }
   };
 
@@ -52,7 +58,7 @@ export default function AdminCreatPage() {
           <form onSubmit={handleAdminLogin} className="space-y-4">
             <input type="text" className="w-full bg-gray-50 border rounded-xl p-4 outline-none" placeholder="Nom Administrateur" value={adminAuth.user} onChange={(e) => setAdminAuth({...adminAuth, user: e.target.value})} required />
             <input type="password" className="w-full bg-gray-50 border rounded-xl p-4 outline-none" placeholder="Mot de passe" value={adminAuth.pass} onChange={(e) => setAdminAuth({...adminAuth, pass: e.target.value})} required />
-            <button className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors">Entrer</button>
+            <button className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold">Entrer</button>
           </form>
         </div>
       </div>
@@ -62,29 +68,29 @@ export default function AdminCreatPage() {
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 p-6 font-sans">
       <header className="flex justify-between items-center mb-8 max-w-2xl mx-auto w-full">
-        <h1 className="text-xl font-bold">Nouveau Compte Étudiant</h1>
+        <h1 className="text-xl font-bold text-gray-800">Nouveau Compte Étudiant</h1>
         <button onClick={() => { setIsAuthorized(false); localStorage.removeItem('gsi_admin_auth'); }} className="text-red-500 font-bold">Déconnexion</button>
       </header>
       <main className="max-w-2xl mx-auto w-full bg-white rounded-3xl p-8 shadow-sm">
         <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input type="text" placeholder="Nom Complet" className="border p-4 rounded-xl outline-none focus:ring-2 ring-primary/20" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} required />
-                <input type="email" placeholder="Email GSI" className="border p-4 rounded-xl outline-none focus:ring-2 ring-primary/20" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required />
-                <input type="text" placeholder="Matricule" className="border p-4 rounded-xl outline-none focus:ring-2 ring-primary/20" value={formData.matricule} onChange={e => setFormData({...formData, matricule: e.target.value})} required />
-                <input type="tel" placeholder="Contact" className="border p-4 rounded-xl outline-none focus:ring-2 ring-primary/20" value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} required />
-                <input type="text" placeholder="Mot de passe par défaut" className="border p-4 rounded-xl outline-none focus:ring-2 ring-primary/20" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} required />
-                <select className="border p-4 rounded-xl outline-none" value={formData.campus} onChange={e => setFormData({...formData, campus: e.target.value, filiere: CAMPUS_FILIERES[e.target.value][0]})}>
+                <input type="text" placeholder="Nom Complet" className="border p-4 rounded-xl" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} required />
+                <input type="email" placeholder="Email GSI" className="border p-4 rounded-xl" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required />
+                <input type="text" placeholder="Matricule" className="border p-4 rounded-xl" value={formData.matricule} onChange={e => setFormData({...formData, matricule: e.target.value})} required />
+                <input type="tel" placeholder="Contact" className="border p-4 rounded-xl" value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} required />
+                <input type="text" placeholder="Mot de passe par défaut" className="border p-4 rounded-xl" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} required />
+                <select className="border p-4 rounded-xl" value={formData.campus} onChange={e => setFormData({...formData, campus: e.target.value, filiere: CAMPUS_FILIERES[e.target.value][0]})}>
                     {CAMPUSES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
-                <select className="border p-4 rounded-xl outline-none" value={formData.filiere} onChange={e => setFormData({...formData, filiere: e.target.value})}>
+                <select className="border p-4 rounded-xl" value={formData.filiere} onChange={e => setFormData({...formData, filiere: e.target.value})}>
                     {CAMPUS_FILIERES[formData.campus].map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
-                <select className="border p-4 rounded-xl outline-none" value={formData.niveau} onChange={e => setFormData({...formData, niveau: e.target.value})}>
+                <select className="border p-4 rounded-xl" value={formData.niveau} onChange={e => setFormData({...formData, niveau: e.target.value})}>
                     {NIVEAUX.map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
             </div>
-            <button type="submit" disabled={loading} className="w-full bg-primary text-white py-5 rounded-2xl font-bold shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50">
-                {loading ? "Création en cours..." : "Créer le profil élève"}
+            <button type="submit" disabled={loading} className="w-full bg-primary text-white py-4 rounded-xl font-bold shadow-lg disabled:opacity-50">
+                {loading ? "Création..." : "Créer le profil élève"}
             </button>
         </form>
       </main>

@@ -1,28 +1,30 @@
-# GSI Insight - Web Version (Structure Simplifiée)
+# GSI Insight - Web Version
 
-Cette version web est optimisée pour un déploiement simple sur cPanel.
+Cette version web est synchronisée avec la même base de données que l'APK.
 
-## Organisation
-- **backend/** : Contient l'API Node.js (`server.js`).
-- **frontend/** : Contient l'application web (`app/`, `components/`, etc.).
+## Structure
+- **web/** : Dossier racine du projet web.
+  - **server.js** : Le serveur Node.js (Proxy & Serveur Statique).
+  - **package.json** : Dépendances du serveur.
+  - **.env** : Configuration (Port, Admin pass).
+  - **frontend/** : Le code source de l'application Next.js (Version simplifiée).
 
-## Déploiement cPanel
+## Déploiement
 
-### 1. Le Backend (API)
-- Uploadez le dossier `backend` sur votre serveur.
+### 1. Le Serveur (Backend)
+- Allez dans le dossier `web`.
 - Installez les paquets : `npm install`.
-- Configurez le `.env` avec votre base MongoDB.
-- Utilisez le menu "Setup Node.js App" de cPanel et pointez sur `backend/server.js`.
+- Sur cPanel : Utilisez "Setup Node.js App" et pointez sur `web/server.js`.
 
-### 2. Le Frontend (Site)
-- Allez dans `frontend`.
-- Générez le site : `npm run build`.
-- Un dossier `out` sera créé. Copiez tout son contenu dans le dossier `public_html` de votre hébergement.
+### 2. Le Site (Frontend)
+- Allez dans `web/frontend`.
+- Installez : `npm install`.
+- Générez le build : `npm run build`.
+- Copiez le contenu de `web/frontend/out` vers le dossier public de votre serveur (ex: `public_html`).
 
-## Accès Administrateur
-La création des élèves se fait sur : `votre-site.com/admincreat`
-- Utilisez vos identifiants administrateur pour valider la création sur le serveur.
-- L'inscription publique est désactivée.
-
-## Mobile & Offline
-Le site propose automatiquement une installation sur l'écran d'accueil du téléphone et fonctionne partiellement hors-ligne.
+## Notes Importantes
+- **Base de données** : Utilise l'API GSI existante (https://groupegsi.mg/rtmggmg/api).
+- **Création Élève** : Uniquement via `/admincreat`.
+  - Login par défaut : `GSI-MG`
+  - Pass par défaut : `GSI-Madagascar`
+- **PWA** : Le site propose automatiquement l'installation sur mobile.

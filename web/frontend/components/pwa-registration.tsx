@@ -50,7 +50,7 @@ export function PWARegistration() {
             <p className="text-[9px] font-bold text-gray-400 uppercase">Sur votre écran d'accueil</p>
           </div>
         </div>
-        <button onClick={handleInstallClick} className="bg-gray-900 text-white px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95">
+        <button onClick={handleInstallClick} className="bg-gray-900 text-white px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest">
           Installer
         </button>
       </div>
