@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 // Configure PDF.js worker
 // Use a check to ensure we are in a browser environment
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/web/pdf.worker.min.mjs';
 }
 
 interface GSIViewerProps {
