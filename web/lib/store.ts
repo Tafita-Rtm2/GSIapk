@@ -23,10 +23,25 @@ export interface Assignment { id: string; title: string; description: string; su
 export interface Submission { id: string; assignmentId: string; studentId: string; studentName: string; date: string; file: string; score?: number; feedback?: string; _id?: string; }
 export interface Grade { id: string; studentId: string; studentName: string; subject: string; score: number; maxScore: number; date: string; niveau: string; filiere: string; _id?: string; }
 export interface Announcement { id: string; title: string; message: string; date: string; author: string; type?: 'info' | 'convocation'; targetUserId?: string; campus?: string[]; filiere?: string[]; niveau?: string; _id?: string; }
-export interface ChatMessage { id: string; senderId: string; senderName: string; senderPhoto?: string; text: string; replyTo?: { senderName: string; text: string; }; timestamp: string; filiere: string; niveau: string; _id?: string; }
-export interface Reminder { id: string; title: string; date: string; time: string; subject: string; notes?: string; completed: boolean; isAlarm?: boolean; }
-export interface ScheduleSlot { day: string; startTime: string; endTime: string; subject: string; room: string; instructor: string; color?: string; }
-export interface StructuredSchedule { id: string; campus: string; niveau: string; lastUpdated: string; slots: ScheduleSlot[]; url?: string; fileUrl?: string; data?: any; _id?: string; }
+
+export interface ChatMessage {
+  id: string; senderId: string; senderName: string; senderPhoto?: string; text: string;
+  replyTo?: { senderName: string; text: string; };
+  timestamp: string; filiere: string; niveau: string; _id?: string;
+}
+
+export interface Reminder {
+  id: string; title: string; date: string; time: string; subject: string; notes?: string; completed: boolean; isAlarm?: boolean;
+}
+
+export interface ScheduleSlot {
+  day: string; startTime: string; endTime: string; subject: string; room: string; instructor: string; color?: string;
+}
+
+export interface StructuredSchedule {
+  id: string; campus: string; niveau: string; lastUpdated: string; slots: ScheduleSlot[];
+  url?: string; fileUrl?: string; data?: any; _id?: string;
+}
 
 interface State {
   currentUser: User | null;
@@ -41,7 +56,9 @@ interface State {
   reminders: Reminder[];
 }
 
-const initialState: State = { currentUser: null, users: [], lessons: [], assignments: [], submissions: [], grades: [], announcements: [], schedules: {}, messages: [], reminders: [] };
+const initialState: State = {
+  currentUser: null, users: [], lessons: [], assignments: [], submissions: [], grades: [], announcements: [], schedules: {}, messages: [], reminders: []
+};
 
 class GSIStoreClass {
   private state: State = { ...initialState };
@@ -101,7 +118,7 @@ class GSIStoreClass {
     setInterval(() => { if (this.state.currentUser) this.fetchChatMessages(); }, 8000);
   }
 
-  private async syncAll() {
+  public async syncAll() {
      return Promise.all([
        this.fetchCollection('users', 'users'),
        this.fetchCollection('lessons', 'lessons'),
@@ -130,11 +147,9 @@ class GSIStoreClass {
   private async apiCall(endpoint: string, method = 'GET', body?: any): Promise<any> {
     const cacheTime = endpoint.includes('messages') ? 3000 : 300000;
     if (method === 'GET' && this.apiCache[endpoint] && (Date.now() - this.apiCache[endpoint].ts < cacheTime)) return this.apiCache[endpoint].data;
-
     this.syncingCount++;
     this.notify('sync_status', true);
     const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
-
     try {
       let response: any;
       if (Capacitor.isNativePlatform()) {
@@ -192,7 +207,18 @@ class GSIStoreClass {
     return null;
   }
 
-  // --- ADMIN METHODS (WEB ONLY) ---
+  async register(user: User): Promise<User | null> {
+    const res = await this.apiCall('/db/users', 'POST', user);
+    if (res) { const final = { ...user, ...res }; this.setCurrentUser(final); return final; }
+    return null;
+  }
+
+  async resetPassword(email: string): Promise<boolean> {
+     const q = encodeURIComponent(JSON.stringify({ email }));
+     const data = await this.apiCall(`/db/users?q=${q}`);
+     return !!(data && data.length > 0);
+  }
+
   async adminCreateStudent(user: User): Promise<any> {
     const auth = localStorage.getItem('gsi_admin_auth');
     try {
@@ -205,34 +231,34 @@ class GSIStoreClass {
     } catch (e) { return { error: "Connection error" }; }
   }
 
-  logout() { this.setCurrentUser(null); }
   getCurrentUser() { return this.state.currentUser; }
   setCurrentUser(user: User | null) { this.state.currentUser = user; this.save(); this.notify('auth', user); }
-  subscribe(cb: any) { return this.subscribeAuth(cb); }
-  subscribeAuth(cb: any) { if (!this.listeners['auth']) this.listeners['auth'] = []; this.listeners['auth'].push(cb); cb(this.state.currentUser); return () => { this.listeners['auth'] = this.listeners['auth']?.filter(l => l !== cb); }; }
-  subscribeUsers(cb: any) { if (!this.listeners['users']) this.listeners['users'] = []; this.listeners['users'].push(cb); cb(this.state.users); this.fetchCollection('users', 'users'); return () => { this.listeners['users'] = this.listeners['users']?.filter(l => l !== cb); }; }
-  subscribeLessons(filter: any, cb: any) {
+  logout() { this.setCurrentUser(null); }
+  subscribe(cb: (u: User | null) => void) { return this.subscribeAuth(cb); }
+  subscribeAuth(cb: (u: User | null) => void) { if (!this.listeners['auth']) this.listeners['auth'] = []; this.listeners['auth'].push(cb); cb(this.state.currentUser); return () => { this.listeners['auth'] = this.listeners['auth']?.filter(l => l !== cb); }; }
+  subscribeUsers(cb: (us: User[]) => void) { if (!this.listeners['users']) this.listeners['users'] = []; this.listeners['users'].push(cb); cb(this.state.users); this.fetchCollection('users', 'users'); return () => { this.listeners['users'] = this.listeners['users']?.filter(l => l !== cb); }; }
+  subscribeLessons(filter: any, cb: (ls: Lesson[]) => void) {
     const subKey = filter.niveau ? `lessons_${filter.niveau}` : 'lessons';
     if (!this.listeners[subKey]) this.listeners[subKey] = [];
     const wrapper = (data: Lesson[]) => cb(filter.niveau ? data.filter((l: any) => l.niveau === filter.niveau) : data);
     this.listeners[subKey].push(wrapper); wrapper(this.state.lessons); this.fetchCollection('lessons', 'lessons');
     return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== wrapper); };
   }
-  subscribeAssignments(filter: any, cb: any) {
+  subscribeAssignments(filter: any, cb: (as: Assignment[]) => void) {
     const subKey = filter.niveau ? `assignments_${filter.niveau}` : 'assignments';
     if (!this.listeners[subKey]) this.listeners[subKey] = [];
     const wrapper = (data: Assignment[]) => cb(filter.niveau ? data.filter((a: any) => a.niveau === filter.niveau) : data);
     this.listeners[subKey].push(wrapper); wrapper(this.state.assignments); this.fetchCollection('assignments', 'assignments');
     return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== wrapper); };
   }
-  subscribeAnnouncements(cb: any) { if (!this.listeners['announcements']) this.listeners['announcements'] = []; this.listeners['announcements'].push(cb); cb(this.state.announcements); this.fetchCollection('announcements', 'announcements'); return () => { this.listeners['announcements'] = this.listeners['announcements']?.filter(l => l !== cb); }; }
-  subscribeGrades(studentId: string, cb: any) {
+  subscribeAnnouncements(cb: (as: Announcement[]) => void) { if (!this.listeners['announcements']) this.listeners['announcements'] = []; this.listeners['announcements'].push(cb); cb(this.state.announcements); this.fetchCollection('announcements', 'announcements'); return () => { this.listeners['announcements'] = this.listeners['announcements']?.filter(l => l !== cb); }; }
+  subscribeGrades(studentId: string, cb: (gs: Grade[]) => void) {
     const subKey = `grades_${studentId}`;
     if (!this.listeners[subKey]) this.listeners[subKey] = [];
     this.listeners[subKey].push(cb); cb(this.state.grades.filter((g: any) => g.studentId === studentId)); this.fetchCollection('grades', 'grades', `?q={"studentId":"${studentId}"}`);
     return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
   }
-  subscribeLatestSchedule(campus: string, niveau: string, cb: any) {
+  subscribeLatestSchedule(campus: string, niveau: string, cb: (s: StructuredSchedule | null) => void) {
     const sKey = campus && niveau ? `${campus}_${niveau}` : 'all';
     const subKey = `schedule_${sKey}`;
     if (!this.listeners[subKey]) this.listeners[subKey] = [];
@@ -241,10 +267,10 @@ class GSIStoreClass {
     else { cb(this.state.schedules[sKey] || null); this.fetchCollection('schedules', 'schedules', `?q={"campus":"${campus}","niveau":"${niveau}"}`); }
     return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
   }
-  subscribeMessages(cb: any) { if (!this.listeners['messages']) this.listeners['messages'] = []; this.listeners['messages'].push(cb); cb(this.state.messages); this.fetchChatMessages(); return () => { this.listeners['messages'] = this.listeners['messages']?.filter(l => l !== cb); }; }
-  subscribeSyncStatus(cb: any) { if (!this.listeners['sync_status']) this.listeners['sync_status'] = []; this.listeners['sync_status'].push(cb); cb(this.syncingCount > 0); return () => { this.listeners['sync_status'] = this.listeners['sync_status']?.filter(l => l !== cb); }; }
-  subscribeReminders(cb: any) { if (!this.listeners['reminders']) this.listeners['reminders'] = []; this.listeners['reminders'].push(cb); cb(this.state.reminders); return () => { this.listeners['reminders'] = this.listeners['reminders']?.filter(l => l !== cb); }; }
-  subscribeSubmissions(assignmentId?: string, cb?: any) {
+  subscribeMessages(cb: (ms: ChatMessage[]) => void) { if (!this.listeners['messages']) this.listeners['messages'] = []; this.listeners['messages'].push(cb); cb(this.state.messages); this.fetchChatMessages(); return () => { this.listeners['messages'] = this.listeners['messages']?.filter(l => l !== cb); }; }
+  subscribeSyncStatus(cb: (s: boolean) => void) { if (!this.listeners['sync_status']) this.listeners['sync_status'] = []; this.listeners['sync_status'].push(cb); cb(this.syncingCount > 0); return () => { this.listeners['sync_status'] = this.listeners['sync_status']?.filter(l => l !== cb); }; }
+  subscribeReminders(cb: (rs: Reminder[]) => void) { if (!this.listeners['reminders']) this.listeners['reminders'] = []; this.listeners['reminders'].push(cb); cb(this.state.reminders); return () => { this.listeners['reminders'] = this.listeners['reminders']?.filter(l => l !== cb); }; }
+  subscribeSubmissions(assignmentId?: string, cb?: (ss: Submission[]) => void) {
     const key = assignmentId ? `submissions_${assignmentId}` : 'submissions';
     if (!this.listeners[key]) this.listeners[key] = [];
     if (cb) { this.listeners[key].push(cb); cb(assignmentId ? this.state.submissions.filter(s => s.assignmentId === assignmentId) : this.state.submissions); }
@@ -253,6 +279,7 @@ class GSIStoreClass {
   }
 
   async addUser(user: User) { await this.apiCall('/db/users', 'POST', user); this.fetchCollection('users', 'users'); }
+  async updateUser(user: User) { if (user._id) await this.apiCall(`/db/users/${user._id}`, 'PATCH', user); this.fetchCollection('users', 'users'); }
   async deleteUser(id: string) {
     const u = this.state.users.find(x => x.id === id);
     if (u?._id) await this.apiCall(`/db/users/${u._id}`, 'DELETE');
@@ -283,7 +310,13 @@ class GSIStoreClass {
     this.fetchCollection('grades', 'grades');
   }
   async addSubmission(s: Submission) { await this.apiCall('/db/submissions', 'POST', s); this.fetchCollection('submissions', 'submissions'); }
+  async updateSubmission(s: Submission) {
+    const existing = await this.apiCall(`/db/submissions?q={"id":"${s.id}"}`);
+    if (existing?.[0]?._id) await this.apiCall(`/db/submissions/${existing[0]._id}`, 'PATCH', s);
+    this.fetchCollection('submissions', 'submissions');
+  }
   async addSchedule(s: StructuredSchedule) { await this.apiCall('/db/schedules', 'POST', s); this.fetchCollection('schedules', 'schedules'); }
+  async deleteSchedule(id: string) { await this.apiCall(`/db/schedules/${id}`, 'DELETE'); this.fetchCollection('schedules', 'schedules'); }
   async sendMessage(text: string, replyTo?: any) {
     if (!this.state.currentUser) return;
     const msg = { id: Math.random().toString(36).substr(2, 9), senderId: this.state.currentUser.id, senderName: this.state.currentUser.fullName, text, replyTo, timestamp: new Date().toISOString(), filiere: this.state.currentUser.filiere, niveau: this.state.currentUser.niveau };
@@ -297,26 +330,50 @@ class GSIStoreClass {
     return `${MEDIA_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
   }
 
-  async uploadFile(file: File, path: string): Promise<string> {
+  getStudentQrData(user: User): string {
+    return JSON.stringify({ m: user.matricule, n: user.fullName, c: user.campus, f: user.filiere, l: user.niveau, v: `https://groupegsi.mg/presence?id=${user.id}` });
+  }
+
+  async uploadFile(file: File, path: string, onProgress?: (p: number) => void): Promise<string> {
     const formData = new FormData(); formData.append('file', file, file.name); formData.append('path', path);
+    if (onProgress) onProgress(100);
     const res = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
     const data = await res.json(); return data.url;
   }
 
   async openPackFile(lessonId: string, url: string): Promise<void> {
-    const absoluteUrl = this.getAbsoluteUrl(url);
-    window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: absoluteUrl, type: 'pdf' } }));
+    window.dispatchEvent(new CustomEvent('gsi-open-viewer', { detail: { url: this.getAbsoluteUrl(url), type: 'pdf' } }));
   }
 
-  getCache(key: string) { return (this.state as any)[key]; }
-  setCache(key: string, data: any) { (this.state as any)[key] = data; this.save(); }
+  async downloadPackFile(url: string, title: string, id: string): Promise<string> { return this.getAbsoluteUrl(url); }
 
-  // Stubs for remaining missing methods to avoid crashes
-  async addReminder(r: any) { this.state.reminders.push(r); this.save(); this.notify('reminders', this.state.reminders); }
-  async updateReminder(r: any) { this.state.reminders = this.state.reminders.map(it => it.id === r.id ? r : it); this.save(); this.notify('reminders', this.state.reminders); }
-  async deleteReminder(id: string) { this.state.reminders = this.state.reminders.filter(it => it.id !== id); this.save(); this.notify('reminders', this.state.reminders); }
-  getProgress(id: string) { return null; }
+  getCache<T = any>(key: string): T | null { return (this.state as any)[key] || null; }
+  setCache(key: string, data: any) { (this.state as any)[key] = data; this.save(); }
+  async getUsers() { return this.state.users; }
+  async getLessons() { return this.state.lessons; }
+  async getAssignments() { return this.state.assignments; }
+  async getGrades() { return this.state.grades; }
+  async getAnnouncements() { return this.state.announcements; }
+  async getUser(id: string, force = false): Promise<User | null> {
+     const local = this.state.users.find(u => u.id === id);
+     if (local && !force) return local;
+     const data = await this.apiCall(`/db/users?q={"id":"${id}"}`);
+     return data?.[0] || local || null;
+  }
+  saveProgress(id: string, data: any) {
+     const saved = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
+     saved[id] = { ...saved[id], ...data };
+     localStorage.setItem('gsi_progress', JSON.stringify(saved));
+  }
+  getProgress(id: string) { return JSON.parse(localStorage.getItem('gsi_progress') || '{}')[id] || null; }
   isDownloaded(id: string) { return false; }
+  toggleLessonCompleted(id: string) {
+     const p = this.getProgress(id) || {};
+     this.saveProgress(id, { completed: !p.completed });
+  }
+  async addReminder(r: Reminder) { this.state.reminders.push(r); this.save(); this.notify('reminders', this.state.reminders); }
+  async updateReminder(r: Reminder) { this.state.reminders = this.state.reminders.map(it => it.id === r.id ? r : it); this.save(); this.notify('reminders', this.state.reminders); }
+  async deleteReminder(id: string) { this.state.reminders = this.state.reminders.filter(it => it.id !== id); this.save(); this.notify('reminders', this.state.reminders); }
 }
 
 export const GSIStore = new GSIStoreClass();
