@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
 
-    const publicPaths = ["/login", "/register", "/admincreat"];
+    const publicPaths = ["/login", "/register"];
     const isPublicPath = publicPaths.includes(pathname);
 
     if (user && isPublicPath) {

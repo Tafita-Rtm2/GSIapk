@@ -23,13 +23,12 @@ mongoose.connect(MONGODB_URI)
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// Generic Dynamic Schema/Model
 const genericSchema = new mongoose.Schema({}, { strict: false, timestamps: true });
 const getModel = (collectionName) => {
   return mongoose.models[collectionName] || mongoose.model(collectionName, genericSchema, collectionName);
 };
 
-// --- AUTH HELPERS ---
+// --- AUTH HELPER ---
 const isAdmin = (req) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) return false;
@@ -49,11 +48,17 @@ app.get('/api/db/:collection', async (req, res) => {
     const { collection } = req.params;
     const { q, s, l, sk } = req.query;
 
-    // Safety: Protect users collection
+    // STRICT SECURITY: Users collection is never publicly listable.
+    // Students can only query for their OWN profile via login (filtering by email/id).
     if (collection === 'users' && !isAdmin(req)) {
-        // If not admin, only allow filtering by email/id (for login/profile)
-        // and NEVER return the whole list.
         if (!q) return res.status(403).json({ error: "Access denied" });
+        const queryParsed = JSON.parse(decodeURIComponent(q));
+        // Only allow searching by id or email for non-admins
+        const allowedKeys = ['id', 'email', '_id'];
+        const keys = Object.keys(queryParsed);
+        if (keys.some(k => !allowedKeys.includes(k))) {
+            return res.status(403).json({ error: "Restricted query" });
+        }
     }
 
     let query = {};
@@ -67,13 +72,7 @@ app.get('/api/db/:collection', async (req, res) => {
 
     const Model = getModel(collection);
     let dbQuery = Model.find(query);
-
-    if (s) {
-      try {
-        dbQuery = dbQuery.sort(JSON.parse(decodeURIComponent(s)));
-      } catch (e) {}
-    }
-
+    if (s) try { dbQuery = dbQuery.sort(JSON.parse(decodeURIComponent(s))); } catch (e) {}
     if (l) dbQuery = dbQuery.limit(parseInt(l));
     if (sk) dbQuery = dbQuery.skip(parseInt(sk));
 
@@ -88,13 +87,10 @@ app.get('/api/db/:collection', async (req, res) => {
 app.post('/api/db/:collection', async (req, res) => {
   try {
     const { collection } = req.params;
-
-    // Restricted collections
     const restricted = ['users', 'lessons', 'assignments', 'announcements', 'schedules'];
     if (restricted.includes(collection) && !isAdmin(req)) {
-      return res.status(403).json({ error: "Admin access required for this collection" });
+      return res.status(403).json({ error: "Admin access required" });
     }
-
     const Model = getModel(collection);
     const newItem = new Model(req.body);
     const saved = await newItem.save();
@@ -107,18 +103,13 @@ app.post('/api/db/:collection', async (req, res) => {
 // Generic Patch
 app.patch('/api/db/:collection/:id', async (req, res) => {
   try {
-    const { collection, id } = req.params;
-
-    // Only allow admin to patch important stuff
+    const { collection } = req.params;
     const restricted = ['users', 'lessons', 'assignments', 'announcements', 'schedules'];
     if (restricted.includes(collection) && !isAdmin(req)) {
-       // Exception: students might want to update their own profile?
-       // But user said "l'admin seule peux...", so let's stick to admin only for now.
        return res.status(403).json({ error: "Admin access required" });
     }
-
     const Model = getModel(collection);
-    const updated = await Model.findByIdAndUpdate(id, req.body, { new: true });
+    const updated = await Model.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -128,11 +119,9 @@ app.patch('/api/db/:collection/:id', async (req, res) => {
 // Generic Delete
 app.delete('/api/db/:collection/:id', async (req, res) => {
   try {
-    const { collection, id } = req.params;
     if (!isAdmin(req)) return res.status(403).json({ error: "Admin access required" });
-
-    const Model = getModel(collection);
-    await Model.findByIdAndDelete(id);
+    const Model = getModel(req.params.collection);
+    await Model.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -151,27 +140,20 @@ const storage = multer.diskStorage({
     cb(null, uniqueSuffix + '-' + file.originalname);
   }
 });
-
 const upload = multer({ storage });
 
 app.post('/api/upload', upload.single('file'), (req, res) => {
-  // We allow upload (students upload homework, profile photos)
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-
   const relativePath = path.join('uploads', req.body.path || '', req.file.filename);
   const viewUrl = `/files/view/${relativePath.replace(/\\/g, '/')}`;
   res.json({ url: viewUrl, viewUrl });
 });
 
-// Serve files
 app.get('/files/view/*', (req, res) => {
     const filePath = req.params[0];
     const fullPath = path.join(__dirname, filePath);
-    if (fs.existsSync(fullPath)) {
-        res.sendFile(fullPath);
-    } else {
-        res.status(404).send('File not found');
-    }
+    if (fs.existsSync(fullPath)) res.sendFile(fullPath);
+    else res.status(404).send('File not found');
 });
 
 app.listen(PORT, () => {

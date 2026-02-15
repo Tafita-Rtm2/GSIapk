@@ -1,36 +1,28 @@
-# GSI Insight - Version Web
+# GSI Insight - Web Version (Structure Simplifiée)
 
-Ce dossier contient la version web complète de l'application GSI Insight, avec son propre backend Node.js.
+Cette version web est optimisée pour un déploiement simple sur cPanel.
 
-## Structure
-- `backend/` : Serveur Node.js (Express + MongoDB) pour gérer les données et les fichiers.
-- `frontend/` : Application Next.js configurée pour le web.
+## Organisation
+- **backend/** : Contient l'API Node.js (`server.js`).
+- **frontend/** : Contient l'application web (`app/`, `components/`, etc.).
 
-## Installation et Déploiement
+## Déploiement cPanel
 
-### 1. Backend (Node.js)
-1. Allez dans `web/backend`.
-2. Installez les dépendances : `npm install`.
-3. Configurez le fichier `.env` avec votre URI MongoDB.
-4. Lancez le serveur : `npm start`.
-   - Sur cPanel, utilisez le "Setup Node.js App" et pointez sur `server.js`.
+### 1. Le Backend (API)
+- Uploadez le dossier `backend` sur votre serveur.
+- Installez les paquets : `npm install`.
+- Configurez le `.env` avec votre base MongoDB.
+- Utilisez le menu "Setup Node.js App" de cPanel et pointez sur `backend/server.js`.
 
-### 2. Frontend (Next.js)
-1. Allez dans `web/frontend`.
-2. Installez les dépendances : `npm install`.
-3. Configurez `.env.local` pour pointer vers l'URL de votre backend.
-4. Générez le build statique : `npm run build`.
-5. Le dossier `out` généré contient les fichiers statiques à uploader sur votre hébergement (ex: `public_html`).
+### 2. Le Frontend (Site)
+- Allez dans `frontend`.
+- Générez le site : `npm run build`.
+- Un dossier `out` sera créé. Copiez tout son contenu dans le dossier `public_html` de votre hébergement.
 
-## Fonctionnalités Spéciales
-- **Création Étudiant** : Accessible via `/admincreat`.
-  - Nom d'utilisateur par défaut : `GSI-MG`
-  - Mot de passe par défaut : `GSI-Madagascar`
-  - (Modifiable dans les variables d'environnement)
-- **Mode Hors-ligne (PWA)** : Le site peut être installé sur l'écran d'accueil du téléphone et fonctionne partiellement hors-ligne grâce au Service Worker.
-- **Base de données** : Utilise MongoDB (via Mongoose) pour correspondre à la structure de l'APK.
+## Accès Administrateur
+La création des élèves se fait sur : `votre-site.com/admincreat`
+- Utilisez vos identifiants administrateur pour valider la création sur le serveur.
+- L'inscription publique est désactivée.
 
-## Note sur cPanel
-Pour un déploiement optimal sur cPanel :
-1. Uploadez le contenu du dossier `frontend/out` à la racine de votre site (`public_html`).
-2. Créez une application Node.js pour le `backend` et assurez-vous que les ports et les URLs correspondent.
+## Mobile & Offline
+Le site propose automatiquement une installation sur l'écran d'accueil du téléphone et fonctionne partiellement hors-ligne.

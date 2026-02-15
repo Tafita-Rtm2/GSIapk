@@ -1,0 +1,61 @@
+name: Build Android APK
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Next.js Static Export
+        run: npm run build
+
+      - name: Setup Capacitor
+        run: |
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init "FirebaseStudio" "com.tafita.rtm2" --web-dir out
+          npx cap add android
+          npx cap copy android
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      # --- ÉTAPE CRUCIALE POUR RÉGLER TES ERREURS ---
+      - name: Force Duplicate Resolution
+        run: |
+          cd android
+          # Force l'utilisation d'une seule version de Kotlin pour tout le projet
+          echo "configurations.all {
+            resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+                if (details.requested.group == 'org.jetbrains.kotlin') {
+                    details.useVersion '1.9.10'
+                }
+            }
+          }" >> build.gradle
+
+          # Active Jetifier et AndroidX
+          echo "android.useAndroidX=true" >> gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
+
+      - name: Build Final APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: MaSuperApp-Debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
