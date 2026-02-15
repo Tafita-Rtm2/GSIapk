@@ -1,35 +1,28 @@
-# GSI Insight - Web Version
+# GSI Insight - Version Web (Installation Directe)
 
-Cette version web est synchronisée avec la même base de données que l'APK.
+Cette version a été simplifiée pour une installation directe sur cPanel.
 
-## Structure Simplifiée
-- **web/** : Dossier principal sur votre serveur.
-  - **server.js** : Le serveur Node.js (Proxy & Serveur Statique).
-  - **package.json** : Dépendances du serveur.
-  - **.env** : Configuration (Admin pass).
-  - **frontend/** : Le code source de l'application.
+## Structure
+- Tout est à la racine du dossier `web/`.
+- Le serveur Node.js (`server.js`) gère à la fois le site et la sécurité.
 
 ## Guide de Déploiement cPanel
 
-### 1. Installation du Serveur (Backend)
-- Uploadez le contenu du dossier `web/` sur votre serveur (ex: `/home/groupegs/domains/groupesgi.mg/web`).
-- Allez dans ce dossier et installez les paquets : `npm install`.
-- Sur cPanel : Utilisez "Setup Node.js App".
-  - **Application root** : `web`
-  - **Application URL** : `https://groupegsi.mg/web`
-  - **Application startup file** : `server.js`
+1.  **Préparation** : Supprimez tout le contenu actuel de votre dossier `web/` sur le serveur pour repartir sur une base propre.
+2.  **Upload** : Transférez tout le contenu de ce dossier `web/` vers votre serveur.
+3.  **Configuration Node.js** :
+    *   Dans cPanel, utilisez "Setup Node.js App".
+    *   **Application root** : `web`
+    *   **Application URL** : `https://groupegsi.mg/web`
+    *   **Application startup file** : `server.js`
+4.  **Installation et Build (Étape Cruciale)** :
+    *   Cliquez sur le bouton "Run JS Script" ou ouvrez le **Terminal** cPanel.
+    *   Tapez : `npm install`
+    *   Tapez : `npm run build`
+    *   Cette dernière commande va créer le dossier `out/`. C'est ce dossier qui contient le site réel.
+5.  **Relancer** : Redémarrez l'application Node.js depuis l'interface cPanel.
 
-### 2. Build du Site (Frontend)
-Le serveur a besoin que le site soit "construit" (build) pour pouvoir l'afficher.
-- Entrez dans le dossier `web/frontend/`.
-- Installez les dépendances : `npm install`.
-- **IMPORTANT** : Lancez la commande `npm run build`.
-- Un dossier nommé `out/` sera créé à l'intérieur de `frontend/`. Le serveur l'utilisera automatiquement.
-
-## Fonctionnalités
-- **Base de données** : Même que l'APK (https://groupegsi.mg/rtmggmg/api).
-- **Création Élève** : Uniquement via `https://groupegsi.mg/web/admincreat`.
-  - Login par défaut : `GSI-MG`
-  - Pass par défaut : `GSI-Madagascar`
-- **Installation Mobile (PWA)** : Propose l'ajout à l'écran d'accueil sur téléphone.
-- **Hébergement en sous-dossier** : Configuré pour fonctionner parfaitement dans `/web/`.
+## Notes de Sécurité
+Éditez le fichier `.env` à la racine pour changer les mots de passe admin si nécessaire.
+- `ADMIN_USER` : Login pour la création d'élèves.
+- `ADMIN_PASS` : Mot de passe pour la création d'élèves.

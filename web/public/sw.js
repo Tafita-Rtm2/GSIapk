@@ -1,8 +1,7 @@
 const CACHE_NAME = 'gsi-insight-web-v1';
 const ASSETS_TO_CACHE = [
   '/web/',
-  '/web/manifest.json',
-  '/web/icon-192.png'
+  '/web/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {

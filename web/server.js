@@ -13,14 +13,13 @@ const ADMIN_PASS = process.env.ADMIN_PASS;
 const MAIN_API_BASE = process.env.MAIN_API_BASE || "https://groupegsi.mg/rtmggmg/api";
 
 if (!ADMIN_USER || !ADMIN_PASS) {
-    console.error("FATAL: ADMIN_USER or ADMIN_PASS not set in .env");
+    console.warn("ATTENTION: ADMIN_USER ou ADMIN_PASS non défini dans .env");
 }
 
 app.use(cors());
 app.use(express.json());
 
 // --- ADMIN CREATION PROXY ---
-// On écoute sur /web/api/... pour correspondre au sous-dossier
 app.post(['/web/api/admin/create-student', '/api/admin/create-student'], async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ error: "Missing authorization" });
@@ -45,52 +44,38 @@ app.post(['/web/api/admin/create-student', '/api/admin/create-student'], async (
 
 // --- SERVE FRONTEND ---
 
-// Possible locations for the built site (the content of 'out' directory)
-const possibleDirs = [
-    path.join(__dirname, 'frontend', 'out'),
-    path.join(__dirname, 'out'),
-    path.join(__dirname, 'frontend')
-];
+// Le dossier 'out' est généré par la commande 'npm run build'
+const buildDir = path.join(__dirname, 'out');
 
-let buildDir = null;
-for (const dir of possibleDirs) {
-    if (fs.existsSync(path.join(dir, 'index.html'))) {
-        buildDir = dir;
-        console.log(`Using build directory: ${buildDir}`);
-        break;
-    }
-}
-
-if (buildDir) {
-    // On sert les fichiers statiques avec le préfixe /web et aussi à la racine au cas où
+if (fs.existsSync(path.join(buildDir, 'index.html'))) {
+    // On sert les fichiers statiques
     app.use('/web', express.static(buildDir));
     app.use(express.static(buildDir));
 
-    // Support for Next.js routing (SPA)
+    // Support pour le routage SPA (Single Page Application)
     app.get(['/web/*', '*'], (req, res) => {
-        // If it's an API call that wasn't caught, return 404
         if (req.url.includes('/api/')) return res.status(404).json({ error: "Not found" });
-
-        const indexPath = path.join(buildDir, 'index.html');
-        res.sendFile(indexPath);
+        res.sendFile(path.join(buildDir, 'index.html'));
     });
 } else {
+    // Page d'aide si le build n'est pas fait
     app.get('*', (req, res) => {
         res.status(200).send(`
-            <h1>GSI Web - Erreur de configuration</h1>
-            <p>Le dossier contenant le site (build) n'a pas été trouvé.</p>
-            <p><strong>Action requise :</strong></p>
-            <ol>
-                <li>Entrez dans le dossier <code>frontend/</code></li>
-                <li>Lancez la commande <code>npm install</code></li>
-                <li>Lancez la commande <code>npm run build</code></li>
-            </ol>
-            <p>Ceci générera un dossier <code>out/</code> à l'intérieur de <code>frontend/</code> que ce serveur pourra utiliser.</p>
-            <hr>
-            <p>Emplacements vérifiés :</p>
-            <ul>
-                ${possibleDirs.map(d => `<li>${d}</li>`).join('')}
-            </ul>
+            <div style="font-family: sans-serif; padding: 40px; line-height: 1.6;">
+                <h1 style="color: #e11d48;">GSI Web - Build Manquant</h1>
+                <p>Le serveur fonctionne, mais les fichiers du site n'ont pas encore été générés.</p>
+                <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; border-left: 4px solid #e11d48;">
+                    <p><strong>Comment régler cela sur cPanel :</strong></p>
+                    <ol>
+                        <li>Ouvrez le <b>Terminal</b> dans cPanel (ou utilisez l'interface "Setup Node.js App").</li>
+                        <li>Allez dans le dossier : <code>cd domains/groupesgi.mg/web</code></li>
+                        <li>Lancez : <code>npm install</code></li>
+                        <li>Lancez : <code>npm run build</code></li>
+                    </ol>
+                    <p>Une fois terminé, un dossier <code>out/</code> apparaîtra et le site fonctionnera.</p>
+                </div>
+                <p style="margin-top: 20px; color: #6b7280;">Dossier vérifié : <code>${buildDir}</code></p>
+            </div>
         `);
     });
 }
