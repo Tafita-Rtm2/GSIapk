@@ -1,0 +1,15 @@
+{
+  "name": "gsi-insight-web",
+  "version": "1.0.0",
+  "description": "GSI Insight Web Server for cPanel",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "dotenv": "^16.3.1",
+    "cors": "^2.8.5",
+    "node-fetch": "^3.3.2"
+  }
+}
