@@ -8,15 +8,20 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const ADMIN_USER = process.env.ADMIN_USER || 'GSI-MG';
-const ADMIN_PASS = process.env.ADMIN_PASS || 'GSI-Madagascar';
-const MAIN_API_BASE = "https://groupegsi.mg/rtmggmg/api";
+const ADMIN_USER = process.env.ADMIN_USER;
+const ADMIN_PASS = process.env.ADMIN_PASS;
+const MAIN_API_BASE = process.env.MAIN_API_BASE || "https://groupegsi.mg/rtmggmg/api";
+
+if (!ADMIN_USER || !ADMIN_PASS) {
+    console.error("FATAL: ADMIN_USER or ADMIN_PASS not set in .env");
+}
 
 app.use(cors());
 app.use(express.json());
 
 // --- ADMIN CREATION PROXY ---
-app.post('/api/admin/create-student', async (req, res) => {
+// On écoute sur /web/api/... pour correspondre au sous-dossier
+app.post(['/web/api/admin/create-student', '/api/admin/create-student'], async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ error: "Missing authorization" });
 
@@ -57,12 +62,14 @@ for (const dir of possibleDirs) {
 }
 
 if (buildDir) {
+    // On sert les fichiers statiques avec le préfixe /web et aussi à la racine au cas où
+    app.use('/web', express.static(buildDir));
     app.use(express.static(buildDir));
 
     // Support for Next.js routing (SPA)
-    app.get('*', (req, res) => {
+    app.get(['/web/*', '*'], (req, res) => {
         // If it's an API call that wasn't caught, return 404
-        if (req.url.startsWith('/api/')) return res.status(404).json({ error: "Not found" });
+        if (req.url.includes('/api/')) return res.status(404).json({ error: "Not found" });
 
         const indexPath = path.join(buildDir, 'index.html');
         res.sendFile(indexPath);

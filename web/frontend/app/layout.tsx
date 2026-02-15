@@ -12,7 +12,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 export const metadata: Metadata = {
   title: "GSI Insight",
   description: "Where data meets your future.",
-  manifest: "/manifest.json",
+  manifest: "/web/manifest.json",
 };
 
 export const viewport: Viewport = {
