@@ -19,6 +19,7 @@ export default function LoginPage() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(false);
+  const isWeb = typeof window !== 'undefined' && window.location.pathname.includes('/web');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,14 +159,16 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-8 text-center">
-          <p className="text-gray-500 text-sm">
-            {t("no_account")}{" "}
-            <Link href="/register" className="text-primary font-bold hover:underline">
-              {t("creer_compte")}
-            </Link>
-          </p>
-        </div>
+        {!isWeb && (
+          <div className="mt-8 text-center">
+            <p className="text-gray-500 text-sm">
+              {t("no_account")}{" "}
+              <Link href="/register" className="text-primary font-bold hover:underline">
+                {t("creer_compte")}
+              </Link>
+            </p>
+          </div>
+        )}
       </div>
 
       {showAdminModal && (
