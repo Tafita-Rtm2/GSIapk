@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 // Configure PDF.js worker
 // Use a check to ensure we are in a browser environment
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/web/pdf.worker.min.mjs';
 }
 
 interface GSIViewerProps {
@@ -211,8 +211,13 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
               controls
               autoPlay
               playsInline
-              onError={() => onError?.("Format vidéo non supporté.")}
-            />
+              muted
+              crossOrigin="anonymous"
+              onError={() => onError?.("Format vidéo non supporté ou accès refusé.")}
+            >
+              <source src={url} type="video/mp4" />
+              Votre navigateur ne supporte pas la lecture de vidéos.
+            </video>
           </div>
         )}
 

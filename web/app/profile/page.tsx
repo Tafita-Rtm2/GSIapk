@@ -23,7 +23,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const currentUser = GSIStore.getCurrentUser();
     if (!currentUser) {
-      router.push("/login");
+      router.push("/web/login");
     } else {
       setUser(currentUser);
     }
@@ -32,7 +32,7 @@ export default function ProfilePage() {
   const handleLogout = () => {
     GSIStore.logout();
     toast.success("Déconnexion réussie");
-    router.push("/login");
+    router.push("/web/login");
   };
 
   if (!user) return null;
@@ -141,11 +141,11 @@ export default function ProfilePage() {
 
       <div className="px-6 -mt-16 pb-32">
         <div className="bg-white rounded-[32px] p-6 shadow-xl mb-6 grid grid-cols-2 gap-4">
-          <Link href="/performance" className="flex flex-col items-center p-4 bg-gray-50 rounded-2xl hover:bg-indigo-50 transition-colors active:scale-95">
+          <Link href="/web/performance" className="flex flex-col items-center p-4 bg-gray-50 rounded-2xl hover:bg-indigo-50 transition-colors active:scale-95">
             <Award className="text-primary mb-2" size={24} />
             <span className="text-[10px] font-black uppercase tracking-widest">{t("reussites")}</span>
           </Link>
-          <Link href="/services" className="flex flex-col items-center p-4 bg-gray-50 rounded-2xl hover:bg-violet-50 transition-colors active:scale-95">
+          <Link href="/web/services" className="flex flex-col items-center p-4 bg-gray-50 rounded-2xl hover:bg-violet-50 transition-colors active:scale-95">
             <FileCheck className="text-accent mb-2" size={24} />
             <span className="text-[10px] font-black uppercase tracking-widest">{t("demandes")}</span>
           </Link>
@@ -154,13 +154,13 @@ export default function ProfilePage() {
         <div className="space-y-2 mb-8">
           <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 px-2 mb-4">Espace Personnel</h3>
 
-          <Link href="/performance">
+          <Link href="/web/performance">
              <ProfileLink icon={TrendingUp} label="Mes Notes & Performance" color="text-indigo-500" />
           </Link>
-          <Link href="/program">
+          <Link href="/web/program">
              <ProfileLink icon={Clock} label="Mon Programme d'étude" color="text-emerald-500" />
           </Link>
-          <Link href="/services">
+          <Link href="/web/services">
             <ProfileLink icon={FileCheck} label="Documents Administratifs" color="text-orange-500" />
           </Link>
 
@@ -171,7 +171,7 @@ export default function ProfilePage() {
                   <Award size={24} />
                 </div>
                 <p className="text-xs font-medium opacity-90 mb-4">Accédez à vos ressources pédagogiques et discutez avec vos camarades.</p>
-                <Link href="/community" className="inline-block bg-white text-indigo-600 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform">
+                <Link href="/web/community" className="inline-block bg-white text-indigo-600 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform">
                   Accéder au Chat
                 </Link>
               </div>

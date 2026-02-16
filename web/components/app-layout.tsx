@@ -66,12 +66,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const navItems = [
-    { icon: Home, label: t("accueil"), href: "/" },
-    { icon: Calendar, label: t("planning"), href: "/schedule" },
-    { icon: BookOpen, label: t("matieres"), href: "/subjects" },
-    { icon: Library, label: t("biblio"), href: "/library" },
-    { icon: Users, label: t("community"), href: "/community" },
-    { icon: User, label: t("profil"), href: "/profile" },
+    { icon: Home, label: t("accueil"), href: "/web/" },
+    { icon: Calendar, label: t("planning"), href: "/web/schedule" },
+    { icon: BookOpen, label: t("matieres"), href: "/web/subjects" },
+    { icon: Library, label: t("biblio"), href: "/web/library" },
+    { icon: Users, label: t("community"), href: "/web/community" },
+    { icon: User, label: t("profil"), href: "/web/profile" },
   ];
 
   return (
@@ -121,7 +121,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Floating Action Button for Ask Insight */}
       {!pathname.includes('chat') && !pathname.includes('community') && (
         <Link
-          href="/chat"
+          href="/web/chat"
           className="absolute bottom-24 right-4 bg-accent text-white p-4 rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all z-20"
         >
           <MessageCircle size={24} />

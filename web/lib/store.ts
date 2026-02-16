@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 // --- CONFIGURATION ---
 let API_BASE = "https://groupegsi.mg/rtmggmg/api";
 let MEDIA_BASE = "https://groupegsi.mg/rtmggmg";
+let configPromise: Promise<any> | null = null;
 
 // Types
 export interface User {
@@ -125,17 +126,36 @@ class GSIStoreClass {
   }
 
   private async initRemoteConfig() {
-    try {
-      const res = await fetch('/web/api/config');
-      if (res.ok) {
-        const config = await res.json();
-        if (config.API_BASE) API_BASE = config.API_BASE;
-        if (config.MEDIA_BASE) MEDIA_BASE = config.MEDIA_BASE;
-        console.log("GSIStore: Remote config loaded", { API_BASE, MEDIA_BASE });
+    if (configPromise) return configPromise;
+
+    configPromise = (async () => {
+      try {
+        // Try multiple paths for config
+        const paths = ['/web/api/config', '/api/config', './api/config'];
+        for (const path of paths) {
+          try {
+            const res = await fetch(path);
+            if (res.ok) {
+              const config = await res.json();
+              if (config.API_BASE) API_BASE = config.API_BASE;
+              if (config.MEDIA_BASE) MEDIA_BASE = config.MEDIA_BASE;
+              console.log(`GSIStore: Config loaded from ${path}`, { API_BASE, MEDIA_BASE });
+              return config;
+            }
+          } catch (e) {}
+        }
+      } catch (e) {
+        console.warn("GSIStore: Failed to load remote config, using defaults");
       }
-    } catch (e) {
-      console.warn("GSIStore: Failed to load remote config, using defaults");
-    }
+      return { API_BASE, MEDIA_BASE };
+    })();
+
+    return configPromise;
+  }
+
+  public async ensureConfig() {
+    if (typeof window === 'undefined') return;
+    return this.initRemoteConfig();
   }
 
   private hydrate() {
@@ -820,13 +840,16 @@ class GSIStoreClass {
        return url;
     }
     // Handle special case for files/view if it's a short relative path
-    if (url.startsWith('files/view/') || url.startsWith('api/files/view/') || url.startsWith('/api/files/view/')) {
-       let path = url.replace('api/', '').replace('/api/', '');
-       return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+    // We must ensure MEDIA_BASE is used correctly
+    const cleanUrl = url.startsWith('/') ? url.substring(1) : url;
+
+    if (cleanUrl.startsWith('api/files/view/') || cleanUrl.startsWith('files/view/')) {
+       const path = cleanUrl.startsWith('api/') ? cleanUrl.substring(4) : cleanUrl;
+       return `${MEDIA_BASE}/api/${path}`;
     }
-    // For relative paths from the custom API
-    const base = MEDIA_BASE;
-    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+
+    // For other relative paths, assume they are relative to MEDIA_BASE
+    return `${MEDIA_BASE}/${cleanUrl}`;
   }
 
   getStudentQrData(user: User): string {

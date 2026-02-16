@@ -23,9 +23,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Hydrate state from store on mount (client-side only)
-    const initialUser = GSIStore.getCurrentUser();
-    setUser(initialUser);
-    setLoading(false);
+    const init = async () => {
+      await GSIStore.ensureConfig();
+      const initialUser = GSIStore.getCurrentUser();
+      setUser(initialUser);
+      setLoading(false);
+    };
+    init();
 
     // Store Listener (Handles all session updates)
     const unsubscribeStore = GSIStore.subscribe((newUser) => {
@@ -49,11 +53,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isPublicPath = publicPaths.includes(pathname);
 
     if (user && isPublicPath) {
-      if (user.role === 'admin') router.replace("/admin");
-      else if (user.role === 'professor') router.replace("/professor");
-      else router.replace("/");
+      if (user.role === 'admin') router.replace("/web/admin");
+      else if (user.role === 'professor') router.replace("/web/professor");
+      else router.replace("/web/");
     } else if (!user && !isPublicPath) {
-      router.replace("/login");
+      // Pour le web, on s'assure de ne pas boucler ou sortir du contexte /web
+      if (pathname !== "/login") {
+        router.replace("/web/login");
+      }
     }
   }, [user, loading, pathname, router]);
 

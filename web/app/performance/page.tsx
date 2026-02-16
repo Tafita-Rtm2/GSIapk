@@ -19,7 +19,7 @@ export default function PerformancePage() {
   useEffect(() => {
     const currentUser = GSIStore.getCurrentUser();
     if (!currentUser) {
-      router.push("/login");
+      router.push("/web/login");
       return;
     }
     setUser(currentUser);
