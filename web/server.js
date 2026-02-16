@@ -13,6 +13,8 @@ app.use(express.json());
 
 const ADMIN_USER = process.env.ADMIN_USER || "GSI-MG";
 const ADMIN_PASS = process.env.ADMIN_PASS || "GSI-Madagascar";
+const ADMIN_CODE = process.env.ADMIN_CODE || "Nina GSI";
+const PROF_PASS = process.env.PROF_PASS || "prof-gsi-mg";
 const API_BASE = process.env.API_BASE || "https://groupegsi.mg/rtmggmg/api";
 const MEDIA_BASE = process.env.MEDIA_BASE || "https://groupegsi.mg/rtmggmg";
 
@@ -20,7 +22,9 @@ const MEDIA_BASE = process.env.MEDIA_BASE || "https://groupegsi.mg/rtmggmg";
 app.get('/web/api/config', (req, res) => {
   res.json({
     API_BASE,
-    MEDIA_BASE
+    MEDIA_BASE,
+    ADMIN_CODE,
+    PROF_PASS
   });
 });
 

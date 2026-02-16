@@ -58,7 +58,7 @@ export default function AdminPage() {
   useEffect(() => {
     const user = GSIStore.getCurrentUser();
     if (!user || user.role !== 'admin') {
-      router.push("/web/login");
+      router.push("/login");
       return;
     }
 
@@ -168,7 +168,7 @@ export default function AdminPage() {
             onClick={() => {
               GSIStore.logout();
               toast.success("Déconnexion");
-              router.push("/web/login");
+              router.push("/login");
             }}
             className="p-3 bg-gray-50 rounded-xl text-gray-400 hover:text-red-500 transition-colors active:scale-90"
           >

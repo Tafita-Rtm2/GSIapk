@@ -7,10 +7,9 @@ import { Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, ZoomIn, Zoom
 import { toast } from 'sonner';
 
 // Configure PDF.js worker
-// Use a check to ensure we are in a browser environment
 if (typeof window !== 'undefined') {
-  // Use absolute path for worker to avoid redirection issues
-  pdfjsLib.GlobalWorkerOptions.workerSrc = window.location.origin + '/web/pdf.worker.min.mjs';
+  // En mode export statique avec basePath /web, le worker est à cette adresse
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/web/pdf.worker.min.mjs';
 }
 
 interface GSIViewerProps {

@@ -16,7 +16,7 @@ export default function ServicesPage() {
     const init = async () => {
       const currentUser = GSIStore.getCurrentUser();
       if (!currentUser) {
-        router.push("/web/login");
+        router.push("/login");
         return;
       }
       setUser(currentUser);
@@ -35,7 +35,7 @@ export default function ServicesPage() {
     <AppLayout>
       <div className="p-6 pb-24">
         <div className="flex items-center gap-4 mb-8">
-           <Link href="/web/profile" className="p-2 bg-gray-100 rounded-full text-gray-500">
+           <Link href="/profile" className="p-2 bg-gray-100 rounded-full text-gray-500">
               <ChevronLeft size={20} />
            </Link>
            <h1 className="text-2xl font-black text-gray-800">Services GSI</h1>

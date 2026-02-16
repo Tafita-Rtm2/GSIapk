@@ -1,14 +1,16 @@
-const CACHE_NAME = 'gsi-web-v2';
+const CACHE_NAME = 'gsi-web-v3';
 const STATIC_ASSETS = [
   '/web/',
+  '/web/index.html',
   '/web/manifest.json',
   '/web/sw.js',
   '/web/pdf.worker.min.mjs',
   '/web/icon-192.png',
-  '/web/icon-512.png'
+  '/web/icon-512.png',
+  '/web/logo.png',
+  '/web/favicon.ico'
 ];
 
-// Installation : mise en cache des actifs de base
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -18,7 +20,6 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activation : nettoyage des anciens caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -34,50 +35,33 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Stratégie de fetch
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Ne pas intercepter les requêtes API
-  if (url.pathname.includes('/api/')) {
-    return;
-  }
+  // Skip API
+  if (url.pathname.includes('/api/')) return;
 
-  // Pour les actifs statiques (JS, CSS, Images), Cache-First
+  // Cache-First for static assets
   if (
     url.pathname.includes('/_next/') ||
-    url.pathname.endsWith('.png') ||
-    url.pathname.endsWith('.jpg') ||
-    url.pathname.endsWith('.svg') ||
-    url.pathname.endsWith('.css') ||
-    url.pathname.endsWith('.js')
+    url.pathname.match(/\.(png|jpg|jpeg|svg|css|js|woff2?|ico)$/)
   ) {
     event.respondWith(
-      caches.match(event.request).then((cachedResponse) => {
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        return fetch(event.request).then((response) => {
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-          return response;
+      caches.match(event.request).then((cached) => {
+        return cached || fetch(event.request).then((res) => {
+          if (!res || res.status !== 200 || res.type !== 'basic') return res;
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          return res;
         });
       })
     );
   } else {
-    // Pour les pages HTML et autres, Network-First avec repli sur le cache
+    // Network-First with fallback to index for SPA
     event.respondWith(
       fetch(event.request).catch(() => {
-        return caches.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          // Si rien n'est trouvé, essayer de renvoyer l'index.html pour le routage SPA
+        return caches.match(event.request).then((cached) => {
+          if (cached) return cached;
           if (event.request.mode === 'navigate') {
             return caches.match('/web/');
           }

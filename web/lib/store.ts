@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 // --- CONFIGURATION ---
 let API_BASE = "https://groupegsi.mg/rtmggmg/api";
 let MEDIA_BASE = "https://groupegsi.mg/rtmggmg";
+let ADMIN_CODE = "Nina GSI";
+let PROF_PASS = "prof-gsi-mg";
 let configPromise: Promise<any> | null = null;
 
 // Types
@@ -139,6 +141,8 @@ class GSIStoreClass {
               const config = await res.json();
               if (config.API_BASE) API_BASE = config.API_BASE;
               if (config.MEDIA_BASE) MEDIA_BASE = config.MEDIA_BASE;
+              if (config.ADMIN_CODE) ADMIN_CODE = config.ADMIN_CODE;
+              if (config.PROF_PASS) PROF_PASS = config.PROF_PASS;
               console.log(`GSIStore: Config loaded from ${path}`, { API_BASE, MEDIA_BASE });
               return config;
             }
@@ -454,6 +458,9 @@ class GSIStoreClass {
      }
      return false;
   }
+
+  getAdminCode() { return ADMIN_CODE; }
+  getProfPass() { return PROF_PASS; }
 
   // --- STORE ACCESS ---
 
@@ -839,21 +846,16 @@ class GSIStoreClass {
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
        return url;
     }
-    // Correctly resolve relative paths against MEDIA_BASE
-    // The original app used MEDIA_BASE + path
-    let path = url;
-    if (path.startsWith('/')) path = path.substring(1);
 
-    // Handle the specific API file view path
-    if (path.startsWith('api/files/view/')) {
-       return `${MEDIA_BASE}/${path}`;
-    }
-    if (path.startsWith('files/view/')) {
-       return `${MEDIA_BASE}/${path}`;
+    // Handle special case for files/view if it's a short relative path
+    if (url.startsWith('files/view/') || url.startsWith('api/files/view/') || url.startsWith('/api/files/view/')) {
+       let path = url.replace('api/', '').replace('/api/', '');
+       return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
     }
 
-    // Fallback
-    return `${MEDIA_BASE}/${path}`;
+    // For relative paths from the custom API
+    const base = MEDIA_BASE;
+    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
   }
 
   getStudentQrData(user: User): string {

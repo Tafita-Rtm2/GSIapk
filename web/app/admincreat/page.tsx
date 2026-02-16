@@ -144,7 +144,7 @@ export default function AdminCreatePage() {
           </form>
 
           <button
-            onClick={() => router.push("/web/login")}
+            onClick={() => router.push("/login")}
             className="w-full mt-4 text-gray-400 text-sm font-medium hover:text-indigo-600 transition-colors"
           >
             Retour au login

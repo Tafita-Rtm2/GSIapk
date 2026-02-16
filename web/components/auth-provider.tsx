@@ -53,13 +53,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isPublicPath = publicPaths.includes(pathname);
 
     if (user && isPublicPath) {
-      if (user.role === 'admin') router.replace("/web/admin");
-      else if (user.role === 'professor') router.replace("/web/professor");
-      else router.replace("/web/");
+      if (user.role === 'admin') router.replace("/admin");
+      else if (user.role === 'professor') router.replace("/professor");
+      else router.replace("/");
     } else if (!user && !isPublicPath) {
       // Pour le web, on s'assure de ne pas boucler ou sortir du contexte /web
       if (pathname !== "/login") {
-        router.replace("/web/login");
+        router.replace("/login");
       }
     }
   }, [user, loading, pathname, router]);

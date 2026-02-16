@@ -66,12 +66,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const navItems = [
-    { icon: Home, label: t("accueil"), href: "/web/" },
-    { icon: Calendar, label: t("planning"), href: "/web/schedule" },
-    { icon: BookOpen, label: t("matieres"), href: "/web/subjects" },
-    { icon: Library, label: t("biblio"), href: "/web/library" },
-    { icon: Users, label: t("community"), href: "/web/community" },
-    { icon: User, label: t("profil"), href: "/web/profile" },
+    { icon: Home, label: t("accueil"), href: "/" },
+    { icon: Calendar, label: t("planning"), href: "/schedule" },
+    { icon: BookOpen, label: t("matieres"), href: "/subjects" },
+    { icon: Library, label: t("biblio"), href: "/library" },
+    { icon: Users, label: t("community"), href: "/community" },
+    { icon: User, label: t("profil"), href: "/profile" },
   ];
 
   return (
