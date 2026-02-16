@@ -47,9 +47,7 @@ firestore-debug.log
 # android
 android/app/build
 android/app/src/main/assets/public
-android/app/src/main/assets/capacitor.config.jsonweb/node_modules
-web/.next
-web/out
+android/app/src/main/assets/capacitor.config.json
+
 web/node_modules/
 web/.next/
-web/out/
