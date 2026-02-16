@@ -9,7 +9,9 @@ import { toast } from 'sonner';
 // Configure PDF.js worker
 if (typeof window !== 'undefined') {
   // En mode export statique avec basePath /web, le worker est à cette adresse
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/web/pdf.worker.min.mjs';
+  // Utiliser window.location.origin pour éviter les problèmes de chemins relatifs
+  const origin = window.location.origin;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `${origin}/web/pdf.worker.min.mjs`;
 }
 
 interface GSIViewerProps {
@@ -211,10 +213,12 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
               autoPlay
               playsInline
               muted
+              controlsList="nodownload"
+              crossOrigin="anonymous"
               key={url}
               onError={(e) => {
                 console.error("Video error event:", e);
-                onError?.("Format vidéo non supporté ou accès refusé.");
+                onError?.("Format vidéo non supporté ou accès refusé. Vérifiez les permissions CORS.");
               }}
             >
               <source src={url} type="video/mp4" />

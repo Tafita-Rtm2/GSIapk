@@ -848,14 +848,18 @@ class GSIStoreClass {
     }
 
     // Handle special case for files/view if it's a short relative path
-    if (url.startsWith('files/view/') || url.startsWith('api/files/view/') || url.startsWith('/api/files/view/')) {
-       let path = url.replace('api/', '').replace('/api/', '');
-       return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+    if (url.includes('files/view/')) {
+       let path = url;
+       if (path.startsWith('api/')) path = path.substring(4);
+       if (path.startsWith('/api/')) path = path.substring(5);
+       if (path.startsWith('/')) path = path.substring(1);
+       return `${MEDIA_BASE}/${path}`;
     }
 
     // For relative paths from the custom API
     const base = MEDIA_BASE;
-    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+    const cleanUrl = url.startsWith('/') ? url.substring(1) : url;
+    return `${base}/${cleanUrl}`;
   }
 
   getStudentQrData(user: User): string {

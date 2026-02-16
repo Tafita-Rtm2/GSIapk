@@ -1,7 +1,10 @@
-const CACHE_NAME = 'gsi-web-v3';
+const CACHE_NAME = 'gsi-web-v4';
 const STATIC_ASSETS = [
   '/web/',
   '/web/index.html',
+  '/web/login/',
+  '/web/admin/',
+  '/web/professor/',
   '/web/manifest.json',
   '/web/sw.js',
   '/web/pdf.worker.min.mjs',

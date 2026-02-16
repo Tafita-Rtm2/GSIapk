@@ -70,9 +70,16 @@ app.get('/web/*', (req, res) => {
   let relativePath = req.path.replace(/^\/web/, '');
   if (!relativePath || relativePath === '/') relativePath = '/index';
 
-  const htmlPath = path.join(__dirname, 'out', relativePath + '.html');
+  // Supprimer le slash final pour tester le fichier .html
+  let cleanPath = relativePath.endsWith('/') ? relativePath.slice(0, -1) : relativePath;
+
+  const htmlPath = path.join(__dirname, 'out', cleanPath + '.html');
+  const folderIndexPath = path.join(__dirname, 'out', cleanPath, 'index.html');
+
   if (fs.existsSync(htmlPath)) {
     return res.sendFile(htmlPath);
+  } else if (fs.existsSync(folderIndexPath)) {
+    return res.sendFile(folderIndexPath);
   }
 
   const indexPath = path.join(__dirname, 'out', 'index.html');
