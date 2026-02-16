@@ -15,7 +15,8 @@
 
 # next.js
 /.next/
-/out/
+# /out/ is allowed for the web folder as requested by the user
+!web/out/
 
 # production
 /build
