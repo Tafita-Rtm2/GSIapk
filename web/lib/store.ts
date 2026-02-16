@@ -839,17 +839,21 @@ class GSIStoreClass {
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
        return url;
     }
-    // Handle special case for files/view if it's a short relative path
-    // We must ensure MEDIA_BASE is used correctly
-    const cleanUrl = url.startsWith('/') ? url.substring(1) : url;
+    // Correctly resolve relative paths against MEDIA_BASE
+    // The original app used MEDIA_BASE + path
+    let path = url;
+    if (path.startsWith('/')) path = path.substring(1);
 
-    if (cleanUrl.startsWith('api/files/view/') || cleanUrl.startsWith('files/view/')) {
-       const path = cleanUrl.startsWith('api/') ? cleanUrl.substring(4) : cleanUrl;
-       return `${MEDIA_BASE}/api/${path}`;
+    // Handle the specific API file view path
+    if (path.startsWith('api/files/view/')) {
+       return `${MEDIA_BASE}/${path}`;
+    }
+    if (path.startsWith('files/view/')) {
+       return `${MEDIA_BASE}/${path}`;
     }
 
-    // For other relative paths, assume they are relative to MEDIA_BASE
-    return `${MEDIA_BASE}/${cleanUrl}`;
+    // Fallback
+    return `${MEDIA_BASE}/${path}`;
   }
 
   getStudentQrData(user: User): string {

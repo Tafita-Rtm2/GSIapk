@@ -56,14 +56,17 @@ app.post('/web/api/admin/create-student', async (req, res) => {
   }
 });
 
+// Servir les fichiers statiques du dossier 'out'
 app.use('/web', express.static(path.join(__dirname, 'out'), {
   extensions: ['html']
 }));
 
+// Fallback pour les routes Next.js (SPA support)
 app.get('/web/*', (req, res) => {
-  const relativePath = req.path.replace(/^\/web/, '');
-  const htmlPath = path.join(__dirname, 'out', relativePath + '.html');
+  let relativePath = req.path.replace(/^\/web/, '');
+  if (!relativePath || relativePath === '/') relativePath = '/index';
 
+  const htmlPath = path.join(__dirname, 'out', relativePath + '.html');
   if (fs.existsSync(htmlPath)) {
     return res.sendFile(htmlPath);
   }
@@ -72,12 +75,12 @@ app.get('/web/*', (req, res) => {
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);
   } else {
-    res.status(404).send("Build non trouvé. Veuillez lancer 'npm run build' dans le dossier web.");
+    res.status(404).send("Build non trouvé.");
   }
 });
 
 app.get('/', (req, res) => {
-  res.redirect('/web');
+  res.redirect('/web/');
 });
 
 app.listen(PORT, () => {
