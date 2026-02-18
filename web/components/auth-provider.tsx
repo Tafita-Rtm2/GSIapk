@@ -50,15 +50,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (loading) return;
 
     const publicPaths = ["/login", "/admincreat"];
-    const isPublicPath = publicPaths.includes(pathname);
+    const isPublicPath = publicPaths.some(p => pathname === p || pathname === p + "/");
 
     if (user && isPublicPath) {
-      if (user.role === 'admin') router.replace("/admin/");
-      else if (user.role === 'professor') router.replace("/professor/");
-      else router.replace("/");
+      if (user.role === 'admin') {
+        if (pathname !== "/admin/") router.replace("/admin/");
+      } else if (user.role === 'professor') {
+        if (pathname !== "/professor/") router.replace("/professor/");
+      } else {
+        if (pathname !== "/") router.replace("/");
+      }
     } else if (!user && !isPublicPath) {
-      // Pour le web, on s'assure de ne pas boucler ou sortir du contexte /web
-      // pathname peut être /login ou /login/ avec trailingSlash
       if (pathname !== "/login" && pathname !== "/login/") {
         router.replace("/login/");
       }

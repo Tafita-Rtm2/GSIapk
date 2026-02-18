@@ -216,7 +216,6 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
               playsInline
               muted
               controlsList="nodownload"
-              crossOrigin="anonymous"
               key={url}
               onLoadedData={() => {
                 console.log("[GSI-DEBUG] Video loaded successfully");
@@ -226,7 +225,7 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
               onError={(e) => {
                 console.error("[GSI-DEBUG] Video load error", e);
                 setLoading(false);
-                onError?.("Format vidéo non supporté ou accès refusé. (CORS)");
+                onError?.("Format vidéo non supporté ou accès refusé.");
               }}
             >
               <source src={url} type="video/mp4" />
@@ -245,7 +244,6 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
                  style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }}
                  className="h-auto transition-transform duration-200"
                  alt="Document"
-                 crossOrigin="anonymous"
                  onLoad={() => {
                    console.log("[GSI-DEBUG] Image loaded successfully");
                    setLoading(false);

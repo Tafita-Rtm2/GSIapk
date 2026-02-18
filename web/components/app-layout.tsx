@@ -67,11 +67,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { icon: Home, label: t("accueil"), href: "/" },
-    { icon: Calendar, label: t("planning"), href: "/schedule" },
-    { icon: BookOpen, label: t("matieres"), href: "/subjects" },
-    { icon: Library, label: t("biblio"), href: "/library" },
-    { icon: Users, label: t("community"), href: "/community" },
-    { icon: User, label: t("profil"), href: "/profile" },
+    { icon: Calendar, label: t("planning"), href: "/schedule/" },
+    { icon: BookOpen, label: t("matieres"), href: "/subjects/" },
+    { icon: Library, label: t("biblio"), href: "/library/" },
+    { icon: Users, label: t("community"), href: "/community/" },
+    { icon: User, label: t("profil"), href: "/profile/" },
   ];
 
   return (
@@ -101,7 +101,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       <nav className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 flex justify-between items-center z-10">
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
           return (
             <Link
               key={item.href}
@@ -119,9 +119,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Floating Action Button for Ask Insight */}
-      {!pathname.includes('chat') && !pathname.includes('community') && (
+      {!pathname?.includes('chat') && !pathname?.includes('community') && (
         <Link
-          href="/web/chat"
+          href="/chat/"
           className="absolute bottom-24 right-4 bg-accent text-white p-4 rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all z-20"
         >
           <MessageCircle size={24} />

@@ -32,10 +32,10 @@ export default function Home() {
     }
 
     if (initialUser.role === 'admin') {
-      router.replace("/admin");
+      router.replace("/admin/");
       return;
     } else if (initialUser.role === 'professor') {
-      router.replace("/professor");
+      router.replace("/professor/");
       return;
     }
 
