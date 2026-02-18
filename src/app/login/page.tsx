@@ -161,9 +161,9 @@ export default function LoginPage() {
         <div className="mt-8 text-center">
           <p className="text-gray-500 text-sm">
             {t("no_account")}{" "}
-            <Link href="/register" className="text-primary font-bold hover:underline">
-              {t("creer_compte")}
-            </Link>
+            <span className="text-primary font-bold">
+              Contactez l'administration
+            </span>
           </p>
         </div>
       </div>

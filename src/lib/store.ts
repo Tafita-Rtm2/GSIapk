@@ -12,6 +12,9 @@ import { toast } from 'sonner';
 const API_BASE = "https://groupegsi.mg/rtmggmg/api";
 const MEDIA_BASE = "https://groupegsi.mg/rtmggmg";
 
+let ADMIN_CODE = "Nina GSI";
+let PROF_PASS = "prof-gsi-mg";
+
 // Types
 export interface User {
   id: string; // Internal/Public UID
@@ -193,6 +196,9 @@ class GSIStoreClass {
        this.autoDownloadEssentials();
     });
 
+    // Sync remote config (Admin/Prof codes)
+    this.syncRemoteConfig();
+
     // Background polling for general data
     setInterval(() => {
        this.syncAll();
@@ -229,6 +235,7 @@ class GSIStoreClass {
   private async syncAll() {
      return Promise.all([
        this.fetchCollection('users', 'users'),
+       this.syncRemoteConfig(),
        this.fetchCollection('lessons', 'lessons'),
        this.fetchCollection('assignments', 'assignments'),
        this.fetchCollection('announcements', 'announcements'),
@@ -379,6 +386,20 @@ class GSIStoreClass {
   }
 
   // --- CUSTOM AUTH ---
+
+  private async syncRemoteConfig() {
+    try {
+      const data = await this.apiCall('/db/system_config');
+      if (data && Array.isArray(data) && data.length > 0) {
+        const config = data[0];
+        if (config.ADMIN_CODE) ADMIN_CODE = config.ADMIN_CODE;
+        if (config.PROF_PASS) PROF_PASS = config.PROF_PASS;
+      }
+    } catch (e) {}
+  }
+
+  getAdminCode() { return ADMIN_CODE; }
+  getProfPass() { return PROF_PASS; }
 
   async login(email: string, password: string): Promise<User | null> {
     const q = encodeURIComponent(JSON.stringify({ email, password }));

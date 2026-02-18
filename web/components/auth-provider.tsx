@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isPublicPath = publicPaths.some(p => pathname === p || pathname === p + "/");
 
     if (user && isPublicPath) {
+      // Si on est sur une page publique mais connecté, on redirige vers le dashboard approprié
       if (user.role === 'admin') {
         if (pathname !== "/admin/") router.replace("/admin/");
       } else if (user.role === 'professor') {
@@ -61,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (pathname !== "/") router.replace("/");
       }
     } else if (!user && !isPublicPath) {
+      // Si on n'est pas connecté et pas sur une page publique, on force le login
       if (pathname !== "/login" && pathname !== "/login/") {
         router.replace("/login/");
       }

@@ -37,6 +37,33 @@ app.post('/web/api/admin/verify', (req, res) => {
   }
 });
 
+app.get('/web/api/proxy', async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).send("URL manquante");
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Range': req.headers.range || ''
+      }
+    });
+
+    res.status(response.status);
+
+    // Transférer les headers importants
+    const headersToTransfer = ['content-type', 'content-length', 'accept-ranges', 'content-range'];
+    headersToTransfer.forEach(h => {
+      const val = response.headers.get(h);
+      if (val) res.setHeader(h, val);
+    });
+
+    response.body.pipe(res);
+  } catch (error) {
+    console.error("Erreur proxy:", error.message);
+    res.status(500).send("Erreur de chargement du média");
+  }
+});
+
 app.post('/web/api/admin/create-student', async (req, res) => {
   const { admin, student } = req.body;
   if (admin.user !== ADMIN_USER || admin.pass !== ADMIN_PASS) {
@@ -94,6 +121,43 @@ app.get('/', (req, res) => {
   res.redirect('/web/');
 });
 
+async function syncConfigToDB() {
+  try {
+    // Check if config already exists
+    const res = await fetch(`${API_BASE}/db/system_config`);
+    const data = await res.json();
+
+    const config = {
+      id: 'main_config',
+      ADMIN_CODE,
+      PROF_PASS,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (Array.isArray(data) && data.length > 0) {
+      // Update existing
+      await fetch(`${API_BASE}/db/system_config/${data[0]._id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+      console.log("Config GSI synchronisée (Mise à jour)");
+    } else {
+      // Create new
+      await fetch(`${API_BASE}/db/system_config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+      console.log("Config GSI synchronisée (Création)");
+    }
+  } catch (error) {
+    console.error("Échec de la synchronisation de la config vers la DB:", error.message);
+  }
+}
+
 app.listen(PORT, () => {
   console.log(`Serveur GSI Web démarré sur le port ${PORT}`);
+  // Sync config to DB for APK to scrape
+  syncConfigToDB();
 });
