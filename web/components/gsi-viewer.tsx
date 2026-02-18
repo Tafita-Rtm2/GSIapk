@@ -29,7 +29,14 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
 
   useEffect(() => {
     console.log(`[GSI-DEBUG] Viewer type: ${type}`);
-    console.log(`[GSI-DEBUG] Loading URL: ${url}`);
+    console.log(`[GSI-DEBUG] Original URL: ${url}`);
+
+    // Tentative de détection si l'URL est correcte
+    if (!url || url === "undefined") {
+      onError?.("URL du fichier invalide.");
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     if (type === 'pdf') {
@@ -209,10 +216,17 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
               playsInline
               muted
               controlsList="nodownload"
+              crossOrigin="anonymous"
               key={url}
+              onLoadedData={() => {
+                console.log("[GSI-DEBUG] Video loaded successfully");
+                setLoading(false);
+                onLoadComplete?.();
+              }}
               onError={(e) => {
-                console.error("Video error event:", e);
-                onError?.("Format vidéo non supporté ou accès refusé.");
+                console.error("[GSI-DEBUG] Video load error", e);
+                setLoading(false);
+                onError?.("Format vidéo non supporté ou accès refusé. (CORS)");
               }}
             >
               <source src={url} type="video/mp4" />
@@ -231,8 +245,17 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
                  style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }}
                  className="h-auto transition-transform duration-200"
                  alt="Document"
-                 onLoad={() => { setLoading(false); onLoadComplete?.(); }}
-                 onError={() => { setLoading(false); onError?.("Échec du chargement de l'image."); }}
+                 crossOrigin="anonymous"
+                 onLoad={() => {
+                   console.log("[GSI-DEBUG] Image loaded successfully");
+                   setLoading(false);
+                   onLoadComplete?.();
+                 }}
+                 onError={(e) => {
+                   console.error("[GSI-DEBUG] Image load error", e);
+                   setLoading(false);
+                   onError?.("Échec du chargement de l'image. Vérifiez la connexion ou les permissions.");
+                 }}
                />
             </div>
             {/* Zoom Controls for Image */}

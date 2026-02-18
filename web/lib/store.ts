@@ -848,23 +848,20 @@ class GSIStoreClass {
        return url;
     }
 
-    const base = MEDIA_BASE.endsWith('/') ? MEDIA_BASE.slice(0, -1) : MEDIA_BASE;
-    let path = url;
+    // On nettoie la base et le chemin pour éviter les doubles slashes
+    const base = MEDIA_BASE.replace(/\/+$/, '');
+    let cleanPath = url.startsWith('/') ? url : `/${url}`;
 
-    // Transformation robuste pour les fichiers du backend GSI
-    if (path.startsWith('files/view/')) {
-      // Si le chemin commence par files/view, il manque probablement /api/
-      path = `/api/${path}`;
-    } else if (!path.startsWith('/')) {
-      path = `/${path}`;
+    // Si le chemin est "files/view/...", on s'assure qu'il commence par "/api/files/view/"
+    // car c'est ainsi que le backend GSI semble structuré.
+    if (cleanPath.startsWith('/files/view/')) {
+      cleanPath = `/api${cleanPath}`;
     }
 
-    // Éviter /api/api/ si l'URL contient déjà /api/
-    if (path.startsWith('/api/api/')) {
-      path = path.substring(4);
-    }
+    // Sécurité anti-doublon pour /api/api/
+    const finalPath = cleanPath.replace(/^\/api\/api\//, '/api/');
 
-    return `${base}${path}`;
+    return `${base}${finalPath}`;
   }
 
   getStudentQrData(user: User): string {
