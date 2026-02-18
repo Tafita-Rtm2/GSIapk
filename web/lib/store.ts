@@ -842,15 +842,27 @@ class GSIStoreClass {
 
   getAbsoluteUrl(url: string | undefined): string {
     if (!url || url === "undefined" || url === "null") return "";
-    // Robust URL handling: if it's already absolute, return as is.
+
+    // Si c'est déjà une URL absolue, on ne fait rien
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
        return url;
     }
 
-    // Pour les chemins relatifs, on préfixe simplement avec MEDIA_BASE
-    // On s'assure qu'il n'y a pas de double slash
     const base = MEDIA_BASE.endsWith('/') ? MEDIA_BASE.slice(0, -1) : MEDIA_BASE;
-    const path = url.startsWith('/') ? url : `/${url}`;
+    let path = url;
+
+    // Transformation robuste pour les fichiers du backend GSI
+    if (path.startsWith('files/view/')) {
+      // Si le chemin commence par files/view, il manque probablement /api/
+      path = `/api/${path}`;
+    } else if (!path.startsWith('/')) {
+      path = `/${path}`;
+    }
+
+    // Éviter /api/api/ si l'URL contient déjà /api/
+    if (path.startsWith('/api/api/')) {
+      path = path.substring(4);
+    }
 
     return `${base}${path}`;
   }

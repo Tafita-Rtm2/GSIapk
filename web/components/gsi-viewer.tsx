@@ -8,10 +8,8 @@ import { toast } from 'sonner';
 
 // Configure PDF.js worker
 if (typeof window !== 'undefined') {
-  // En mode export statique avec basePath /web, le worker est à cette adresse
-  // Utiliser window.location.origin pour éviter les problèmes de chemins relatifs
-  const origin = window.location.origin;
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `${origin}/web/pdf.worker.min.mjs`;
+  // Utilisation d'un CDN pour le worker PDF afin d'assurer la compatibilité maximale sur le web
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs`;
 }
 
 interface GSIViewerProps {
@@ -30,7 +28,9 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    console.log(`GSIViewer: Loading ${type} from ${url}`);
+    console.log(`[GSI-DEBUG] Viewer type: ${type}`);
+    console.log(`[GSI-DEBUG] Loading URL: ${url}`);
+
     setLoading(true);
     if (type === 'pdf') {
       renderPdf();
