@@ -849,7 +849,9 @@ class GSIStoreClass {
     // Handle special case for files/view if it's a short relative path
     if (url.startsWith('files/view/') || url.startsWith('api/files/view/') || url.startsWith('/api/files/view/')) {
        let path = url.replace('api/', '').replace('/api/', '');
-       return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+       // Ensure path starts with /
+       const cleanP = path.startsWith('/') ? path : `/${path}`;
+       return `${MEDIA_BASE}${cleanP}`;
     }
     // For relative paths from the custom API
     const base = MEDIA_BASE;
@@ -859,6 +861,13 @@ class GSIStoreClass {
   getMediaUrl(url: string | undefined): string {
     const absUrl = this.getAbsoluteUrl(url);
     if (!absUrl || !absUrl.startsWith('http')) return absUrl;
+    // Don't proxy if already proxied or data url
+    if (absUrl.includes('/api/proxy?url=')) return absUrl;
+
+    // Use absolute path for proxy to ensure it works from any subroute
+    if (typeof window !== 'undefined') {
+       return `${window.location.origin}/web/api/proxy?url=${encodeURIComponent(absUrl)}`;
+    }
     return `/web/api/proxy?url=${encodeURIComponent(absUrl)}`;
   }
 
@@ -917,60 +926,49 @@ class GSIStoreClass {
     try {
       const absoluteUrl = this.getAbsoluteUrl(url);
       const safeFileName = fileName.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
-      const path = `gsi_packs/${lessonId}_${safeFileName}`;
 
-      try {
-        await Filesystem.stat({ path, directory: Directory.Data });
-        return path;
-      } catch (e) {}
-
-      if (typeof window === 'undefined' || !window.navigator.onLine) {
-         throw new Error("Connexion requise pour le téléchargement.");
-      }
-
-      let base64Data = "";
-      let contentType = "";
-
+      // Native Implementation
       if (Capacitor.isNativePlatform()) {
-        const response = await CapacitorHttp.get({
-          url: absoluteUrl,
-          responseType: 'blob'
-        });
+        const path = `gsi_packs/${lessonId}_${safeFileName}`;
+        try {
+          await Filesystem.stat({ path, directory: Directory.Data });
+          return path;
+        } catch (e) {}
 
-        if (response.status >= 300 && response.status < 400) {
-          const location = response.headers['Location'] || response.headers['location'];
-          if (location) return this.downloadPackFile(location, fileName, lessonId, redirectCount + 1);
-        }
+        if (!window.navigator.onLine) throw new Error("Connexion requise.");
 
+        const response = await CapacitorHttp.get({ url: absoluteUrl, responseType: 'blob' });
         if (response.status !== 200) throw new Error(`Erreur serveur (${response.status})`);
-        base64Data = response.data; // CapacitorHttp with responseType: 'blob' returns base64 on native
-        contentType = response.headers['Content-Type'] || response.headers['content-type'] || "";
-      } else {
-        const response = await fetch(absoluteUrl);
-        if (!response.ok) throw new Error(`Erreur serveur (${response.status})`);
-        contentType = response.headers.get('content-type') || "";
-        const blob = await response.blob();
-        base64Data = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const b64 = (reader.result as string).split(',')[1];
-            if (b64) resolve(b64);
-            else reject(new Error("Échec Base64"));
-          };
-          reader.readAsDataURL(blob);
+
+        await Filesystem.writeFile({
+          path,
+          data: response.data,
+          directory: Directory.Data,
+          recursive: true
         });
+
+        this.setDownloaded(lessonId, true);
+        this.saveProgress(lessonId, { localPath: path, mimeType: response.headers['Content-Type'] });
+        return path;
       }
 
-      await Filesystem.writeFile({
-        path,
-        data: base64Data,
-        directory: Directory.Data,
-        recursive: true
-      });
+      // WEB Implementation (Cache API)
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        const cache = await caches.open('gsi-media-cache');
+        const cachedResponse = await cache.match(absoluteUrl);
+        if (cachedResponse) return absoluteUrl;
 
-      this.setDownloaded(lessonId, true);
-      this.saveProgress(lessonId, { localPath: path, mimeType: contentType });
-      return path;
+        if (!window.navigator.onLine) throw new Error("Connexion requise.");
+
+        const response = await fetch(this.getMediaUrl(url));
+        if (!response.ok) throw new Error("Erreur de téléchargement.");
+
+        await cache.put(absoluteUrl, response.clone());
+        this.setDownloaded(lessonId, true);
+        return absoluteUrl;
+      }
+
+      return absoluteUrl;
     } catch (e: any) {
       console.error("Pack download failed:", e);
       throw e;
@@ -995,67 +993,63 @@ class GSIStoreClass {
       else if (lowUrl.includes('.mp4')) type = 'video';
     }
 
-    const dispatchViewer = (targetUrl: string) => {
+    const dispatchViewer = (targetUrl: string, isLocal = false) => {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('gsi-open-viewer', {
-          detail: { url: targetUrl, type, originalUrl: absoluteUrl }
+          detail: {
+            url: targetUrl,
+            type,
+            originalUrl: absoluteUrl,
+            lessonId,
+            isLocal,
+            position: progress?.position || 0
+          }
         }));
       }
     };
 
     try {
-      // 1. Check for cached/downloaded file
-      if (progress?.localPath) {
+      // 1. Check for cached/downloaded file (NATIVE)
+      if (Capacitor.isNativePlatform() && progress?.localPath) {
         try {
           const path = progress.localPath;
-          const stats = await Filesystem.stat({ path, directory: Directory.Data });
-
-          // Debug trace for local file
-          console.log(`GSIStore: Found local file at ${path}, size: ${stats.size}`);
-
-          // FOR MULTIMEDIA: Use file URI directly (better for large videos/images)
           if (type === 'video' || type === 'image') {
              const fileUri = await Filesystem.getUri({ path, directory: Directory.Data });
-             dispatchViewer(Capacitor.convertFileSrc(fileUri.uri));
+             dispatchViewer(Capacitor.convertFileSrc(fileUri.uri), true);
              return;
           }
-
-          // FOR DOCUMENTS: Use Blob (better for Render Engines like PDF.js/Mammoth)
           const file = await Filesystem.readFile({ path, directory: Directory.Data });
-          const dataStr = typeof file.data === 'string' ? file.data : '';
-
-          let actualMime = progress.mimeType || mime;
-          if (!actualMime) {
-             actualMime = type === 'pdf' ? 'application/pdf' :
-                          type === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' :
-                          type === 'video' ? 'video/mp4' : 'image/jpeg';
-          }
-
-          const blob = this.b64toBlob(dataStr, actualMime);
-          const blobUrl = URL.createObjectURL(blob);
-          console.log(`GSIStore: Dispatched Blob URL for ${type}`);
-          dispatchViewer(blobUrl);
+          const blob = this.b64toBlob(file.data as string, progress.mimeType || "");
+          dispatchViewer(URL.createObjectURL(blob), true);
           return;
         } catch (e) {
-          console.warn("GSIStore: Local file check failed, re-downloading...", e);
           this.setDownloaded(lessonId, false);
         }
       }
 
-      // 2. If not cached, download then open
-      if (window.navigator.onLine) {
-        const fileName = absoluteUrl.split('/').pop() || (type === 'pdf' ? 'doc.pdf' : type === 'docx' ? 'doc.docx' : 'video.mp4');
-        const path = await this.downloadPackFile(absoluteUrl, fileName, lessonId);
+      // 2. Check for cached/downloaded file (WEB)
+      if (!Capacitor.isNativePlatform() && typeof window !== 'undefined' && 'caches' in window) {
+        const cache = await caches.open('gsi-media-cache');
+        const cachedResponse = await cache.match(absoluteUrl);
+        if (cachedResponse) {
+          const blob = await cachedResponse.blob();
+          dispatchViewer(URL.createObjectURL(blob), true);
+          return;
+        }
+      }
 
-        // RECURSIVE CALL to use the newly cached logic
+      // 3. If not cached, try to download/cache then open
+      if (window.navigator.onLine) {
+        const fileName = absoluteUrl.split('/').pop() || 'file';
+        await this.downloadPackFile(url, fileName, lessonId);
         return this.openPackFile(lessonId, url);
       } else {
-        // Stream directly if online (fallback)
-        dispatchViewer(absoluteUrl);
+        // Last resort fallback
+        dispatchViewer(this.getMediaUrl(url));
       }
     } catch (e: any) {
       console.error("Open pack failed:", e);
-      dispatchViewer(absoluteUrl);
+      dispatchViewer(this.getMediaUrl(url));
     }
   }
 

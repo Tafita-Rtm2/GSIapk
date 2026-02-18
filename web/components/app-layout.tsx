@@ -28,13 +28,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
 
-  const [viewerData, setViewerData] = useState<{ url: string, type: string, originalUrl?: string } | null>(null);
+  const [viewerData, setViewerData] = useState<{ url: string, type: string, originalUrl?: string, lessonId?: string, position?: number } | null>(null);
   const [viewerLoading, setViewerLoading] = useState(true);
 
   useEffect(() => {
     setUser(GSIStore.getCurrentUser());
 
     // Request permissions for notifications
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      Notification.requestPermission();
+    }
     if (typeof window !== 'undefined' && 'Capacitor' in window) {
        import('@capacitor/local-notifications').then(ln => {
           ln.LocalNotifications.requestPermissions();
@@ -51,6 +54,40 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
     const unsubSync = GSIStore.subscribeSyncStatus((s) => setIsSyncing(s));
 
+    // Schedule Check for Notifications
+    const scheduleInterval = setInterval(() => {
+       const u = GSIStore.getCurrentUser();
+       if (!u) return;
+
+       const scheds = GSIStore.getCache<Record<string, any>>('schedules') || {};
+       const sched = scheds[`${u.campus}_${u.niveau}`];
+       if (!sched || !sched.slots) return;
+
+       const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+       const currentDay = days[new Date().getDay()];
+       const now = new Date();
+       const nowMin = now.getHours() * 60 + now.getMinutes();
+
+       sched.slots.forEach((slot: any) => {
+          if (slot.day === currentDay && slot.startTime) {
+             try {
+                const [h, m] = slot.startTime.split(':').map(Number);
+                const startMin = h * 60 + m;
+                const diff = startMin - nowMin;
+
+                // Alert 10 minutes before
+                if (diff === 10) {
+                   const msg = `Cours de ${slot.subject} dans 10 minutes (Salle ${slot.room})`;
+                   if (Notification.permission === 'granted') {
+                      new Notification("GSI Planning", { body: msg, icon: '/web/icon-192.png' });
+                   }
+                   toast.info(msg, { duration: 10000 });
+                }
+             } catch (e) {}
+          }
+       });
+    }, 60000); // Check every minute
+
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
@@ -60,6 +97,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener('gsi-open-viewer', handleOpen);
       unsubSync();
+      clearInterval(scheduleInterval);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -149,6 +187,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <GSIViewer
                 url={viewerData.url}
                 type={viewerData.type as any}
+                lessonId={viewerData.lessonId}
+                initialPosition={viewerData.position}
                 onLoadComplete={() => setViewerLoading(false)}
                 onError={(err) => {
                   setViewerLoading(false);

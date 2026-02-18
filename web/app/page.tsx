@@ -242,8 +242,14 @@ export default function Home() {
                  <div className="space-y-4">
                     {subjects.slice(0, 4).map((sub, i) => {
                        const subLessons = lessons.filter(l => l.subject === sub);
-                       const completedCount = subLessons.filter(l => progressData[l.id]?.completed).length;
-                       const prog = subLessons.length > 0 ? Math.round((completedCount / subLessons.length) * 100) : 0;
+                       // Progression: Completed = 100%, In Progress (has position) = 50%, Not started = 0%
+                       const totalProg = subLessons.reduce((acc, l) => {
+                          const p = progressData[l.id];
+                          if (p?.completed) return acc + 100;
+                          if (p?.position) return acc + 50;
+                          return acc;
+                       }, 0);
+                       const prog = subLessons.length > 0 ? Math.round(totalProg / subLessons.length) : 0;
                        const colors = ["bg-indigo-500", "bg-emerald-500", "bg-orange-500", "bg-rose-500"];
                        return (
                           <div key={sub}>

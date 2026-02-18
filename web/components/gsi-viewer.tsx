@@ -15,21 +15,23 @@ if (typeof window !== 'undefined') {
 interface GSIViewerProps {
   url: string;
   type: 'pdf' | 'video' | 'docx' | 'image';
+  lessonId?: string;
+  initialPosition?: number;
   onLoadComplete?: () => void;
   onError?: (err: string) => void;
 }
 
-export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps) {
+export function GSIViewer({ url, type, lessonId, initialPosition = 0, onLoadComplete, onError }: GSIViewerProps) {
   const [loading, setLoading] = useState(true);
   const [pdfData, setPdfData] = useState<{ numPages: number; currentPage: number } | null>(null);
   const [scale, setScale] = useState(1.5);
   const [docxHtml, setDocxHtml] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    console.log(`[GSI-DEBUG] Viewer type: ${type}`);
-    console.log(`[GSI-DEBUG] Original URL: ${url}`);
+    console.log(`[GSI-DEBUG] Viewer type: ${type} at position ${initialPosition}`);
 
     // Tentative de détection si l'URL est correcte
     if (!url || url === "undefined") {
@@ -40,7 +42,7 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
 
     setLoading(true);
     if (type === 'pdf') {
-      renderPdf();
+      renderPdf(initialPosition || 1);
     } else if (type === 'docx') {
       renderDocx();
     } else if (type === 'video' || type === 'image') {
@@ -52,10 +54,26 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
     }
   }, [url, type]);
 
+  const saveProgress = (pos: number) => {
+    if (lessonId && typeof window !== 'undefined') {
+      const all = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
+      all[lessonId] = { ...(all[lessonId] || {}), position: pos, ts: Date.now() };
+      localStorage.setItem('gsi_progress', JSON.stringify(all));
+    }
+  };
+
+  const getProxyUrl = (targetUrl: string) => {
+    if (!targetUrl.startsWith('http')) return targetUrl;
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}/web/api/proxy?url=${encodeURIComponent(targetUrl)}`;
+    }
+    return `/web/api/proxy?url=${encodeURIComponent(targetUrl)}`;
+  };
+
   const renderPdf = async (pageNum = 1, currentScale = scale) => {
     try {
       // Use proxy for remote URLs to avoid CORS, use directly for Blobs
-      const targetUrl = url.startsWith('http') ? `/web/api/proxy?url=${encodeURIComponent(url)}` : url;
+      const targetUrl = getProxyUrl(url);
 
       const loadingTask = pdfjsLib.getDocument({
         url: targetUrl,
@@ -63,9 +81,11 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
       });
 
       const pdf = await loadingTask.promise;
-      setPdfData({ numPages: pdf.numPages, currentPage: pageNum });
+      const safePage = Math.min(Math.max(pageNum, 1), pdf.numPages);
+      setPdfData({ numPages: pdf.numPages, currentPage: safePage });
+      saveProgress(safePage);
 
-      const page = await pdf.getPage(pageNum);
+      const page = await pdf.getPage(safePage);
       const viewport = page.getViewport({ scale: currentScale });
 
       const canvas = canvasRef.current;
@@ -211,13 +231,25 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
         {type === 'video' && (
           <div className="w-full h-full flex items-center justify-center bg-black rounded-3xl overflow-hidden shadow-2xl">
             <video
+              ref={videoRef}
               className="w-full max-h-full"
               controls
               autoPlay
               playsInline
               muted
-              controlsList="nodownload"
+              controlsList="nodownload noplaybackrate"
+              onContextMenu={(e) => e.preventDefault()}
               key={url}
+              onLoadedMetadata={() => {
+                if (videoRef.current && initialPosition) {
+                  videoRef.current.currentTime = initialPosition;
+                }
+              }}
+              onTimeUpdate={() => {
+                if (videoRef.current && videoRef.current.currentTime > 0) {
+                  saveProgress(videoRef.current.currentTime);
+                }
+              }}
               onLoadedData={() => {
                 console.log("[GSI-DEBUG] Video loaded successfully");
                 setLoading(false);
@@ -230,7 +262,7 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
               }}
             >
               {url.startsWith('http') ? (
-                <source src={`/web/api/proxy?url=${encodeURIComponent(url)}`} type="video/mp4" />
+                <source src={getProxyUrl(url)} type="video/mp4" />
               ) : (
                 <source src={url} type="video/mp4" />
               )}
@@ -245,9 +277,10 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
           <div className="flex flex-col items-center gap-4">
             <div className="overflow-auto max-w-full rounded-2xl shadow-xl">
                <img
-                 src={url.startsWith('http') ? `/web/api/proxy?url=${encodeURIComponent(url)}` : url}
+                 src={getProxyUrl(url)}
                  style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }}
-                 className="h-auto transition-transform duration-200"
+                 className="h-auto transition-transform duration-200 select-none pointer-events-none"
+                 onContextMenu={(e) => e.preventDefault()}
                  alt="Document"
                  onLoad={() => {
                    console.log("[GSI-DEBUG] Image loaded successfully");

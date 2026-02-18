@@ -42,24 +42,31 @@ app.get('/web/api/proxy', async (req, res) => {
   if (!url) return res.status(400).send("URL manquante");
 
   try {
+    console.log(`[PROXY] Fetching: ${url}`);
     const response = await fetch(url, {
       headers: {
-        'Range': req.headers.range || ''
+        'Range': req.headers.range || '',
+        'User-Agent': req.headers['user-agent'] || 'GSI-Web-Proxy'
       }
     });
 
     res.status(response.status);
 
     // Transférer les headers importants
-    const headersToTransfer = ['content-type', 'content-length', 'accept-ranges', 'content-range'];
+    const headersToTransfer = ['content-type', 'content-length', 'accept-ranges', 'content-range', 'cache-control'];
     headersToTransfer.forEach(h => {
       const val = response.headers.get(h);
       if (val) res.setHeader(h, val);
     });
 
+    // Allow browser caching for proxy responses to improve performance
+    if (!response.headers.get('cache-control')) {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+    }
+
     response.body.pipe(res);
   } catch (error) {
-    console.error("Erreur proxy:", error.message);
+    console.error(`[PROXY ERROR] for ${url}:`, error.message);
     res.status(500).send("Erreur de chargement du média");
   }
 });
