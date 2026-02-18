@@ -441,7 +441,7 @@ export default function ProfessorPage() {
                  <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center font-bold text-indigo-600 overflow-hidden">
                     {s.photo ? (
                       <img
-                        src={GSIStore.getAbsoluteUrl(s.photo)}
+                        src={GSIStore.getMediaUrl(s.photo)}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           e.currentTarget.src = `https://api.dicebear.com/7.x/initials/svg?seed=${s.fullName}`;

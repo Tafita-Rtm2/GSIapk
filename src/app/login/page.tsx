@@ -43,7 +43,7 @@ export default function LoginPage() {
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminCode === "Nina GSI") {
+    if (adminCode === GSIStore.getAdminCode()) {
       const adminUser = await GSIStore.login("admin@gsi.mg", "password");
       if (adminUser) {
         toast.success("Accès Administrateur accordé");
@@ -68,7 +68,7 @@ export default function LoginPage() {
 
   const handleProfLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (profPass === "prof-gsi-mg") {
+    if (profPass === GSIStore.getProfPass()) {
       const profUser = await GSIStore.login("prof@gsi.mg", "password");
       if (profUser) {
         toast.success("Accès Professeur accordé");

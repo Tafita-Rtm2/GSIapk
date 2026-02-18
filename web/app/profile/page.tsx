@@ -62,7 +62,7 @@ export default function ProfilePage() {
           <div className="relative mb-4">
             <div className="w-24 h-24 rounded-full border-4 border-white overflow-hidden shadow-lg bg-white/20 flex items-center justify-center">
               <img
-                src={GSIStore.getAbsoluteUrl(user.photo) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
+                src={GSIStore.getMediaUrl(user.photo) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
                 alt="Profile"
                 className="w-full h-full object-cover"
                 onError={(e) => {
@@ -238,7 +238,7 @@ export default function ProfilePage() {
               <div className="flex items-center gap-4">
                  <div className="w-16 h-16 rounded-2xl border-2 border-white/30 overflow-hidden shadow-lg bg-white/10">
                     <img
-                      src={GSIStore.getAbsoluteUrl(user.photo) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
+                      src={GSIStore.getMediaUrl(user.photo) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`;

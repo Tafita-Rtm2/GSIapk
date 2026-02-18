@@ -160,7 +160,7 @@ export default function Home() {
           <div className="flex items-center gap-4">
              <Link href="/profile" className="w-14 h-14 rounded-[22px] bg-white p-0.5 shadow-xl shadow-indigo-100/50 border border-indigo-50 rotate-[-3deg] hover:rotate-0 transition-all duration-500 overflow-hidden">
                 <img
-                  src={user.photo ? GSIStore.getAbsoluteUrl(user.photo) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
+                  src={user.photo ? GSIStore.getMediaUrl(user.photo) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
                   alt="Avatar"
                   className="w-full h-full object-cover rounded-[20px]"
                   onError={(e) => {

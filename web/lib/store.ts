@@ -842,24 +842,24 @@ class GSIStoreClass {
 
   getAbsoluteUrl(url: string | undefined): string {
     if (!url || url === "undefined" || url === "null") return "";
-
-    // Si c'est déjà une URL absolue, on ne fait rien
+    // Robust URL handling: if it's already absolute, return as is.
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
        return url;
     }
-
-    // On nettoie la base pour éviter le slash final
-    const base = MEDIA_BASE.replace(/\/+$/, '');
-
-    // Logique identique à l'APK : pour les fichiers, on ENLÈVE "/api/" si présent
-    // car ils sont servis directement à la racine du backend rtmggmg/files/view/
-    let path = url;
-    if (path.includes('files/view/')) {
-       path = path.replace('api/', '').replace('/api/', '');
+    // Handle special case for files/view if it's a short relative path
+    if (url.startsWith('files/view/') || url.startsWith('api/files/view/') || url.startsWith('/api/files/view/')) {
+       let path = url.replace('api/', '').replace('/api/', '');
+       return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
     }
+    // For relative paths from the custom API
+    const base = MEDIA_BASE;
+    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+  }
 
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
-    return `${base}${cleanPath}`;
+  getMediaUrl(url: string | undefined): string {
+    const absUrl = this.getAbsoluteUrl(url);
+    if (!absUrl || !absUrl.startsWith('http')) return absUrl;
+    return `/web/api/proxy?url=${encodeURIComponent(absUrl)}`;
   }
 
   getStudentQrData(user: User): string {

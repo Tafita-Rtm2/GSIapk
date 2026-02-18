@@ -54,11 +54,11 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
 
   const renderPdf = async (pageNum = 1, currentScale = scale) => {
     try {
-      // Proxy URL for PDF to avoid CORS
-      const proxyUrl = `/web/api/proxy?url=${encodeURIComponent(url)}`;
+      // Use proxy for remote URLs to avoid CORS, use directly for Blobs
+      const targetUrl = url.startsWith('http') ? `/web/api/proxy?url=${encodeURIComponent(url)}` : url;
 
       const loadingTask = pdfjsLib.getDocument({
-        url: proxyUrl,
+        url: targetUrl,
         withCredentials: false
       });
 
@@ -229,7 +229,12 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
                 onError?.("Format vidéo non supporté ou accès refusé.");
               }}
             >
-              <source src={`/web/api/proxy?url=${encodeURIComponent(url)}`} type="video/mp4" />
+              {url.startsWith('http') ? (
+                <source src={`/web/api/proxy?url=${encodeURIComponent(url)}`} type="video/mp4" />
+              ) : (
+                <source src={url} type="video/mp4" />
+              )}
+              {/* Fallback direct if proxy fails or not used */}
               <source src={url} type="video/mp4" />
               Votre navigateur ne supporte pas la lecture de vidéos.
             </video>
@@ -240,7 +245,7 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
           <div className="flex flex-col items-center gap-4">
             <div className="overflow-auto max-w-full rounded-2xl shadow-xl">
                <img
-                 src={`/web/api/proxy?url=${encodeURIComponent(url)}`}
+                 src={url.startsWith('http') ? `/web/api/proxy?url=${encodeURIComponent(url)}` : url}
                  style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }}
                  className="h-auto transition-transform duration-200"
                  alt="Document"

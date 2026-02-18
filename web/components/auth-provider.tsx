@@ -50,20 +50,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (loading) return;
 
     const publicPaths = ["/login", "/admincreat"];
-    const isPublicPath = publicPaths.some(p => pathname === p || pathname === p + "/");
+    // On normalize le pathname pour enlever les doubles slashes et s'assurer qu'il finit par /
+    const normalizedPath = pathname?.endsWith("/") ? pathname : pathname + "/";
+    const isPublicPath = publicPaths.some(p => {
+      const normalizedP = p.endsWith("/") ? p : p + "/";
+      return normalizedPath === normalizedP;
+    });
 
     if (user && isPublicPath) {
-      // Si on est sur une page publique mais connecté, on redirige vers le dashboard approprié
+      // Si on est sur une page publique (login/register) mais déjà connecté, on redirige vers le dashboard
       if (user.role === 'admin') {
-        if (pathname !== "/admin/") router.replace("/admin/");
+        if (normalizedPath !== "/admin/") router.replace("/admin/");
       } else if (user.role === 'professor') {
-        if (pathname !== "/professor/") router.replace("/professor/");
+        if (normalizedPath !== "/professor/") router.replace("/professor/");
       } else {
-        if (pathname !== "/") router.replace("/");
+        if (normalizedPath !== "/") router.replace("/");
       }
     } else if (!user && !isPublicPath) {
       // Si on n'est pas connecté et pas sur une page publique, on force le login
-      if (pathname !== "/login" && pathname !== "/login/") {
+      if (normalizedPath !== "/login/") {
         router.replace("/login/");
       }
     }

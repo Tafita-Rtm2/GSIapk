@@ -225,7 +225,7 @@ export default function AdminPage() {
                   <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center overflow-hidden font-bold">
                     {u.photo ? (
                       <img
-                        src={GSIStore.getAbsoluteUrl(u.photo)}
+                        src={GSIStore.getMediaUrl(u.photo)}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           e.currentTarget.src = `https://api.dicebear.com/7.x/initials/svg?seed=${u.fullName}`;
@@ -520,7 +520,7 @@ export default function AdminPage() {
                  <div className="flex flex-col items-center text-center">
                     <div className="w-24 h-24 rounded-[32px] border-4 border-white/20 overflow-hidden shadow-2xl bg-white/10 mb-4">
                        <img
-                         src={GSIStore.getAbsoluteUrl(viewingStudent.photo) || `https://api.dicebear.com/7.x/initials/svg?seed=${viewingStudent.fullName}`}
+                         src={GSIStore.getMediaUrl(viewingStudent.photo) || `https://api.dicebear.com/7.x/initials/svg?seed=${viewingStudent.fullName}`}
                          className="w-full h-full object-cover"
                          onError={(e) => { e.currentTarget.src = `https://api.dicebear.com/7.x/initials/svg?seed=${viewingStudent.fullName}`; }}
                        />
