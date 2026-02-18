@@ -47,18 +47,13 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
 
   const renderPdf = async (pageNum = 1, currentScale = scale) => {
     try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const arrayBuffer = await response.arrayBuffer();
+      // Pour éviter les problèmes de CORS avec fetch, on passe directement l'URL à pdf.js
+      // Mais on garde une option de repli
+      const loadingTask = pdfjsLib.getDocument({
+        url: url,
+        withCredentials: false
+      });
 
-      // Basic PDF magic number check (%PDF-)
-      const header = new Uint8Array(arrayBuffer.slice(0, 5));
-      const headerString = String.fromCharCode(...header);
-      if (!headerString.includes('%PDF-')) {
-         throw new Error("Le fichier n'est pas un document PDF valide.");
-      }
-
-      const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
       const pdf = await loadingTask.promise;
       setPdfData({ numPages: pdf.numPages, currentPage: pageNum });
 
@@ -214,11 +209,10 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
               playsInline
               muted
               controlsList="nodownload"
-              crossOrigin="anonymous"
               key={url}
               onError={(e) => {
                 console.error("Video error event:", e);
-                onError?.("Format vidéo non supporté ou accès refusé. Vérifiez les permissions CORS.");
+                onError?.("Format vidéo non supporté ou accès refusé.");
               }}
             >
               <source src={url} type="video/mp4" />
