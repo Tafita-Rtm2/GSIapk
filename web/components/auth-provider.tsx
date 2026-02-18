@@ -23,9 +23,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Hydrate state from store on mount (client-side only)
-    const initialUser = GSIStore.getCurrentUser();
-    setUser(initialUser);
-    setLoading(false);
+    const init = async () => {
+      await GSIStore.ensureConfig();
+      const initialUser = GSIStore.getCurrentUser();
+      setUser(initialUser);
+      setLoading(false);
+    };
+    init();
 
     // Store Listener (Handles all session updates)
     const unsubscribeStore = GSIStore.subscribe((newUser) => {
@@ -45,15 +49,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
 
-    const publicPaths = ["/login"];
-    const isPublicPath = publicPaths.includes(pathname);
+    const publicPaths = ["/login", "/admincreat"];
+    const isPublicPath = publicPaths.some(p => pathname === p || pathname === p + "/");
 
     if (user && isPublicPath) {
-      if (user.role === 'admin') router.replace("/admin");
-      else if (user.role === 'professor') router.replace("/professor");
-      else router.replace("/");
+      // Si on est sur une page publique mais connecté, on redirige vers le dashboard approprié
+      if (user.role === 'admin') {
+        if (pathname !== "/admin/") router.replace("/admin/");
+      } else if (user.role === 'professor') {
+        if (pathname !== "/professor/") router.replace("/professor/");
+      } else {
+        if (pathname !== "/") router.replace("/");
+      }
     } else if (!user && !isPublicPath) {
-      router.replace("/login");
+      // Si on n'est pas connecté et pas sur une page publique, on force le login
+      if (pathname !== "/login" && pathname !== "/login/") {
+        router.replace("/login/");
+      }
     }
   }, [user, loading, pathname, router]);
 

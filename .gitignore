@@ -15,7 +15,8 @@
 
 # next.js
 /.next/
-/out/
+# /out/ is allowed for the web folder as requested by the user
+!web/out/
 
 # production
 /build
@@ -48,3 +49,6 @@ firestore-debug.log
 android/app/build
 android/app/src/main/assets/public
 android/app/src/main/assets/capacitor.config.json
+
+web/node_modules/
+web/.next/

@@ -7,13 +7,11 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { toast } from 'sonner';
 
 // --- CONFIGURATION ---
-// IMPORTANT: Assurez-vous que ces URLs correspondent exactement à votre config serveur.
-// Un slash manquant ou un domaine sans 'www' peut causer des erreurs 301.
-const API_BASE = "https://groupegsi.mg/rtmggmg/api";
-const MEDIA_BASE = "https://groupegsi.mg/rtmggmg";
-
+let API_BASE = "https://groupegsi.mg/rtmggmg/api";
+let MEDIA_BASE = "https://groupegsi.mg/rtmggmg";
 let ADMIN_CODE = "Nina GSI";
 let PROF_PASS = "prof-gsi-mg";
+let configPromise: Promise<any> | null = null;
 
 // Types
 export interface User {
@@ -122,10 +120,46 @@ class GSIStoreClass {
   constructor() {
     if (typeof window !== 'undefined') {
       this.hydrate();
+      this.initRemoteConfig();
       // Wait a bit before syncing to let UI render first
       setTimeout(() => this.startGlobalSync(), 2000);
       window.addEventListener('beforeunload', () => this.saveImmediate());
     }
+  }
+
+  private async initRemoteConfig() {
+    if (configPromise) return configPromise;
+
+    configPromise = (async () => {
+      try {
+        // Try multiple paths for config
+        const paths = ['/web/api/config', '/api/config', './api/config'];
+        for (const path of paths) {
+          try {
+            const res = await fetch(path);
+            if (res.ok) {
+              const config = await res.json();
+              if (config.API_BASE) API_BASE = config.API_BASE;
+              if (config.MEDIA_BASE) MEDIA_BASE = config.MEDIA_BASE;
+              if (config.ADMIN_CODE) ADMIN_CODE = config.ADMIN_CODE;
+              if (config.PROF_PASS) PROF_PASS = config.PROF_PASS;
+              console.log(`GSIStore: Config loaded from ${path}`, { API_BASE, MEDIA_BASE });
+              return config;
+            }
+          } catch (e) {}
+        }
+      } catch (e) {
+        console.warn("GSIStore: Failed to load remote config, using defaults");
+      }
+      return { API_BASE, MEDIA_BASE };
+    })();
+
+    return configPromise;
+  }
+
+  public async ensureConfig() {
+    if (typeof window === 'undefined') return;
+    return this.initRemoteConfig();
   }
 
   private hydrate() {
@@ -196,9 +230,6 @@ class GSIStoreClass {
        this.autoDownloadEssentials();
     });
 
-    // Sync remote config (Admin/Prof codes)
-    this.syncRemoteConfig();
-
     // Background polling for general data
     setInterval(() => {
        this.syncAll();
@@ -235,7 +266,6 @@ class GSIStoreClass {
   private async syncAll() {
      return Promise.all([
        this.fetchCollection('users', 'users'),
-       this.syncRemoteConfig(),
        this.fetchCollection('lessons', 'lessons'),
        this.fetchCollection('assignments', 'assignments'),
        this.fetchCollection('announcements', 'announcements'),
@@ -387,20 +417,6 @@ class GSIStoreClass {
 
   // --- CUSTOM AUTH ---
 
-  private async syncRemoteConfig() {
-    try {
-      const data = await this.apiCall('/db/system_config');
-      if (data && Array.isArray(data) && data.length > 0) {
-        const config = data[0];
-        if (config.ADMIN_CODE) ADMIN_CODE = config.ADMIN_CODE;
-        if (config.PROF_PASS) PROF_PASS = config.PROF_PASS;
-      }
-    } catch (e) {}
-  }
-
-  getAdminCode() { return ADMIN_CODE; }
-  getProfPass() { return PROF_PASS; }
-
   async login(email: string, password: string): Promise<User | null> {
     const q = encodeURIComponent(JSON.stringify({ email, password }));
     const data = await this.apiCall(`/db/users?q=${q}`);
@@ -442,6 +458,9 @@ class GSIStoreClass {
      }
      return false;
   }
+
+  getAdminCode() { return ADMIN_CODE; }
+  getProfPass() { return PROF_PASS; }
 
   // --- STORE ACCESS ---
 
@@ -823,18 +842,24 @@ class GSIStoreClass {
 
   getAbsoluteUrl(url: string | undefined): string {
     if (!url || url === "undefined" || url === "null") return "";
-    // Robust URL handling: if it's already absolute, return as is.
+
+    // Si c'est déjà une URL absolue, on ne fait rien
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
        return url;
     }
-    // Handle special case for files/view if it's a short relative path
-    if (url.startsWith('files/view/') || url.startsWith('api/files/view/') || url.startsWith('/api/files/view/')) {
-       let path = url.replace('api/', '').replace('/api/', '');
-       return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+
+    // On nettoie la base pour éviter le slash final
+    const base = MEDIA_BASE.replace(/\/+$/, '');
+
+    // Logique identique à l'APK : pour les fichiers, on ENLÈVE "/api/" si présent
+    // car ils sont servis directement à la racine du backend rtmggmg/files/view/
+    let path = url;
+    if (path.includes('files/view/')) {
+       path = path.replace('api/', '').replace('/api/', '');
     }
-    // For relative paths from the custom API
-    const base = MEDIA_BASE;
-    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${base}${cleanPath}`;
   }
 
   getStudentQrData(user: User): string {

@@ -28,8 +28,8 @@ export default function LoginPage() {
       const userData = await GSIStore.login(email, password);
       if (userData) {
         toast.success("Ravi de vous revoir !", { id: toastId });
-        if (userData.role === 'admin') router.push("/admin");
-        else if (userData.role === 'professor') router.push("/professor");
+        if (userData.role === 'admin') router.push("/admin/");
+        else if (userData.role === 'professor') router.push("/professor/");
         else router.push("/");
       } else {
         toast.error("Identifiants incorrects ou profil introuvable.", { id: toastId });
@@ -43,11 +43,11 @@ export default function LoginPage() {
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminCode === "Nina GSI") {
+    if (adminCode === GSIStore.getAdminCode()) {
       const adminUser = await GSIStore.login("admin@gsi.mg", "password");
       if (adminUser) {
         toast.success("Accès Administrateur accordé");
-        router.push("/admin");
+        router.push("/admin/");
       } else {
          GSIStore.setCurrentUser({
             id: 'admin-id',
@@ -59,7 +59,7 @@ export default function LoginPage() {
             niveau: 'N/A'
           });
           toast.success("Accès Administrateur (Local)");
-          router.push("/admin");
+          router.push("/admin/");
       }
     } else {
       toast.error("Code administrateur incorrect");
@@ -68,11 +68,11 @@ export default function LoginPage() {
 
   const handleProfLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (profPass === "prof-gsi-mg") {
+    if (profPass === GSIStore.getProfPass()) {
       const profUser = await GSIStore.login("prof@gsi.mg", "password");
       if (profUser) {
         toast.success("Accès Professeur accordé");
-        router.push("/professor");
+        router.push("/professor/");
       } else {
         GSIStore.setCurrentUser({
             id: 'prof-id',
@@ -84,7 +84,7 @@ export default function LoginPage() {
             niveau: 'Multiple'
           });
           toast.success("Accès Professeur (Local)");
-          router.push("/professor");
+          router.push("/professor/");
       }
     } else {
       toast.error("Mot de passe professeur incorrect");
