@@ -32,7 +32,7 @@ import { GSIStore, User, Lesson, Assignment, Grade, Announcement, Submission } f
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
-import { CAMPUSES, ALL_FILIERES as FILIERES, NIVEAUX } from "@/lib/constants";
+import { CAMPUSES, ALL_FILIERES as FILIERES, NIVEAUX, CAMPUS_FILIERES } from "@/lib/constants";
 import * as XLSX from 'xlsx';
 
 export default function ProfessorPage() {
@@ -80,8 +80,8 @@ export default function ProfessorPage() {
     };
   }, [router]);
 
-  const [selectedFilieres, setSelectedFilieres] = useState<string[]>([]);
-  const [selectedCampuses, setSelectedCampuses] = useState<string[]>([]);
+  const [selectedFiliere, setSelectedFiliere] = useState<string>("");
+  const [selectedCampus, setSelectedCampus] = useState<string>("");
 
   const handleSendAnnouncement = async (e: any) => {
     e.preventDefault();
@@ -95,19 +95,19 @@ export default function ProfessorPage() {
       message,
       date: new Date().toISOString(),
       author: "Professeur",
-      campus: selectedCampuses,
-      filiere: selectedFilieres,
+      campus: [selectedCampus],
+      filiere: [selectedFiliere],
       niveau: niveau === "Tous" ? undefined : niveau
     });
 
-    toast.success("Annonce envoyée à vos classes !");
+    toast.success("Annonce envoyée à votre promo !");
     e.target.reset();
     setActiveTab("dashboard");
   };
 
   const handlePublishLesson = async (e: any) => {
     e.preventDefault();
-    if (selectedFilieres.length === 0 || selectedCampuses.length === 0) {
+    if (!selectedFiliere || !selectedCampus) {
       toast.error("Filière et campus obligatoires.");
       return;
     }
@@ -135,8 +135,8 @@ export default function ProfessorPage() {
           description: form.description.value,
           subject: form.subject.value,
           niveau: form.niveau.value,
-          filiere: selectedFilieres,
-          campus: selectedCampuses,
+          filiere: [selectedFiliere],
+          campus: [selectedCampus],
           date: new Date().toISOString(),
           files: fileUrls
         });
@@ -175,8 +175,8 @@ export default function ProfessorPage() {
             description: form.description.value,
             subject: form.subject.value,
             niveau: form.niveau.value,
-            filiere: selectedFilieres,
-            campus: selectedCampuses,
+            filiere: [selectedFiliere],
+            campus: [selectedCampus],
             deadline: form.deadline.value,
             timeLimit: "23:59",
             maxScore: 20,
@@ -195,10 +195,10 @@ export default function ProfessorPage() {
   return (
     <div className="flex flex-col min-h-screen max-w-md mx-auto bg-[#F8FAFC] pb-20">
       {/* Quick Setup for publishing */}
-      {(selectedCampuses.length === 0 || selectedFilieres.length === 0) && activeTab === "dashboard" && (
+      {(!selectedCampus || !selectedFiliere) && activeTab === "dashboard" && (
          <div className="bg-orange-50 p-4 border-b border-orange-100 flex items-center gap-3 animate-pulse">
             <Zap size={18} className="text-orange-500" />
-            <p className="text-[10px] font-bold text-orange-700 uppercase tracking-tight">Veuillez sélectionner votre campus et matière pour publier</p>
+            <p className="text-[10px] font-bold text-orange-700 uppercase tracking-tight">Veuillez sélectionner votre campus et matière pour commencer</p>
          </div>
       )}
 
@@ -244,17 +244,27 @@ export default function ProfessorPage() {
           <>
             {/* Section Selection */}
             <div className="bg-white p-6 rounded-[32px] border border-violet-100 shadow-sm space-y-4">
-               <h3 className="text-[10px] font-black uppercase tracking-widest text-violet-600">Votre Section Actuelle</h3>
-               <div className="grid grid-cols-2 gap-2">
-                  {CAMPUSES.map(c => (
-                    <button key={c} onClick={() => selectedCampuses.includes(c) ? setSelectedCampuses(selectedCampuses.filter(x => x !== c)) : setSelectedCampuses([...selectedCampuses, c])} className={cn("p-2 rounded-xl text-[10px] font-bold transition-all", selectedCampuses.includes(c) ? "bg-violet-600 text-white" : "bg-gray-50 text-gray-400 border border-gray-100")}>{c}</button>
-                  ))}
+               <h3 className="text-[10px] font-black uppercase tracking-widest text-violet-600">Configuration de Section</h3>
+
+               <div className="space-y-2">
+                  <p className="text-[9px] font-bold text-gray-400 uppercase ml-2">Sélectionner le Campus</p>
+                  <div className="grid grid-cols-2 gap-2">
+                     {CAMPUSES.map(c => (
+                       <button key={c} onClick={() => { setSelectedCampus(c); setSelectedFiliere(""); }} className={cn("p-2 rounded-xl text-[10px] font-bold transition-all", selectedCampus === c ? "bg-violet-600 text-white shadow-lg shadow-violet-100" : "bg-gray-50 text-gray-400 border border-gray-100")}>{c}</button>
+                     ))}
+                  </div>
                </div>
-               <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 bg-gray-50 rounded-2xl border border-gray-100">
-                  {FILIERES.map(f => (
-                    <button key={f} onClick={() => selectedFilieres.includes(f) ? setSelectedFilieres(selectedFilieres.filter(x => x !== f)) : setSelectedFilieres([...selectedFilieres, f])} className={cn("px-3 py-1.5 rounded-lg text-[9px] font-bold transition-all", selectedFilieres.includes(f) ? "bg-indigo-600 text-white" : "bg-white text-gray-400 border border-gray-100")}>{f}</button>
-                  ))}
-               </div>
+
+               {selectedCampus && (
+                  <div className="space-y-2 animate-in slide-in-from-top-2">
+                     <p className="text-[9px] font-bold text-gray-400 uppercase ml-2">Sélectionner la Filière ({selectedCampus})</p>
+                     <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-2xl border border-gray-100">
+                        {(CAMPUS_FILIERES[selectedCampus] || []).map(f => (
+                          <button key={f} onClick={() => setSelectedFiliere(f)} className={cn("px-3 py-2 rounded-lg text-[9px] font-bold transition-all", selectedFiliere === f ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100" : "bg-white text-gray-400 border border-gray-100")}>{f}</button>
+                        ))}
+                     </div>
+                  </div>
+               )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -267,7 +277,7 @@ export default function ProfessorPage() {
               {id: "media", icon: BookOpen, label: "Médiathèque", color: "bg-emerald-600"},
               {id: "students", icon: Users, label: "Étudiants", color: "bg-indigo-500"}].map(item => (
               <button key={item.id} onClick={() => {
-                 if ((item.id === "lessons" || item.id === "assignments" || item.id === "announcements") && (selectedCampuses.length === 0 || selectedFilieres.length === 0)) {
+                 if ((item.id === "lessons" || item.id === "assignments" || item.id === "announcements" || item.id === "students" || item.id === "grades" || item.id === "schedule") && (!selectedCampus || !selectedFiliere)) {
                     return toast.error("Veuillez d'abord sélectionner un campus et une filière.");
                  }
                  setActiveTab(item.id);
@@ -284,26 +294,13 @@ export default function ProfessorPage() {
           <div className="space-y-6">
             <PageHeader title={activeTab === 'lessons' ? "Publier Leçon" : "Publier Devoir"} onBack={() => setActiveTab("dashboard")} />
             <form onSubmit={activeTab === 'lessons' ? handlePublishLesson : handlePublishAssignment} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
-                <input name="subject" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none" placeholder="Matière" />
-                <input name="title" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none" placeholder="Titre" />
-                <textarea name="description" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none min-h-[100px]" placeholder="Description"></textarea>
-
-                <div className="p-4 bg-gray-50 rounded-2xl space-y-3">
-                   <p className="text-[10px] font-black uppercase text-gray-400">Ciblage (Filières)</p>
-                   <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
-                     {FILIERES.map(f => (
-                       <label key={f} className="flex items-center gap-2 text-[10px] font-bold">
-                         <input type="checkbox" checked={selectedFilieres.includes(f)} onChange={e => e.target.checked ? setSelectedFilieres([...selectedFilieres, f]) : setSelectedFilieres(selectedFilieres.filter(x => x !== f))} /> {f}
-                       </label>
-                     ))}
-                   </div>
+                <div className="p-4 bg-violet-50 rounded-2xl border border-violet-100">
+                   <p className="text-[10px] font-black uppercase text-violet-400 mb-1">Cible</p>
+                   <p className="text-xs font-bold text-violet-700">{selectedCampus} • {selectedFiliere}</p>
                 </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                   {CAMPUSES.map(c => (
-                     <button type="button" key={c} onClick={() => selectedCampuses.includes(c) ? setSelectedCampuses(selectedCampuses.filter(x => x !== c)) : setSelectedCampuses([...selectedCampuses, c])} className={cn("p-2 rounded-xl text-[10px] font-bold transition-all", selectedCampuses.includes(c) ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-400")}>{c}</button>
-                   ))}
-                </div>
+                <input name="subject" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none" placeholder="Matière (ex: Mathématiques)" />
+                <input name="title" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none" placeholder="Titre du document" />
+                <textarea name="description" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none min-h-[100px]" placeholder="Description ou instructions..."></textarea>
 
                 <div className="flex gap-2">
                    <select name="niveau" className="flex-1 p-4 bg-gray-50 rounded-2xl font-bold text-xs">
@@ -321,9 +318,11 @@ export default function ProfessorPage() {
 
             <div className="space-y-3 mt-8">
                <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 px-2">
-                 {activeTab === 'lessons' ? "Vos Leçons" : "Vos Devoirs"}
+                 {activeTab === 'lessons' ? "Archives Leçons" : "Archives Devoirs"}
                </h3>
-               {(activeTab === 'lessons' ? lessons : assignments).map((item: any, i) => (
+               {(activeTab === 'lessons' ? lessons : assignments)
+               .filter(item => item.campus.includes(selectedCampus) && item.filiere.includes(selectedFiliere))
+               .map((item: any, i) => (
                  <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-between shadow-sm group">
                     <div className="flex-1 pr-4">
                        <h4 className="font-bold text-[11px] uppercase mb-1 group-hover:text-violet-600 transition-colors">{item.title}</h4>
@@ -354,6 +353,10 @@ export default function ProfessorPage() {
            <div className="space-y-6">
               <PageHeader title="Mon Emploi du Temps" onBack={() => setActiveTab("dashboard")} />
               <div className="bg-white p-6 rounded-[32px] border border-violet-100 shadow-xl space-y-4">
+                 <div className="p-4 bg-violet-50 rounded-2xl border border-violet-100 mb-2">
+                    <p className="text-[10px] font-black uppercase text-violet-400 mb-1">Target Section</p>
+                    <p className="text-xs font-bold text-violet-700">{selectedCampus} • {selectedFiliere}</p>
+                 </div>
                  <div className="flex justify-between items-center mb-2">
                     <h3 className="text-sm font-bold">Import planning</h3>
                     <button
@@ -374,12 +377,10 @@ export default function ProfessorPage() {
 
                                 toast.success(`${data.length} créneaux détectés. Enregistrement en cours...`);
 
-                                // Professors can add schedules for specific campus/niveau they teach
-                                // We'll prompt them for which class they are importing if not in excel
-                                const targetCampus = prompt("Campus (ex: Antananarivo) ?", CAMPUSES[0]);
-                                const targetNiveau = prompt("Niveau (ex: L1) ?", "L1");
+                                // Professors use their selected campus/filiere
+                                const targetNiveau = prompt("Pour quel niveau (ex: L1) ?", "L1");
 
-                                if (targetCampus && targetNiveau) {
+                                if (targetNiveau) {
                                    const slots = data.map((row: any) => {
                                       const normalizedRow: any = {};
                                       Object.keys(row).forEach(key => {
@@ -398,7 +399,7 @@ export default function ProfessorPage() {
 
                                    GSIStore.addSchedule({
                                       id: Math.random().toString(36).substr(2,9),
-                                      campus: targetCampus,
+                                      campus: selectedCampus,
                                       niveau: targetNiveau,
                                       lastUpdated: new Date().toISOString(),
                                       slots
@@ -427,6 +428,10 @@ export default function ProfessorPage() {
           <div className="space-y-4">
              <PageHeader title="Saisie des Notes" onBack={() => setActiveTab("dashboard")} />
              <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+                <div className="p-4 bg-pink-50 rounded-2xl border border-pink-100 mb-2">
+                   <p className="text-[10px] font-black uppercase text-pink-400 mb-1">Classe Actuelle</p>
+                   <p className="text-xs font-bold text-pink-700">{selectedCampus} • {selectedFiliere}</p>
+                </div>
                 <div className="flex justify-between items-center mb-2">
                    <h3 className="text-sm font-bold">Grille de saisie</h3>
                    <button
@@ -482,7 +487,9 @@ export default function ProfessorPage() {
                 </div>
                 <input id="grade-subject" className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold" placeholder="Matière de l'examen" />
                 <div className="max-h-60 overflow-y-auto space-y-2">
-                   {students.map(s => (
+                   {students
+                   .filter(s => s.campus === selectedCampus && s.filiere === selectedFiliere)
+                   .map(s => (
                      <div key={s.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                         <span className="text-xs font-bold">{s.fullName}</span>
                         <input id={`grade-${s.id}`} type="number" className="w-12 p-2 rounded-lg text-center font-bold" placeholder="-" max="20" />
@@ -525,25 +532,12 @@ export default function ProfessorPage() {
           <div className="space-y-6">
             <PageHeader title="Envoyer une Annonce" onBack={() => setActiveTab("dashboard")} />
             <form onSubmit={handleSendAnnouncement} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+                <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100">
+                   <p className="text-[10px] font-black uppercase text-orange-400 mb-1">Cible</p>
+                   <p className="text-xs font-bold text-orange-700">{selectedCampus} • {selectedFiliere}</p>
+                </div>
                 <input name="title" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none" placeholder="Titre de l'annonce" />
                 <textarea name="message" required className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold outline-none min-h-[100px]" placeholder="Votre message aux étudiants..."></textarea>
-
-                <div className="p-4 bg-gray-50 rounded-2xl space-y-3">
-                   <p className="text-[10px] font-black uppercase text-gray-400">Ciblage (Filières)</p>
-                   <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
-                     {FILIERES.map(f => (
-                       <label key={f} className="flex items-center gap-2 text-[10px] font-bold">
-                         <input type="checkbox" checked={selectedFilieres.includes(f)} onChange={e => e.target.checked ? setSelectedFilieres([...selectedFilieres, f]) : setSelectedFilieres(selectedFilieres.filter(x => x !== f))} /> {f}
-                       </label>
-                     ))}
-                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                   {CAMPUSES.map(c => (
-                     <button type="button" key={c} onClick={() => selectedCampuses.includes(c) ? setSelectedCampuses(selectedCampuses.filter(x => x !== c)) : setSelectedCampuses([...selectedCampuses, c])} className={cn("p-2 rounded-xl text-[10px] font-bold transition-all", selectedCampuses.includes(c) ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-400")}>{c}</button>
-                   ))}
-                </div>
 
                 <select name="niveau" className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-xs">
                    <option>Tous</option>
@@ -571,8 +565,11 @@ export default function ProfessorPage() {
 
         {activeTab === "students" && (
           <div className="space-y-4">
-            <PageHeader title="Mes Étudiants" onBack={() => setActiveTab("dashboard")} />
-            {students.map((s, i) => (
+            <PageHeader title={`Étudiants ${selectedCampus}`} onBack={() => setActiveTab("dashboard")} />
+            <p className="text-[10px] font-bold text-gray-400 uppercase ml-2">{selectedFiliere}</p>
+            {students
+            .filter(s => s.campus === selectedCampus && s.filiere === selectedFiliere)
+            .map((s, i) => (
               <div key={i} className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm">
                  <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center font-bold text-indigo-600 overflow-hidden">
                     {s.photo ? (
@@ -595,34 +592,19 @@ export default function ProfessorPage() {
           <div className="space-y-4">
              <PageHeader title="Devoirs Reçus" onBack={() => setActiveTab("dashboard")} />
 
-             {/* Submissions Filters */}
-             <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm space-y-3">
-                <p className="text-[10px] font-black uppercase text-gray-400">Filtrer les rendus</p>
-                <div className="grid grid-cols-2 gap-2">
-                   <select
-                     value={subFilterCampus}
-                     onChange={(e) => setSubFilterCampus(e.target.value)}
-                     className="p-3 bg-gray-50 rounded-xl text-[10px] font-bold outline-none"
-                   >
-                      <option value="">Tous les Campus</option>
-                      {CAMPUSES.map(c => <option key={c} value={c}>{c}</option>)}
-                   </select>
-                   <select
-                     value={subFilterNiveau}
-                     onChange={(e) => setSubFilterNiveau(e.target.value)}
-                     className="p-3 bg-gray-50 rounded-xl text-[10px] font-bold outline-none"
-                   >
-                      <option value="">Tous les Niveaux</option>
-                      {NIVEAUX.map(n => <option key={n} value={n}>{n}</option>)}
-                   </select>
+             {/* Active Section Filter */}
+             <div className="bg-white p-4 rounded-3xl border border-violet-100 shadow-sm flex items-center justify-between">
+                <div>
+                   <p className="text-[8px] font-black uppercase text-gray-400">Filtrage Actif</p>
+                   <p className="text-[10px] font-bold text-violet-600 uppercase">{selectedCampus} • {selectedFiliere}</p>
                 </div>
                 <select
-                   value={subFilterFiliere}
-                   onChange={(e) => setSubFilterFiliere(e.target.value)}
-                   className="w-full p-3 bg-gray-50 rounded-xl text-[10px] font-bold outline-none"
+                   value={subFilterNiveau}
+                   onChange={(e) => setSubFilterNiveau(e.target.value)}
+                   className="p-2 bg-gray-50 rounded-xl text-[10px] font-bold outline-none border border-gray-100"
                 >
-                   <option value="">Toutes les Filières</option>
-                   {FILIERES.map(f => <option key={f} value={f}>{f}</option>)}
+                   <option value="">Tous Niveaux</option>
+                   {NIVEAUX.map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
              </div>
 
@@ -630,8 +612,8 @@ export default function ProfessorPage() {
                 {submissions
                 .filter(s => {
                    const student = students.find(u => u.id === s.studentId);
-                   if (subFilterCampus && student?.campus !== subFilterCampus) return false;
-                   if (subFilterFiliere && student?.filiere !== subFilterFiliere) return false;
+                   if (student?.campus !== selectedCampus) return false;
+                   if (student?.filiere !== selectedFiliere) return false;
                    if (subFilterNiveau && student?.niveau !== subFilterNiveau) return false;
                    return true;
                 })

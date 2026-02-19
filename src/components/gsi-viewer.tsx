@@ -30,7 +30,13 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    console.log(`GSIViewer: Loading ${type} from ${url}`);
+    if (!url) {
+       setLoading(false);
+       onError?.("Aucun contenu à afficher.");
+       return;
+    }
+
+    console.log(`GSIViewer: Loading ${type} from ${url.substring(0, 50)}...`);
     setLoading(true);
 
     const progress = GSIStore.getProgress(id);

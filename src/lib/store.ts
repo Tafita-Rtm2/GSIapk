@@ -864,16 +864,25 @@ class GSIStoreClass {
 
   getAbsoluteUrl(url: string | undefined): string {
     if (!url || url === "undefined" || url === "null") return "";
-    // Robust URL handling: if it's already absolute, return as is.
+
+    // 1. If it's already absolute, return as is.
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
        return url;
     }
-    // Handle special case for files/view if it's a short relative path
+
+    // 2. Detect raw text (non-path strings)
+    // If it has spaces and doesn't start with / or files/, it's likely raw text
+    if (url.includes(' ') && !url.startsWith('/') && !url.startsWith('files/')) {
+       return url;
+    }
+
+    // 3. Handle special case for files/view
     if (url.startsWith('files/view/') || url.startsWith('api/files/view/') || url.startsWith('/api/files/view/')) {
        let path = url.replace('api/', '').replace('/api/', '');
        return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
     }
-    // For relative paths from the custom API
+
+    // 4. For relative paths from the custom API
     const base = MEDIA_BASE;
     return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
   }
@@ -994,23 +1003,26 @@ class GSIStoreClass {
   }
 
   async openPackFile(lessonId: string, url: string): Promise<void> {
-    const absoluteUrl = this.getAbsoluteUrl(url);
-    const lowUrl = absoluteUrl.toLowerCase().split('?')[0];
-    const progress = this.getProgress(lessonId);
+    const lowUrl = (url || "").toLowerCase();
 
+    // 1. Determine type BEFORE calling getAbsoluteUrl to avoid mangling raw text
     let type: 'pdf' | 'docx' | 'video' | 'image' | 'text' = 'pdf';
+
+    if (lowUrl.endsWith('.pdf') || lowUrl.includes('/pdf')) type = 'pdf';
+    else if (lowUrl.endsWith('.docx') || lowUrl.includes('word')) type = 'docx';
+    else if (lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/)) type = 'video';
+    else if (lowUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/) || lowUrl.includes('photo')) type = 'image';
+    else if (!url.startsWith('http') && !url.startsWith('/') && !url.startsWith('files/')) type = 'text';
+
+    const absoluteUrl = type === 'text' ? url : this.getAbsoluteUrl(url);
+    const progress = this.getProgress(lessonId);
     const mime = (progress?.mimeType || "").toLowerCase();
 
-    if (mime.includes('pdf') || lowUrl.endsWith('.pdf') || lowUrl.includes('/pdf')) type = 'pdf';
-    else if (mime.includes('word') || mime.includes('docx') || lowUrl.endsWith('.docx')) type = 'docx';
-    else if (mime.includes('video') || lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/)) type = 'video';
-    else if (mime.includes('image') || lowUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/) || lowUrl.includes('photo')) type = 'image';
-    else if (!url.startsWith('http') && !url.startsWith('/') && !url.startsWith('files/')) type = 'text';
-    else {
-      if (lowUrl.includes('.pdf')) type = 'pdf';
-      else if (lowUrl.includes('.docx')) type = 'docx';
-      else if (lowUrl.includes('.mp4')) type = 'video';
-    }
+    // Re-verify type if mime exists
+    if (mime.includes('pdf')) type = 'pdf';
+    else if (mime.includes('word') || mime.includes('docx')) type = 'docx';
+    else if (mime.includes('video')) type = 'video';
+    else if (mime.includes('image')) type = 'image';
 
     const dispatchViewer = (targetUrl: string) => {
       if (typeof window !== 'undefined') {
@@ -1021,7 +1033,7 @@ class GSIStoreClass {
     };
 
     if (type === 'text') {
-       dispatchViewer(url); // Send raw text as URL
+       dispatchViewer(url);
        return;
     }
 
