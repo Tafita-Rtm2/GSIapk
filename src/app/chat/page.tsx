@@ -10,9 +10,15 @@ import { toast } from "sonner";
 import OpenAI from "openai";
 import ReactMarkdown from 'react-markdown';
 
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  image?: string | null;
+}
+
 export default function ChatPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "assistant", content: "Bonjour ! Je suis Insight, votre assistant académique GSI. Comment puis-je vous aider aujourd'hui ?" },
   ]);
   const [input, setInput] = useState("");
