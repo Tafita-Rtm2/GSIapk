@@ -14,6 +14,10 @@ const MEDIA_BASE = "https://groupegsi.mg/rtmggmg";
 
 let ADMIN_CODE = "Nina GSI";
 let PROF_PASS = "prof-gsi-mg";
+let AI_CONFIG = {
+  apiKey: "",
+  prompts: {} as Record<string, string> // campus_subject -> prompt
+};
 
 // Types
 export interface User {
@@ -33,7 +37,7 @@ export interface User {
 
 export interface Lesson { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; date: string; files: string[]; _id?: string; }
 export interface Assignment { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; deadline: string; timeLimit: string; maxScore: number; files?: string[]; _id?: string; }
-export interface Submission { id: string; assignmentId: string; studentId: string; studentName: string; date: string; file: string; score?: number; feedback?: string; _id?: string; }
+export interface Submission { id: string; assignmentId: string; studentId: string; studentName: string; date: string; file: string; score?: number; feedback?: string; _id?: string; campus?: string; filiere?: string; niveau?: string; }
 export interface Grade { id: string; studentId: string; studentName: string; subject: string; score: number; maxScore: number; date: string; niveau: string; filiere: string; _id?: string; }
 export interface Announcement { id: string; title: string; message: string; date: string; author: string; type?: 'info' | 'convocation'; targetUserId?: string; campus?: string[]; filiere?: string[]; niveau?: string; _id?: string; }
 
@@ -43,6 +47,7 @@ export interface ChatMessage {
   senderName: string;
   senderPhoto?: string;
   text: string;
+  image?: string;
   replyTo?: {
     senderName: string;
     text: string;
@@ -72,6 +77,7 @@ export interface ScheduleSlot {
   room: string;
   instructor: string;
   color?: string;
+  campusInfo?: string;
 }
 
 export interface StructuredSchedule {
@@ -232,8 +238,8 @@ class GSIStoreClass {
      }
   }
 
-  private async syncAll() {
-     return Promise.all([
+  async syncAll() {
+     await Promise.all([
        this.fetchCollection('users', 'users'),
        this.syncRemoteConfig(),
        this.fetchCollection('lessons', 'lessons'),
@@ -243,6 +249,31 @@ class GSIStoreClass {
        this.fetchCollection('schedules', 'schedules'),
        this.fetchChatMessages()
      ]);
+     this.cleanOfflineFiles();
+  }
+
+  private async cleanOfflineFiles() {
+     // Delete offline files for lessons/assignments that are no longer in the cloud
+     const progress = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
+     const downloaded = JSON.parse(localStorage.getItem('gsi_downloaded') || '{}');
+
+     const cloudLessonIds = new Set(this.state.lessons.map(l => l.id));
+     const cloudAssignmentIds = new Set(this.state.assignments.map(a => a.id));
+
+     for (const id in downloaded) {
+        if (!cloudLessonIds.has(id) && !cloudAssignmentIds.has(id)) {
+           console.log(`GSIStore: Cleaning up deleted content ${id}`);
+           if (progress[id]?.localPath) {
+              try {
+                 await Filesystem.deleteFile({ path: progress[id].localPath, directory: Directory.Data });
+              } catch (e) {}
+           }
+           delete downloaded[id];
+           delete progress[id];
+        }
+     }
+     localStorage.setItem('gsi_downloaded', JSON.stringify(downloaded));
+     localStorage.setItem('gsi_progress', JSON.stringify(progress));
   }
 
   private async fetchChatMessages() {
@@ -394,12 +425,24 @@ class GSIStoreClass {
         const config = data[0];
         if (config.ADMIN_CODE) ADMIN_CODE = config.ADMIN_CODE;
         if (config.PROF_PASS) PROF_PASS = config.PROF_PASS;
+        if (config.AI_CONFIG) AI_CONFIG = config.AI_CONFIG;
       }
     } catch (e) {}
   }
 
   getAdminCode() { return ADMIN_CODE; }
   getProfPass() { return PROF_PASS; }
+  getAIConfig() { return AI_CONFIG; }
+
+  async updateAIConfig(config: typeof AI_CONFIG) {
+     AI_CONFIG = config;
+     const existing = await this.apiCall('/db/system_config');
+     if (existing && Array.isArray(existing) && existing.length > 0) {
+        await this.apiCall(`/db/system_config/${existing[0]._id}`, 'PATCH', { AI_CONFIG });
+     } else {
+        await this.apiCall('/db/system_config', 'POST', { AI_CONFIG });
+     }
+  }
 
   async login(email: string, password: string): Promise<User | null> {
     const q = encodeURIComponent(JSON.stringify({ email, password }));
@@ -823,16 +866,25 @@ class GSIStoreClass {
 
   getAbsoluteUrl(url: string | undefined): string {
     if (!url || url === "undefined" || url === "null") return "";
-    // Robust URL handling: if it's already absolute, return as is.
+
+    // 1. If it's already absolute, return as is.
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
        return url;
     }
-    // Handle special case for files/view if it's a short relative path
+
+    // 2. Detect raw text (non-path strings)
+    // If it has spaces and doesn't start with / or files/, it's likely raw text
+    if (url.includes(' ') && !url.startsWith('/') && !url.startsWith('files/')) {
+       return url;
+    }
+
+    // 3. Handle special case for files/view
     if (url.startsWith('files/view/') || url.startsWith('api/files/view/') || url.startsWith('/api/files/view/')) {
        let path = url.replace('api/', '').replace('/api/', '');
        return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
     }
-    // For relative paths from the custom API
+
+    // 4. For relative paths from the custom API
     const base = MEDIA_BASE;
     return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
   }
@@ -953,30 +1005,39 @@ class GSIStoreClass {
   }
 
   async openPackFile(lessonId: string, url: string): Promise<void> {
-    const absoluteUrl = this.getAbsoluteUrl(url);
-    const lowUrl = absoluteUrl.toLowerCase().split('?')[0];
-    const progress = this.getProgress(lessonId);
+    const lowUrl = (url || "").toLowerCase();
 
-    let type: 'pdf' | 'docx' | 'video' | 'image' = 'pdf';
+    // 1. Determine type BEFORE calling getAbsoluteUrl to avoid mangling raw text
+    let type: 'pdf' | 'docx' | 'video' | 'image' | 'text' = 'pdf';
+
+    if (lowUrl.endsWith('.pdf') || lowUrl.includes('/pdf')) type = 'pdf';
+    else if (lowUrl.endsWith('.docx') || lowUrl.includes('word')) type = 'docx';
+    else if (lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/)) type = 'video';
+    else if (lowUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/) || lowUrl.includes('photo')) type = 'image';
+    else if (!url.startsWith('http') && !url.startsWith('/') && !url.startsWith('files/')) type = 'text';
+
+    const absoluteUrl = type === 'text' ? url : this.getAbsoluteUrl(url);
+    const progress = this.getProgress(lessonId);
     const mime = (progress?.mimeType || "").toLowerCase();
 
-    if (mime.includes('pdf') || lowUrl.endsWith('.pdf')) type = 'pdf';
-    else if (mime.includes('word') || mime.includes('docx') || lowUrl.endsWith('.docx')) type = 'docx';
-    else if (mime.includes('video') || lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/)) type = 'video';
-    else if (mime.includes('image') || lowUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/)) type = 'image';
-    else {
-      if (lowUrl.includes('.pdf')) type = 'pdf';
-      else if (lowUrl.includes('.docx')) type = 'docx';
-      else if (lowUrl.includes('.mp4')) type = 'video';
-    }
+    // Re-verify type if mime exists
+    if (mime.includes('pdf')) type = 'pdf';
+    else if (mime.includes('word') || mime.includes('docx')) type = 'docx';
+    else if (mime.includes('video')) type = 'video';
+    else if (mime.includes('image')) type = 'image';
 
     const dispatchViewer = (targetUrl: string) => {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('gsi-open-viewer', {
-          detail: { url: targetUrl, type, originalUrl: absoluteUrl }
+          detail: { id: lessonId, url: targetUrl, type, originalUrl: absoluteUrl }
         }));
       }
     };
+
+    if (type === 'text') {
+       dispatchViewer(url);
+       return;
+    }
 
     try {
       // 1. Check for cached/downloaded file
@@ -1081,6 +1142,8 @@ class GSIStoreClass {
     all[id] = { ...(all[id] || {}), ...p, ts: Date.now() };
     localStorage.setItem('gsi_progress', JSON.stringify(all));
     this.notify('progress', all);
+    // Broadcast for cross-tab or component updates
+    window.dispatchEvent(new CustomEvent('gsi_progress_updated', { detail: all }));
   }
 
   toggleLessonCompleted(id: string) {

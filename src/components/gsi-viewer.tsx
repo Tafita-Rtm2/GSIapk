@@ -5,6 +5,7 @@ import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as mammoth from 'mammoth';
 import { Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, ZoomIn, ZoomOut } from 'lucide-react';
 import { toast } from 'sonner';
+import { GSIStore } from '@/lib/store';
 
 // Configure PDF.js worker
 // Use a check to ensure we are in a browser environment
@@ -13,13 +14,14 @@ if (typeof window !== 'undefined') {
 }
 
 interface GSIViewerProps {
+  id: string;
   url: string;
-  type: 'pdf' | 'video' | 'docx' | 'image';
+  type: 'pdf' | 'video' | 'docx' | 'image' | 'text';
   onLoadComplete?: () => void;
   onError?: (err: string) => void;
 }
 
-export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps) {
+export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerProps) {
   const [loading, setLoading] = useState(true);
   const [pdfData, setPdfData] = useState<{ numPages: number; currentPage: number } | null>(null);
   const [scale, setScale] = useState(1.5);
@@ -28,13 +30,23 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    console.log(`GSIViewer: Loading ${type} from ${url}`);
+    if (!url) {
+       setLoading(false);
+       onError?.("Aucun contenu à afficher.");
+       return;
+    }
+
+    console.log(`GSIViewer: Loading ${type} from ${url.substring(0, 50)}...`);
     setLoading(true);
+
+    const progress = GSIStore.getProgress(id);
+    const startPage = progress?.currentPage || 1;
+
     if (type === 'pdf') {
-      renderPdf();
+      renderPdf(startPage);
     } else if (type === 'docx') {
       renderDocx();
-    } else if (type === 'video' || type === 'image') {
+    } else if (type === 'video' || type === 'image' || type === 'text') {
       setLoading(false);
       onLoadComplete?.();
     } else {
@@ -136,6 +148,13 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
     if (newPage >= 1 && newPage <= pdfData.numPages) {
       setLoading(true);
       renderPdf(newPage);
+      const percent = Math.round((newPage / pdfData.numPages) * 100);
+      const prevProgress = GSIStore.getProgress(id) || {};
+      GSIStore.saveProgress(id, {
+        currentPage: newPage,
+        percent: Math.max(prevProgress.percent || 0, percent),
+        completed: prevProgress.completed || percent === 100
+      });
     }
   };
 
@@ -148,8 +167,20 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
      }
   };
 
+  const markFinished = () => {
+     GSIStore.saveProgress(id, { completed: true, percent: 100 });
+     toast.success("Leçon terminée ! Progression mise à jour.");
+  };
+
+  const currentPercent = pdfData ? Math.round((pdfData.currentPage / pdfData.numPages) * 100) : (GSIStore.getProgress(id)?.percent || 0);
+
   return (
-    <div className="w-full h-full flex flex-col bg-gray-50 overflow-hidden">
+    <div className="w-full h-full flex flex-col bg-gray-50 overflow-hidden relative">
+      {/* Real-time progress bar */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gray-100 z-30">
+         <div className="h-full bg-indigo-600 transition-all duration-500" style={{ width: `${currentPercent}%` }}></div>
+      </div>
+
       {loading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-20 backdrop-blur-sm">
           <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
@@ -240,6 +271,15 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
                    <ZoomIn size={20} />
                 </button>
             </div>
+          </div>
+        )}
+
+        {type === 'text' && (
+          <div className="w-full max-w-2xl bg-white p-8 shadow-lg rounded-[32px] border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
+             <h3 className="text-[10px] font-black uppercase text-indigo-600 mb-4 tracking-widest">Réponse de l'élève</h3>
+             <div className="prose prose-sm prose-indigo max-w-none whitespace-pre-wrap font-medium text-gray-700 leading-relaxed">
+                {url}
+             </div>
           </div>
         )}
       </div>

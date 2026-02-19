@@ -16,11 +16,13 @@ import {
   RefreshCcw,
   BookOpen,
   FileText,
+  Cpu,
   Mail,
   X,
   Wifi,
   WifiOff,
   FileSpreadsheet,
+  Phone,
   CheckCircle2,
   TrendingUp
 } from "lucide-react";
@@ -134,6 +136,7 @@ export default function AdminPage() {
     { id: "academic", icon: GraduationCap, label: t("gestion_academique"), color: "bg-purple-600" },
     { id: "schedule", icon: RefreshCcw, label: "Emploi du temps", color: "bg-violet-600" },
     { id: "media", icon: BookOpen, label: "Médiathèque", color: "bg-sky-600" },
+    { id: "ai_config", icon: Cpu, label: "IA Config", color: "bg-black" },
     { id: "stats", icon: BarChart3, label: t("stats_rapports"), color: "bg-pink-600" },
   ];
 
@@ -245,6 +248,10 @@ export default function AdminPage() {
               ))}
             </div>
           </div>
+        )}
+
+        {activeTab === "ai_config" && (
+           <AIConfigEditor onBack={() => setActiveTab("dashboard")} />
         )}
 
         {activeTab === "communication" && (
@@ -425,10 +432,13 @@ export default function AdminPage() {
              <div className="space-y-3">
                 {submissions
                 .filter(s => {
-                   const student = users.find(u => u.id === s.studentId);
-                   if (subFilterCampus && student?.campus !== subFilterCampus) return false;
-                   if (subFilterFiliere && student?.filiere !== subFilterFiliere) return false;
-                   if (subFilterNiveau && student?.niveau !== subFilterNiveau) return false;
+                   const campus = s.campus || users.find(u => u.id === s.studentId)?.campus;
+                   const filiere = s.filiere || users.find(u => u.id === s.studentId)?.filiere;
+                   const niveau = s.niveau || users.find(u => u.id === s.studentId)?.niveau;
+
+                   if (subFilterCampus && campus !== subFilterCampus) return false;
+                   if (subFilterFiliere && filiere !== subFilterFiliere) return false;
+                   if (subFilterNiveau && niveau !== subFilterNiveau) return false;
                    return true;
                 })
                 .map((s, i) => {
@@ -445,13 +455,7 @@ export default function AdminPage() {
 
                          <div className="flex gap-2">
                             <button
-                               onClick={() => {
-                                  if (s.file.startsWith('http') || s.file.startsWith('/') || s.file.startsWith('files/')) {
-                                     GSIStore.openPackFile(s.id, s.file);
-                                  } else {
-                                     alert(`Travail écrit : \n\n${s.file}`);
-                                  }
-                               }}
+                               onClick={() => GSIStore.openPackFile(s.id, s.file)}
                                className="flex-1 bg-gray-50 py-3 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2"
                             >
                                <FileText size={14} /> Voir le travail
@@ -553,6 +557,18 @@ export default function AdminPage() {
                        </div>
                     </div>
 
+                    {viewingStudent.contact && (
+                       <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-3xl border border-gray-100">
+                          <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm">
+                             <Phone size={18} />
+                          </div>
+                          <div>
+                             <p className="text-[10px] font-black text-gray-400 uppercase">Téléphone</p>
+                             <p className="text-xs font-bold text-gray-700">{viewingStudent.contact}</p>
+                          </div>
+                       </div>
+                    )}
+
                     <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-3xl border border-gray-100">
                        <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center text-purple-600 shadow-sm">
                           <GraduationCap size={18} />
@@ -634,6 +650,81 @@ const StatCard = memo(({ label, value, change, color }: { label: string, value: 
     </div>
   );
 });
+
+function AIConfigEditor({ onBack }: { onBack: () => void }) {
+   const [config, setConfig] = useState(GSIStore.getAIConfig());
+   const [selectedCampus, setSelectedCampus] = useState(CAMPUSES[0]);
+   const [selectedSubject, setSelectedSubject] = useState("Général");
+
+   const currentPromptKey = `${selectedCampus}_${selectedSubject}`;
+   const currentPrompt = config.prompts[currentPromptKey] || "";
+
+   const handleSave = async () => {
+      await GSIStore.updateAIConfig(config);
+      toast.success("Configuration IA enregistrée !");
+   };
+
+   return (
+      <div className="space-y-6">
+         <PageHeader title="Configuration IA" onBack={onBack} />
+
+         <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-6">
+            <div className="space-y-2">
+               <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Clé API OpenAI</label>
+               <input
+                  type="password"
+                  value={config.apiKey}
+                  onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
+                  placeholder="sk-..."
+                  className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-bold outline-none border-2 border-transparent focus:border-black transition-all"
+               />
+            </div>
+
+            <div className="pt-4 border-t border-gray-100 space-y-4">
+               <h3 className="text-xs font-black uppercase tracking-widest text-indigo-600">Prompts Personnalisés</h3>
+
+               <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={selectedCampus}
+                    onChange={(e) => setSelectedCampus(e.target.value)}
+                    className="p-3 bg-gray-50 rounded-xl text-[10px] font-bold outline-none"
+                  >
+                     {CAMPUSES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <select
+                    value={selectedSubject}
+                    onChange={(e) => setSelectedSubject(e.target.value)}
+                    className="p-3 bg-gray-50 rounded-xl text-[10px] font-bold outline-none"
+                  >
+                     <option value="Général">Général</option>
+                     {FILIERES.map(f => <option key={f} value={f}>{f}</option>)}
+                  </select>
+               </div>
+
+               <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase text-gray-400 ml-1">Instruction Système ({selectedCampus} - {selectedSubject})</label>
+                  <textarea
+                     value={currentPrompt}
+                     onChange={(e) => {
+                        const newPrompts = { ...config.prompts, [currentPromptKey]: e.target.value };
+                        setConfig({ ...config, prompts: newPrompts });
+                     }}
+                     placeholder="Tu es Insight, un assistant spécialisé pour le campus..."
+                     className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-medium outline-none min-h-[200px] border-2 border-transparent focus:border-indigo-500 transition-all"
+                  />
+               </div>
+            </div>
+
+            <button
+               onClick={handleSave}
+               className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+            >
+               Sauvegarder Configuration
+            </button>
+         </div>
+      </div>
+   );
+}
 
 function ScheduleEditor({ campuses, onSave }: { campuses: string[], onSave: (s: any) => void }) {
   const [campus, setCampus] = useState(campuses[0]);

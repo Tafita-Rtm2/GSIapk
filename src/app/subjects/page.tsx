@@ -27,11 +27,17 @@ export default function SubjectsPage() {
 
       const subjectNames = Array.from(new Set(filtered.map(l => l.subject)));
       const mapped = subjectNames.map((name, i) => {
-        const count = filtered.filter(l => l.subject === name).length;
+        const subjectLessons = filtered.filter(l => l.subject === name);
+        const count = subjectLessons.length;
+
+        // Calculate progression
+        const totalPercent = subjectLessons.reduce((acc, l) => acc + (GSIStore.getProgress(l.id)?.percent || 0), 0);
+        const progress = count > 0 ? Math.round(totalPercent / count) : 0;
+
         return {
           id: i,
           title: name,
-          progress: 0,
+          progress: progress,
           icon: "📖",
           color: "bg-indigo-500",
           items: count
@@ -45,9 +51,22 @@ export default function SubjectsPage() {
       setAssignments(filtered);
     });
 
+    const handleProgressUpdate = () => {
+       // Just trigger a re-render/re-fetch of lessons which will recalculate mapped subjects
+       GSIStore.getLessons().then(all => {
+          const user = GSIStore.getCurrentUser();
+          if (user) {
+             const filtered = all.filter(l => (l.filiere.includes(user.filiere) || l.filiere.length === 0) && l.niveau === user.niveau);
+             setLessons([...filtered]);
+          }
+       });
+    };
+    window.addEventListener('gsi_progress_updated', handleProgressUpdate);
+
     return () => {
       unsubLessons();
       unsubAssignments();
+      window.removeEventListener('gsi_progress_updated', handleProgressUpdate);
     };
   }, []);
 
@@ -84,8 +103,14 @@ export default function SubjectsPage() {
                     {s.icon}
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-black text-gray-900 text-sm uppercase tracking-tight">{s.title}</h4>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">{s.items} Ressources</p>
+                    <div className="flex justify-between items-center mb-1">
+                       <h4 className="font-black text-gray-900 text-sm uppercase tracking-tight">{s.title}</h4>
+                       <span className="text-[10px] font-black text-indigo-600">{s.progress}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                       <div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${s.progress}%` }}></div>
+                    </div>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-2">{s.items} Ressources</p>
                   </div>
                   <ChevronRight size={20} className="text-gray-300" />
                 </div>
@@ -110,8 +135,24 @@ export default function SubjectsPage() {
                            <FileText size={20} />
                         </div>
                         <div className="flex-1">
-                           <h4 className="font-bold text-xs uppercase tracking-tight">{l.title}</h4>
-                           <p className="text-[10px] text-gray-400 font-medium">{new Date(l.date).toLocaleDateString()}</p>
+                           <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-xs uppercase tracking-tight">{l.title}</h4>
+                              {GSIStore.getProgress(l.id)?.completed && <CheckCircle2 size={12} className="text-emerald-500" />}
+                           </div>
+                           <div className="flex items-center justify-between">
+                              <p className="text-[10px] text-gray-400 font-medium">
+                                 {new Date(l.date).toLocaleDateString()}
+                                 {GSIStore.getProgress(l.id)?.currentPage && ` • Page ${GSIStore.getProgress(l.id).currentPage}`}
+                              </p>
+                              {GSIStore.getProgress(l.id)?.percent !== undefined && (
+                                 <span className="text-[9px] font-black text-indigo-500">{GSIStore.getProgress(l.id).percent}%</span>
+                              )}
+                           </div>
+                           {GSIStore.getProgress(l.id)?.percent !== undefined && (
+                              <div className="w-full h-1 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
+                                 <div className="h-full bg-indigo-500 transition-all duration-700" style={{ width: `${GSIStore.getProgress(l.id).percent}%` }}></div>
+                              </div>
+                           )}
                         </div>
                         <div className="flex gap-2">
                            <button
@@ -156,38 +197,60 @@ export default function SubjectsPage() {
                            <button
                               disabled={isSubmitting === a.id}
                               onClick={() => {
-                                 const input = document.createElement('input');
-                                 input.type = 'file';
-                                 input.onchange = async (e: any) => {
-                                    const file = e.target.files[0];
-                                    if(!file) return;
+                                 const choice = confirm("Voulez-vous envoyer un FICHIER (OK) ou du TEXTE (Annuler) ?");
+                                 const user = GSIStore.getCurrentUser();
+                                 if(!user) return toast.error("Veuillez vous reconnecter.");
 
-                                    const user = GSIStore.getCurrentUser();
-                                    if(!user) return toast.error("Veuillez vous reconnecter.");
+                                 if (choice) {
+                                    const input = document.createElement('input');
+                                    input.type = 'file';
+                                    input.onchange = async (e: any) => {
+                                       const file = e.target.files[0];
+                                       if(!file) return;
 
-                                    setIsSubmitting(a.id);
-                                    const tid = toast.loading(`Téléversement de "${file.name}"...`);
+                                       setIsSubmitting(a.id);
+                                       const tid = toast.loading(`Téléversement de "${file.name}"...`);
 
-                                    try {
-                                       const fileUrl = await GSIStore.uploadFile(file, `submissions/${a.id}_${user.id}_${file.name}`);
+                                       try {
+                                          const fileUrl = await GSIStore.uploadFile(file, `submissions/${a.id}_${user.id}_${file.name}`);
 
-                                       await GSIStore.addSubmission({
+                                          await GSIStore.addSubmission({
+                                             id: Math.random().toString(36).substr(2, 9),
+                                             assignmentId: a.id,
+                                             studentId: user.id,
+                                             studentName: user.fullName,
+                                             date: new Date().toISOString(),
+                                             file: fileUrl,
+                                             campus: user.campus,
+                                             filiere: user.filiere,
+                                             niveau: user.niveau
+                                          });
+
+                                          toast.success("Devoir envoyé avec succès !", { id: tid });
+                                       } catch (err: any) {
+                                          toast.error("Échec de l'envoi : " + err.message, { id: tid });
+                                       } finally {
+                                          setIsSubmitting(null);
+                                       }
+                                    };
+                                    input.click();
+                                 } else {
+                                    const text = prompt("Entrez votre réponse :");
+                                    if (text) {
+                                       setIsSubmitting(a.id);
+                                       GSIStore.addSubmission({
                                           id: Math.random().toString(36).substr(2, 9),
                                           assignmentId: a.id,
                                           studentId: user.id,
                                           studentName: user.fullName,
                                           date: new Date().toISOString(),
-                                          file: fileUrl
+                                          file: text // Direct text submission
+                                       }).then(() => {
+                                          toast.success("Réponse envoyée !");
+                                          setIsSubmitting(null);
                                        });
-
-                                       toast.success("Devoir envoyé avec succès !", { id: tid });
-                                    } catch (err: any) {
-                                       toast.error("Échec de l'envoi : " + err.message, { id: tid });
-                                    } finally {
-                                       setIsSubmitting(null);
                                     }
-                                 };
-                                 input.click();
+                                 }
                               }}
                               className={cn(
                                 "flex-1 py-3 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 disabled:opacity-50 disabled:animate-pulse",

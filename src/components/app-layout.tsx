@@ -28,7 +28,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
 
-  const [viewerData, setViewerData] = useState<{ url: string, type: string, originalUrl?: string } | null>(null);
+  const [viewerData, setViewerData] = useState<{ id: string, url: string, type: string, originalUrl?: string } | null>(null);
   const [viewerLoading, setViewerLoading] = useState(true);
 
   useEffect(() => {
@@ -147,6 +147,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
            </div>
            <div className="flex-1 bg-white relative overflow-hidden">
               <GSIViewer
+                id={viewerData.id}
                 url={viewerData.url}
                 type={viewerData.type as any}
                 onLoadComplete={() => setViewerLoading(false)}
@@ -156,7 +157,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 }}
               />
            </div>
-           <div className="p-4 bg-gray-900 text-center">
+           <div className="p-4 bg-gray-900 flex justify-between items-center px-6">
+              <button
+                onClick={() => {
+                   GSIStore.saveProgress(viewerData.id, { completed: true, percent: 100 });
+                   toast.success("Leçon terminée ! Progression mise à jour.");
+                   setViewerData(null);
+                }}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                  GSIStore.getProgress(viewerData.id)?.completed ? "bg-emerald-500 text-white" : "bg-white/10 text-gray-400 hover:text-white"
+                )}
+              >
+                {GSIStore.getProgress(viewerData.id)?.completed ? "Terminé ✓" : "Terminer la leçon"}
+              </button>
               <p className="text-[8px] font-bold text-gray-500 uppercase tracking-widest">© Groupe GSI — Confidentialité Totale</p>
            </div>
         </div>
