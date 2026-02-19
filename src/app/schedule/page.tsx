@@ -125,11 +125,9 @@ export default function SchedulePage() {
                             <MapPin size={12} className="text-indigo-500" />
                             <span className="text-[10px] font-bold text-gray-500">{slot.room}</span>
                          </div>
-                         {/* @ts-ignore */}
                          {slot.campusInfo && (
                             <div className="flex items-center gap-1.5">
                                <MapPin size={12} className="text-orange-500" />
-                               {/* @ts-ignore */}
                                <span className="text-[10px] font-bold text-orange-600 uppercase">{slot.campusInfo}</span>
                             </div>
                          )}

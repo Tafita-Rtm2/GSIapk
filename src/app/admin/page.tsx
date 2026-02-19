@@ -22,6 +22,7 @@ import {
   Wifi,
   WifiOff,
   FileSpreadsheet,
+  Phone,
   CheckCircle2,
   TrendingUp
 } from "lucide-react";
@@ -431,10 +432,13 @@ export default function AdminPage() {
              <div className="space-y-3">
                 {submissions
                 .filter(s => {
-                   const student = users.find(u => u.id === s.studentId);
-                   if (subFilterCampus && student?.campus !== subFilterCampus) return false;
-                   if (subFilterFiliere && student?.filiere !== subFilterFiliere) return false;
-                   if (subFilterNiveau && student?.niveau !== subFilterNiveau) return false;
+                   const campus = s.campus || users.find(u => u.id === s.studentId)?.campus;
+                   const filiere = s.filiere || users.find(u => u.id === s.studentId)?.filiere;
+                   const niveau = s.niveau || users.find(u => u.id === s.studentId)?.niveau;
+
+                   if (subFilterCampus && campus !== subFilterCampus) return false;
+                   if (subFilterFiliere && filiere !== subFilterFiliere) return false;
+                   if (subFilterNiveau && niveau !== subFilterNiveau) return false;
                    return true;
                 })
                 .map((s, i) => {
@@ -552,6 +556,18 @@ export default function AdminPage() {
                           <p className="text-xs font-bold text-gray-700">{viewingStudent.email}</p>
                        </div>
                     </div>
+
+                    {viewingStudent.contact && (
+                       <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-3xl border border-gray-100">
+                          <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm">
+                             <Phone size={18} />
+                          </div>
+                          <div>
+                             <p className="text-[10px] font-black text-gray-400 uppercase">Téléphone</p>
+                             <p className="text-xs font-bold text-gray-700">{viewingStudent.contact}</p>
+                          </div>
+                       </div>
+                    )}
 
                     <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-3xl border border-gray-100">
                        <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center text-purple-600 shadow-sm">

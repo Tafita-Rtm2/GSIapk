@@ -147,10 +147,8 @@ export default function ChatPage() {
             "flex flex-col animate-in fade-in slide-in-from-bottom-2",
             m.role === "user" ? "items-end" : "items-start"
           )}>
-            {/* @ts-ignore */}
             {m.image && (
               <div className="mb-2 max-w-[70%] rounded-2xl overflow-hidden shadow-md border-4 border-white">
-                {/* @ts-ignore */}
                 <img src={m.image} alt="User upload" className="w-full h-auto" />
               </div>
             )}

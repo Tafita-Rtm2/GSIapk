@@ -37,7 +37,7 @@ export interface User {
 
 export interface Lesson { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; date: string; files: string[]; _id?: string; }
 export interface Assignment { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; deadline: string; timeLimit: string; maxScore: number; files?: string[]; _id?: string; }
-export interface Submission { id: string; assignmentId: string; studentId: string; studentName: string; date: string; file: string; score?: number; feedback?: string; _id?: string; }
+export interface Submission { id: string; assignmentId: string; studentId: string; studentName: string; date: string; file: string; score?: number; feedback?: string; _id?: string; campus?: string; filiere?: string; niveau?: string; }
 export interface Grade { id: string; studentId: string; studentName: string; subject: string; score: number; maxScore: number; date: string; niveau: string; filiere: string; _id?: string; }
 export interface Announcement { id: string; title: string; message: string; date: string; author: string; type?: 'info' | 'convocation'; targetUserId?: string; campus?: string[]; filiere?: string[]; niveau?: string; _id?: string; }
 
@@ -47,6 +47,7 @@ export interface ChatMessage {
   senderName: string;
   senderPhoto?: string;
   text: string;
+  image?: string;
   replyTo?: {
     senderName: string;
     text: string;
@@ -76,6 +77,7 @@ export interface ScheduleSlot {
   room: string;
   instructor: string;
   color?: string;
+  campusInfo?: string;
 }
 
 export interface StructuredSchedule {
@@ -1140,6 +1142,8 @@ class GSIStoreClass {
     all[id] = { ...(all[id] || {}), ...p, ts: Date.now() };
     localStorage.setItem('gsi_progress', JSON.stringify(all));
     this.notify('progress', all);
+    // Broadcast for cross-tab or component updates
+    window.dispatchEvent(new CustomEvent('gsi_progress_updated', { detail: all }));
   }
 
   toggleLessonCompleted(id: string) {

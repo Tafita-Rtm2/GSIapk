@@ -93,6 +93,12 @@ export default function Home() {
 
      const read = localStorage.getItem('gsi_read_notifications');
      if (read) setReadNotifications(JSON.parse(read));
+
+     const handleProgressUpdate = (e: any) => {
+        setProgressData(e.detail);
+     };
+     window.addEventListener('gsi_progress_updated', handleProgressUpdate);
+     return () => window.removeEventListener('gsi_progress_updated', handleProgressUpdate);
   }, [lessons]);
 
   const markNotificationAsRead = (id: string) => {
@@ -242,8 +248,8 @@ export default function Home() {
                  <div className="space-y-4">
                     {subjects.slice(0, 4).map((sub, i) => {
                        const subLessons = lessons.filter(l => l.subject === sub);
-                       const completedCount = subLessons.filter(l => progressData[l.id]?.completed).length;
-                       const prog = subLessons.length > 0 ? Math.round((completedCount / subLessons.length) * 100) : 0;
+                       const totalPercent = subLessons.reduce((acc, l) => acc + (progressData[l.id]?.percent || 0), 0);
+                       const prog = subLessons.length > 0 ? Math.round(totalPercent / subLessons.length) : 0;
                        const colors = ["bg-indigo-500", "bg-emerald-500", "bg-orange-500", "bg-rose-500"];
                        return (
                           <div key={sub}>
@@ -366,7 +372,10 @@ export default function Home() {
                               studentId: user.id,
                               studentName: user.fullName,
                               date: new Date().toISOString(),
-                              file: fileUrl
+                              file: fileUrl,
+                              campus: user.campus,
+                              filiere: user.filiere,
+                              niveau: user.niveau
                             });
                             toast.success("Devoir envoyé avec succès !", { id: tid });
                           } catch (err: any) {

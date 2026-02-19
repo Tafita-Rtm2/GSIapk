@@ -51,9 +51,22 @@ export default function SubjectsPage() {
       setAssignments(filtered);
     });
 
+    const handleProgressUpdate = () => {
+       // Just trigger a re-render/re-fetch of lessons which will recalculate mapped subjects
+       GSIStore.getLessons().then(all => {
+          const user = GSIStore.getCurrentUser();
+          if (user) {
+             const filtered = all.filter(l => (l.filiere.includes(user.filiere) || l.filiere.length === 0) && l.niveau === user.niveau);
+             setLessons([...filtered]);
+          }
+       });
+    };
+    window.addEventListener('gsi_progress_updated', handleProgressUpdate);
+
     return () => {
       unsubLessons();
       unsubAssignments();
+      window.removeEventListener('gsi_progress_updated', handleProgressUpdate);
     };
   }, []);
 
@@ -207,7 +220,10 @@ export default function SubjectsPage() {
                                              studentId: user.id,
                                              studentName: user.fullName,
                                              date: new Date().toISOString(),
-                                             file: fileUrl
+                                             file: fileUrl,
+                                             campus: user.campus,
+                                             filiere: user.filiere,
+                                             niveau: user.niveau
                                           });
 
                                           toast.success("Devoir envoyé avec succès !", { id: tid });

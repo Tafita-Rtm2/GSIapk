@@ -611,10 +611,14 @@ export default function ProfessorPage() {
              <div className="space-y-3">
                 {submissions
                 .filter(s => {
-                   const student = students.find(u => u.id === s.studentId);
-                   if (student?.campus !== selectedCampus) return false;
-                   if (student?.filiere !== selectedFiliere) return false;
-                   if (subFilterNiveau && student?.niveau !== subFilterNiveau) return false;
+                   // Filter by active section
+                   const campus = s.campus || students.find(u => u.id === s.studentId)?.campus;
+                   const filiere = s.filiere || students.find(u => u.id === s.studentId)?.filiere;
+                   const niveau = s.niveau || students.find(u => u.id === s.studentId)?.niveau;
+
+                   if (campus !== selectedCampus) return false;
+                   if (filiere !== selectedFiliere) return false;
+                   if (subFilterNiveau && niveau !== subFilterNiveau) return false;
                    return true;
                 })
                 .map((s, i) => {
