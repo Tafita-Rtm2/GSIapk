@@ -451,13 +451,7 @@ export default function AdminPage() {
 
                          <div className="flex gap-2">
                             <button
-                               onClick={() => {
-                                  if (s.file.startsWith('http') || s.file.startsWith('/') || s.file.startsWith('files/')) {
-                                     GSIStore.openPackFile(s.id, s.file);
-                                  } else {
-                                     alert(`Travail écrit : \n\n${s.file}`);
-                                  }
-                               }}
+                               onClick={() => GSIStore.openPackFile(s.id, s.file)}
                                className="flex-1 bg-gray-50 py-3 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2"
                             >
                                <FileText size={14} /> Voir le travail

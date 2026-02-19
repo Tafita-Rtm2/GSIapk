@@ -998,13 +998,14 @@ class GSIStoreClass {
     const lowUrl = absoluteUrl.toLowerCase().split('?')[0];
     const progress = this.getProgress(lessonId);
 
-    let type: 'pdf' | 'docx' | 'video' | 'image' = 'pdf';
+    let type: 'pdf' | 'docx' | 'video' | 'image' | 'text' = 'pdf';
     const mime = (progress?.mimeType || "").toLowerCase();
 
     if (mime.includes('pdf') || lowUrl.endsWith('.pdf') || lowUrl.includes('/pdf')) type = 'pdf';
     else if (mime.includes('word') || mime.includes('docx') || lowUrl.endsWith('.docx')) type = 'docx';
     else if (mime.includes('video') || lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/)) type = 'video';
     else if (mime.includes('image') || lowUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/) || lowUrl.includes('photo')) type = 'image';
+    else if (!url.startsWith('http') && !url.startsWith('/') && !url.startsWith('files/')) type = 'text';
     else {
       if (lowUrl.includes('.pdf')) type = 'pdf';
       else if (lowUrl.includes('.docx')) type = 'docx';
@@ -1018,6 +1019,11 @@ class GSIStoreClass {
         }));
       }
     };
+
+    if (type === 'text') {
+       dispatchViewer(url); // Send raw text as URL
+       return;
+    }
 
     try {
       // 1. Check for cached/downloaded file
