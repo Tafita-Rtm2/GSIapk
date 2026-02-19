@@ -6,6 +6,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { GSIStore, User } from "@/lib/store";
 import { PageHeader } from "@/components/page-header";
+import { toast } from "sonner";
 import OpenAI from "openai";
 import ReactMarkdown from 'react-markdown';
 

@@ -5,6 +5,7 @@ import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as mammoth from 'mammoth';
 import { Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, ZoomIn, ZoomOut } from 'lucide-react';
 import { toast } from 'sonner';
+import { GSIStore } from '@/lib/store';
 
 // Configure PDF.js worker
 // Use a check to ensure we are in a browser environment
