@@ -13,13 +13,14 @@ if (typeof window !== 'undefined') {
 }
 
 interface GSIViewerProps {
+  id: string;
   url: string;
   type: 'pdf' | 'video' | 'docx' | 'image';
   onLoadComplete?: () => void;
   onError?: (err: string) => void;
 }
 
-export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps) {
+export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerProps) {
   const [loading, setLoading] = useState(true);
   const [pdfData, setPdfData] = useState<{ numPages: number; currentPage: number } | null>(null);
   const [scale, setScale] = useState(1.5);
@@ -30,8 +31,12 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
   useEffect(() => {
     console.log(`GSIViewer: Loading ${type} from ${url}`);
     setLoading(true);
+
+    const progress = GSIStore.getProgress(id);
+    const startPage = progress?.currentPage || 1;
+
     if (type === 'pdf') {
-      renderPdf();
+      renderPdf(startPage);
     } else if (type === 'docx') {
       renderDocx();
     } else if (type === 'video' || type === 'image') {
@@ -136,6 +141,7 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
     if (newPage >= 1 && newPage <= pdfData.numPages) {
       setLoading(true);
       renderPdf(newPage);
+      GSIStore.saveProgress(id, { currentPage: newPage });
     }
   };
 
@@ -146,6 +152,11 @@ export function GSIViewer({ url, type, onLoadComplete, onError }: GSIViewerProps
         setLoading(true);
         renderPdf(pdfData?.currentPage || 1, newScale);
      }
+  };
+
+  const markFinished = () => {
+     GSIStore.saveProgress(id, { completed: true, percent: 100 });
+     toast.success("Leçon terminée ! Progression mise à jour.");
   };
 
   return (

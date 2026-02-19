@@ -9,6 +9,7 @@ import {
   BarChart3,
   Users,
   Search,
+  CalendarDays,
   LogOut,
   Megaphone,
   ChevronRight,
@@ -32,6 +33,7 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
 import { CAMPUSES, ALL_FILIERES as FILIERES, NIVEAUX } from "@/lib/constants";
+import * as XLSX from 'xlsx';
 
 export default function ProfessorPage() {
   const { t } = useLanguage();
@@ -192,6 +194,14 @@ export default function ProfessorPage() {
 
   return (
     <div className="flex flex-col min-h-screen max-w-md mx-auto bg-[#F8FAFC] pb-20">
+      {/* Quick Setup for publishing */}
+      {(selectedCampuses.length === 0 || selectedFilieres.length === 0) && activeTab === "dashboard" && (
+         <div className="bg-orange-50 p-4 border-b border-orange-100 flex items-center gap-3 animate-pulse">
+            <Zap size={18} className="text-orange-500" />
+            <p className="text-[10px] font-bold text-orange-700 uppercase tracking-tight">Veuillez sélectionner votre campus et matière pour publier</p>
+         </div>
+      )}
+
       {/* Sync Status Banner */}
       <div className={cn(
         "px-6 py-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest",
@@ -231,20 +241,43 @@ export default function ProfessorPage() {
 
       <div className="px-6 space-y-8 flex-1 pb-10">
         {activeTab === "dashboard" && (
-          <div className="grid grid-cols-2 gap-4">
+          <>
+            {/* Section Selection */}
+            <div className="bg-white p-6 rounded-[32px] border border-violet-100 shadow-sm space-y-4">
+               <h3 className="text-[10px] font-black uppercase tracking-widest text-violet-600">Votre Section Actuelle</h3>
+               <div className="grid grid-cols-2 gap-2">
+                  {CAMPUSES.map(c => (
+                    <button key={c} onClick={() => selectedCampuses.includes(c) ? setSelectedCampuses(selectedCampuses.filter(x => x !== c)) : setSelectedCampuses([...selectedCampuses, c])} className={cn("p-2 rounded-xl text-[10px] font-bold transition-all", selectedCampuses.includes(c) ? "bg-violet-600 text-white" : "bg-gray-50 text-gray-400 border border-gray-100")}>{c}</button>
+                  ))}
+               </div>
+               <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 bg-gray-50 rounded-2xl border border-gray-100">
+                  {FILIERES.map(f => (
+                    <button key={f} onClick={() => selectedFilieres.includes(f) ? setSelectedFilieres(selectedFilieres.filter(x => x !== f)) : setSelectedFilieres([...selectedFilieres, f])} className={cn("px-3 py-1.5 rounded-lg text-[9px] font-bold transition-all", selectedFilieres.includes(f) ? "bg-indigo-600 text-white" : "bg-white text-gray-400 border border-gray-100")}>{f}</button>
+                  ))}
+               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
             {[{id: "lessons", icon: BookOpen, label: "Publier Leçon", color: "bg-emerald-500"},
               {id: "assignments", icon: FileText, label: "Publier Devoir", color: "bg-orange-500"},
               {id: "submissions", icon: CheckCircle, label: "Devoirs Reçus", color: "bg-blue-500"},
               {id: "grades", icon: BarChart3, label: "Notes", color: "bg-pink-500"},
+              {id: "schedule", icon: CalendarDays, label: "Mon Planning", color: "bg-violet-600"},
               {id: "announcements", icon: Megaphone, label: "Annonce", color: "bg-orange-600"},
               {id: "media", icon: BookOpen, label: "Médiathèque", color: "bg-emerald-600"},
               {id: "students", icon: Users, label: "Étudiants", color: "bg-indigo-500"}].map(item => (
-              <button key={item.id} onClick={() => setActiveTab(item.id)} className="bg-white p-5 rounded-[32px] shadow-sm border border-gray-100 flex flex-col items-center gap-3 active:scale-95">
+              <button key={item.id} onClick={() => {
+                 if ((item.id === "lessons" || item.id === "assignments" || item.id === "announcements") && (selectedCampuses.length === 0 || selectedFilieres.length === 0)) {
+                    return toast.error("Veuillez d'abord sélectionner un campus et une filière.");
+                 }
+                 setActiveTab(item.id);
+              }} className="bg-white p-5 rounded-[32px] shadow-sm border border-gray-100 flex flex-col items-center gap-3 active:scale-95">
                 <div className={`${item.color} w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-black/5`}><item.icon size={24} /></div>
                 <span className="text-[10px] font-black uppercase tracking-tight">{item.label}</span>
               </button>
             ))}
           </div>
+          </>
         )}
 
         {(activeTab === "lessons" || activeTab === "assignments") && (
@@ -317,6 +350,79 @@ export default function ProfessorPage() {
           </div>
         )}
 
+        {activeTab === "schedule" && (
+           <div className="space-y-6">
+              <PageHeader title="Mon Emploi du Temps" onBack={() => setActiveTab("dashboard")} />
+              <div className="bg-white p-6 rounded-[32px] border border-violet-100 shadow-xl space-y-4">
+                 <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-sm font-bold">Import planning</h3>
+                    <button
+                       onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = '.xlsx, .xls, .csv';
+                          input.onchange = (e: any) => {
+                             const file = e.target.files[0];
+                             if (!file) return;
+                             const reader = new FileReader();
+                             reader.onload = (evt) => {
+                                const bstr = evt.target?.result;
+                                const wb = XLSX.read(bstr, { type: 'binary' });
+                                const wsname = wb.SheetNames[0];
+                                const ws = wb.Sheets[wsname];
+                                const data = XLSX.utils.sheet_to_json(ws);
+
+                                toast.success(`${data.length} créneaux détectés. Enregistrement en cours...`);
+
+                                // Professors can add schedules for specific campus/niveau they teach
+                                // We'll prompt them for which class they are importing if not in excel
+                                const targetCampus = prompt("Campus (ex: Antananarivo) ?", CAMPUSES[0]);
+                                const targetNiveau = prompt("Niveau (ex: L1) ?", "L1");
+
+                                if (targetCampus && targetNiveau) {
+                                   const slots = data.map((row: any) => {
+                                      const normalizedRow: any = {};
+                                      Object.keys(row).forEach(key => {
+                                         normalizedRow[key.toLowerCase().replace(/\s/g, '')] = row[key];
+                                      });
+
+                                      return {
+                                         day: normalizedRow.jour || normalizedRow.day || "Lundi",
+                                         startTime: normalizedRow.debut || normalizedRow.start || "08:00",
+                                         endTime: normalizedRow.fin || normalizedRow.end || "10:00",
+                                         subject: normalizedRow.matiere || normalizedRow.subject || "Cours",
+                                         room: normalizedRow.salle || normalizedRow.room || "-",
+                                         instructor: GSIStore.getCurrentUser()?.fullName || "-"
+                                      };
+                                   });
+
+                                   GSIStore.addSchedule({
+                                      id: Math.random().toString(36).substr(2,9),
+                                      campus: targetCampus,
+                                      niveau: targetNiveau,
+                                      lastUpdated: new Date().toISOString(),
+                                      slots
+                                   });
+                                   toast.success("Planning mis à jour !");
+                                }
+                             };
+                             reader.readAsBinaryString(file);
+                          };
+                          input.click();
+                       }}
+                       className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl text-[10px] font-black uppercase active:scale-95 transition-all"
+                    >
+                       <FileSpreadsheet size={14} />
+                       Import Excel
+                    </button>
+                 </div>
+                 <p className="text-[10px] text-gray-400 font-medium leading-relaxed italic">
+                    Astuce: Importez un fichier Excel avec les colonnes "Jour", "Debut", "Fin", "Matiere", "Salle" pour mettre à jour l'emploi du temps des étudiants.
+                 </p>
+              </div>
+           </div>
+        )}
+
         {activeTab === "grades" && (
           <div className="space-y-4">
              <PageHeader title="Saisie des Notes" onBack={() => setActiveTab("dashboard")} />
@@ -328,13 +434,43 @@ export default function ProfessorPage() {
                         const input = document.createElement('input');
                         input.type = 'file';
                         input.accept = '.xlsx, .xls, .csv';
-                        input.onchange = () => {
-                           toast.success("Fichier Excel analysé. 12 notes détectées.");
-                           // Simulation: fill some random grades
-                           students.forEach(s => {
-                              const el = document.getElementById(`grade-${s.id}`) as HTMLInputElement;
-                              if(el) el.value = (Math.floor(Math.random() * 10) + 10).toString();
-                           });
+                        input.onchange = (e: any) => {
+                           const file = e.target.files[0];
+                           if (!file) return;
+                           const reader = new FileReader();
+                           reader.onload = (evt) => {
+                              const bstr = evt.target?.result;
+                              const wb = XLSX.read(bstr, { type: 'binary' });
+                              const wsname = wb.SheetNames[0];
+                              const ws = wb.Sheets[wsname];
+                              const data = XLSX.utils.sheet_to_json(ws);
+
+                              let count = 0;
+                              data.forEach((row: any) => {
+                                 // Try to find student by name or matricule in the row
+                                 const name = row.Nom || row.Name || row.Student || row.Etudiant;
+                                 const matricule = row.Matricule || row.ID;
+                                 const note = row.Note || row.Grade || row.Score;
+                                 const subject = row.Matiere || row.Subject;
+
+                                 const student = students.find(s =>
+                                    (name && s.fullName.toLowerCase().includes(name.toString().toLowerCase())) ||
+                                    (matricule && s.matricule === matricule.toString())
+                                 );
+
+                                 if (student && note !== undefined) {
+                                    const el = document.getElementById(`grade-${student.id}`) as HTMLInputElement;
+                                    if (el) el.value = note.toString();
+                                    if (subject) {
+                                       const subEl = document.getElementById('grade-subject') as HTMLInputElement;
+                                       if (subEl) subEl.value = subject.toString();
+                                    }
+                                    count++;
+                                 }
+                              });
+                              toast.success(`${count} notes importées avec succès !`);
+                           };
+                           reader.readAsBinaryString(file);
                         };
                         input.click();
                      }}

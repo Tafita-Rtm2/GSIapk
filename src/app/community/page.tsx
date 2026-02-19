@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from "react";
 import { GSIStore, ChatMessage, User } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
+import ReactMarkdown from 'react-markdown';
 
 export default function CommunityPage() {
   const { t } = useLanguage();
@@ -126,7 +127,11 @@ export default function CommunityPage() {
                              <File size={16} /> Document joint
                           </a>
                        ) : (
-                          m.text
+                          <div className="prose prose-sm prose-invert max-w-none prose-p:my-0 prose-headings:text-sm prose-headings:my-1">
+                             <ReactMarkdown>
+                                {m.text}
+                             </ReactMarkdown>
+                          </div>
                        )}
                     </div>
                 </div>

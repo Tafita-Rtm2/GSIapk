@@ -14,6 +14,10 @@ const MEDIA_BASE = "https://groupegsi.mg/rtmggmg";
 
 let ADMIN_CODE = "Nina GSI";
 let PROF_PASS = "prof-gsi-mg";
+let AI_CONFIG = {
+  apiKey: "",
+  prompts: {} as Record<string, string> // campus_subject -> prompt
+};
 
 // Types
 export interface User {
@@ -232,8 +236,8 @@ class GSIStoreClass {
      }
   }
 
-  private async syncAll() {
-     return Promise.all([
+  async syncAll() {
+     await Promise.all([
        this.fetchCollection('users', 'users'),
        this.syncRemoteConfig(),
        this.fetchCollection('lessons', 'lessons'),
@@ -243,6 +247,31 @@ class GSIStoreClass {
        this.fetchCollection('schedules', 'schedules'),
        this.fetchChatMessages()
      ]);
+     this.cleanOfflineFiles();
+  }
+
+  private async cleanOfflineFiles() {
+     // Delete offline files for lessons/assignments that are no longer in the cloud
+     const progress = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
+     const downloaded = JSON.parse(localStorage.getItem('gsi_downloaded') || '{}');
+
+     const cloudLessonIds = new Set(this.state.lessons.map(l => l.id));
+     const cloudAssignmentIds = new Set(this.state.assignments.map(a => a.id));
+
+     for (const id in downloaded) {
+        if (!cloudLessonIds.has(id) && !cloudAssignmentIds.has(id)) {
+           console.log(`GSIStore: Cleaning up deleted content ${id}`);
+           if (progress[id]?.localPath) {
+              try {
+                 await Filesystem.deleteFile({ path: progress[id].localPath, directory: Directory.Data });
+              } catch (e) {}
+           }
+           delete downloaded[id];
+           delete progress[id];
+        }
+     }
+     localStorage.setItem('gsi_downloaded', JSON.stringify(downloaded));
+     localStorage.setItem('gsi_progress', JSON.stringify(progress));
   }
 
   private async fetchChatMessages() {
@@ -394,12 +423,24 @@ class GSIStoreClass {
         const config = data[0];
         if (config.ADMIN_CODE) ADMIN_CODE = config.ADMIN_CODE;
         if (config.PROF_PASS) PROF_PASS = config.PROF_PASS;
+        if (config.AI_CONFIG) AI_CONFIG = config.AI_CONFIG;
       }
     } catch (e) {}
   }
 
   getAdminCode() { return ADMIN_CODE; }
   getProfPass() { return PROF_PASS; }
+  getAIConfig() { return AI_CONFIG; }
+
+  async updateAIConfig(config: typeof AI_CONFIG) {
+     AI_CONFIG = config;
+     const existing = await this.apiCall('/db/system_config');
+     if (existing && Array.isArray(existing) && existing.length > 0) {
+        await this.apiCall(`/db/system_config/${existing[0]._id}`, 'PATCH', { AI_CONFIG });
+     } else {
+        await this.apiCall('/db/system_config', 'POST', { AI_CONFIG });
+     }
+  }
 
   async login(email: string, password: string): Promise<User | null> {
     const q = encodeURIComponent(JSON.stringify({ email, password }));
@@ -960,10 +1001,10 @@ class GSIStoreClass {
     let type: 'pdf' | 'docx' | 'video' | 'image' = 'pdf';
     const mime = (progress?.mimeType || "").toLowerCase();
 
-    if (mime.includes('pdf') || lowUrl.endsWith('.pdf')) type = 'pdf';
+    if (mime.includes('pdf') || lowUrl.endsWith('.pdf') || lowUrl.includes('/pdf')) type = 'pdf';
     else if (mime.includes('word') || mime.includes('docx') || lowUrl.endsWith('.docx')) type = 'docx';
     else if (mime.includes('video') || lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/)) type = 'video';
-    else if (mime.includes('image') || lowUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/)) type = 'image';
+    else if (mime.includes('image') || lowUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/) || lowUrl.includes('photo')) type = 'image';
     else {
       if (lowUrl.includes('.pdf')) type = 'pdf';
       else if (lowUrl.includes('.docx')) type = 'docx';
@@ -973,7 +1014,7 @@ class GSIStoreClass {
     const dispatchViewer = (targetUrl: string) => {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('gsi-open-viewer', {
-          detail: { url: targetUrl, type, originalUrl: absoluteUrl }
+          detail: { id: lessonId, url: targetUrl, type, originalUrl: absoluteUrl }
         }));
       }
     };

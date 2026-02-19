@@ -27,11 +27,17 @@ export default function SubjectsPage() {
 
       const subjectNames = Array.from(new Set(filtered.map(l => l.subject)));
       const mapped = subjectNames.map((name, i) => {
-        const count = filtered.filter(l => l.subject === name).length;
+        const subjectLessons = filtered.filter(l => l.subject === name);
+        const count = subjectLessons.length;
+
+        // Calculate progression
+        const completedCount = subjectLessons.filter(l => GSIStore.getProgress(l.id)?.completed).length;
+        const progress = count > 0 ? Math.round((completedCount / count) * 100) : 0;
+
         return {
           id: i,
           title: name,
-          progress: 0,
+          progress: progress,
           icon: "📖",
           color: "bg-indigo-500",
           items: count
@@ -84,8 +90,14 @@ export default function SubjectsPage() {
                     {s.icon}
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-black text-gray-900 text-sm uppercase tracking-tight">{s.title}</h4>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">{s.items} Ressources</p>
+                    <div className="flex justify-between items-center mb-1">
+                       <h4 className="font-black text-gray-900 text-sm uppercase tracking-tight">{s.title}</h4>
+                       <span className="text-[10px] font-black text-indigo-600">{s.progress}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                       <div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${s.progress}%` }}></div>
+                    </div>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-2">{s.items} Ressources</p>
                   </div>
                   <ChevronRight size={20} className="text-gray-300" />
                 </div>
@@ -110,8 +122,14 @@ export default function SubjectsPage() {
                            <FileText size={20} />
                         </div>
                         <div className="flex-1">
-                           <h4 className="font-bold text-xs uppercase tracking-tight">{l.title}</h4>
-                           <p className="text-[10px] text-gray-400 font-medium">{new Date(l.date).toLocaleDateString()}</p>
+                           <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-xs uppercase tracking-tight">{l.title}</h4>
+                              {GSIStore.getProgress(l.id)?.completed && <CheckCircle2 size={12} className="text-emerald-500" />}
+                           </div>
+                           <p className="text-[10px] text-gray-400 font-medium">
+                              {new Date(l.date).toLocaleDateString()}
+                              {GSIStore.getProgress(l.id)?.currentPage && ` • Page ${GSIStore.getProgress(l.id).currentPage}`}
+                           </p>
                         </div>
                         <div className="flex gap-2">
                            <button
