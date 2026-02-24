@@ -62,22 +62,37 @@ app.get('/', (req, res) => {
 
 // Fallback to index.html for SPA routing
 app.get('/apk/*', (req, res) => {
+  console.log(`[DEBUG] Request for: ${req.path}`);
   const requestedPath = req.path.replace('/apk', '');
 
   // Try to find the file in the out directory
   // Next.js with trailingSlash: true creates folder/index.html
   let potentialFile = path.join(__dirname, 'out', requestedPath);
 
+  // Clean up potential double slashes
+  potentialFile = path.normalize(potentialFile);
+
   if (fs.existsSync(potentialFile) && fs.lstatSync(potentialFile).isDirectory()) {
     potentialFile = path.join(potentialFile, 'index.html');
   } else if (!fs.existsSync(potentialFile) && !requestedPath.includes('.')) {
-    potentialFile = path.join(__dirname, 'out', requestedPath, 'index.html');
+    // If it doesn't exist and has no extension, it's likely a route
+    const withIndex = path.join(__dirname, 'out', requestedPath, 'index.html');
+    if (fs.existsSync(withIndex)) {
+      potentialFile = withIndex;
+    } else {
+      potentialFile = path.join(__dirname, 'out', 'index.html');
+    }
   }
 
   if (fs.existsSync(potentialFile) && fs.lstatSync(potentialFile).isFile()) {
     res.sendFile(potentialFile);
   } else {
-    res.sendFile(path.join(__dirname, 'out', 'index.html'));
+    const mainIndex = path.join(__dirname, 'out', 'index.html');
+    if (fs.existsSync(mainIndex)) {
+      res.sendFile(mainIndex);
+    } else {
+      res.status(404).send('Error: out/index.html not found. Please ensure the project is built (npm run build).');
+    }
   }
 });
 
