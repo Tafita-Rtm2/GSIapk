@@ -914,7 +914,14 @@ class GSIStoreClass {
     if (!absolute || Capacitor.isNativePlatform() || absolute.startsWith('blob:') || absolute.startsWith('data:')) {
       return absolute;
     }
-    // Utilisation du proxy pour éviter les problèmes de CORS sur le web
+
+    // Si c'est déjà sur groupegsi.mg, on tente l'accès direct en premier
+    // car le proxy peut poser problème avec le streaming vidéo (Range requests)
+    if (absolute.includes('groupegsi.mg')) {
+      return absolute;
+    }
+
+    // Utilisation du proxy pour éviter les problèmes de CORS sur le web pour les ressources externes
     return `/apk/api/proxy?url=${encodeURIComponent(absolute)}`;
   }
 
@@ -1045,7 +1052,7 @@ class GSIStoreClass {
     else if (lowUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/) || lowUrl.includes('photo')) type = 'image';
     else if (!url.startsWith('http') && !url.startsWith('/') && !url.startsWith('files/')) type = 'text';
 
-    const absoluteUrl = type === 'text' ? url : this.getAbsoluteUrl(url);
+    const absoluteUrl = type === 'text' ? url : this.getMediaUrl(url);
     const progress = this.getProgress(lessonId);
     const mime = (progress?.mimeType || "").toLowerCase();
 

@@ -34,6 +34,9 @@ app.get('/apk/api/proxy', async (req, res) => {
     const response = await fetch(url);
     const contentType = response.headers.get('content-type');
     if (contentType) res.setHeader('Content-Type', contentType);
+
+    // Support Range headers for videos if possible
+    // Note: node-fetch 2.x body is a stream
     response.body.pipe(res);
   } catch (error) {
     console.error('Proxy error:', error);

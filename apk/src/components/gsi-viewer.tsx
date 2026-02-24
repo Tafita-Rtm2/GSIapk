@@ -10,7 +10,8 @@ import { GSIStore } from '@/lib/store';
 // Configure PDF.js worker
 // Use a check to ensure we are in a browser environment
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+  // Utilisation d'un CDN pour le worker afin d'éviter les problèmes de chemins relatifs dans les sous-dossiers
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs';
 }
 
 interface GSIViewerProps {
@@ -57,18 +58,9 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
 
   const renderPdf = async (pageNum = 1, currentScale = scale) => {
     try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const arrayBuffer = await response.arrayBuffer();
-
-      // Basic PDF magic number check (%PDF-)
-      const header = new Uint8Array(arrayBuffer.slice(0, 5));
-      const headerString = String.fromCharCode(...header);
-      if (!headerString.includes('%PDF-')) {
-         throw new Error("Le fichier n'est pas un document PDF valide.");
-      }
-
-      const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+      // Pour les PDFs, on passe l'URL directement à PDF.js si c'est possible
+      // cela permet une meilleure gestion du streaming et du cache par le navigateur
+      const loadingTask = pdfjsLib.getDocument(url);
       const pdf = await loadingTask.promise;
       setPdfData({ numPages: pdf.numPages, currentPage: pageNum });
 
