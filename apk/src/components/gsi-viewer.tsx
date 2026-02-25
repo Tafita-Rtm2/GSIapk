@@ -227,7 +227,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
         )}
 
         {type === 'video' && (
-          <div className="w-full h-full flex items-center justify-center bg-black rounded-3xl overflow-hidden shadow-2xl relative">
+          <div className="w-full h-full flex items-center justify-center bg-black rounded-3xl overflow-hidden shadow-2xl relative" onContextMenu={(e) => e.preventDefault()}>
             <video
               key={url}
               src={url}
@@ -237,6 +237,8 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
               playsInline
               muted
               preload="auto"
+              controlsList="nodownload"
+              disablePictureInPicture
               onError={(e) => {
                 console.error("Video error event:", e);
                 const videoElement = e.currentTarget;
@@ -251,11 +253,12 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
         )}
 
         {type === 'image' && (
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-4" onContextMenu={(e) => e.preventDefault()}>
             <div className="overflow-auto max-w-full rounded-2xl shadow-xl">
                <img
                  key={url}
                  src={url}
+                 draggable={false}
                  style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }}
                  className="h-auto transition-transform duration-200"
                  alt="Document"

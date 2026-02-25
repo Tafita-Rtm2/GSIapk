@@ -59,8 +59,7 @@ app.get('/apk/api/proxy', async (req, res) => {
       'accept-ranges',
       'cache-control',
       'last-modified',
-      'etag',
-      'content-disposition'
+      'etag'
     ];
 
     headersToCopy.forEach(h => {
@@ -68,12 +67,18 @@ app.get('/apk/api/proxy', async (req, res) => {
       if (val) res.setHeader(h, val);
     });
 
+    // Force inline disposition pour éviter le téléchargement forcé et permettre la lecture
+    res.setHeader('Content-Disposition', 'inline');
+    // Autoriser CORS pour le contenu proxifié
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
     console.log(`[PROXY] Status: ${response.status}, Type: ${response.headers.get('content-type')}`);
 
     // Robust stream piping with error handling
     response.body.on('error', (err) => {
       console.error('[PROXY] Stream error:', err);
-      res.end();
+      if (!res.headersSent) res.status(500).end();
+      else res.end();
     });
 
     response.body.pipe(res);
