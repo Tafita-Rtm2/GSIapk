@@ -234,8 +234,14 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
               controls
               autoPlay
               playsInline
-              onError={() => onError?.("Format vidéo non supporté.")}
-            />
+              preload="auto"
+              onError={(e) => {
+                console.error("Video error:", e);
+                onError?.("Format vidéo non supporté ou erreur de chargement.");
+              }}
+            >
+              Votre navigateur ne supporte pas la lecture de vidéos.
+            </video>
           </div>
         )}
 
@@ -248,7 +254,11 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
                  className="h-auto transition-transform duration-200"
                  alt="Document"
                  onLoad={() => { setLoading(false); onLoadComplete?.(); }}
-                 onError={() => { setLoading(false); onError?.("Échec du chargement de l'image."); }}
+                 onError={(e) => {
+                   console.error("Image error:", e);
+                   setLoading(false);
+                   onError?.("Échec du chargement de l'image.");
+                 }}
                />
             </div>
             {/* Zoom Controls for Image */}

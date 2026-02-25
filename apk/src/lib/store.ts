@@ -915,13 +915,8 @@ class GSIStoreClass {
       return absolute;
     }
 
-    // Si c'est déjà sur groupegsi.mg, on tente l'accès direct en premier
-    // car le proxy peut poser problème avec le streaming vidéo (Range requests)
-    if (absolute.includes('groupegsi.mg')) {
-      return absolute;
-    }
-
-    // Utilisation du proxy pour éviter les problèmes de CORS sur le web pour les ressources externes
+    // On utilise systématiquement le proxy pour les ressources distantes sur le web
+    // pour garantir le bon passage des headers (CORS, Content-Type, etc.)
     return `/apk/api/proxy?url=${encodeURIComponent(absolute)}`;
   }
 

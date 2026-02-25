@@ -31,12 +31,40 @@ app.get('/apk/api/proxy', async (req, res) => {
   }
 
   try {
-    const response = await fetch(url);
-    const contentType = response.headers.get('content-type');
-    if (contentType) res.setHeader('Content-Type', contentType);
+    const fetchOptions = {
+      headers: {}
+    };
 
-    // Support Range headers for videos if possible
-    // Note: node-fetch 2.x body is a stream
+    // Forward Range header for video streaming
+    if (req.headers.range) {
+      fetchOptions.headers.range = req.headers.range;
+    }
+
+    const response = await fetch(url, fetchOptions);
+
+    // Set status and copy headers from upstream
+    res.status(response.status);
+
+    const headersToCopy = [
+      'content-type',
+      'content-length',
+      'content-range',
+      'accept-ranges',
+      'cache-control',
+      'last-modified',
+      'etag'
+    ];
+
+    headersToCopy.forEach(h => {
+      const val = response.headers.get(h);
+      if (val) res.setHeader(h, val);
+    });
+
+    // Ensure we don't have double Content-Type or weird issues
+    if (!res.getHeader('Content-Type') && response.headers.get('content-type')) {
+      res.setHeader('Content-Type', response.headers.get('content-type'));
+    }
+
     response.body.pipe(res);
   } catch (error) {
     console.error('Proxy error:', error);
