@@ -27,22 +27,29 @@ app.get('/apk/api/proxy', async (req, res) => {
   // Sécurité SSRF : On n'autorise que les URLs provenant du domaine officiel
   const allowedBase = "https://groupegsi.mg";
   if (!url.startsWith(allowedBase)) {
+    console.warn(`[PROXY] Blocked unauthorized URL: ${url}`);
     return res.status(403).send('URL non autorisée.');
   }
 
+  console.log(`[PROXY] Fetching: ${url}`);
+
   try {
     const fetchOptions = {
-      headers: {}
+      method: 'GET',
+      headers: {
+        'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0'
+      }
     };
 
-    // Forward Range header for video streaming
-    if (req.headers.range) {
-      fetchOptions.headers.range = req.headers.range;
-    }
+    // Forward critical headers for streaming
+    const forwardHeaders = ['range', 'accept', 'accept-encoding', 'connection'];
+    forwardHeaders.forEach(h => {
+      if (req.headers[h]) fetchOptions.headers[h] = req.headers[h];
+    });
 
     const response = await fetch(url, fetchOptions);
 
-    // Set status and copy headers from upstream
+    // Copy status and all relevant headers from upstream
     res.status(response.status);
 
     const headersToCopy = [
@@ -52,7 +59,8 @@ app.get('/apk/api/proxy', async (req, res) => {
       'accept-ranges',
       'cache-control',
       'last-modified',
-      'etag'
+      'etag',
+      'content-disposition'
     ];
 
     headersToCopy.forEach(h => {
@@ -60,15 +68,20 @@ app.get('/apk/api/proxy', async (req, res) => {
       if (val) res.setHeader(h, val);
     });
 
-    // Ensure we don't have double Content-Type or weird issues
-    if (!res.getHeader('Content-Type') && response.headers.get('content-type')) {
-      res.setHeader('Content-Type', response.headers.get('content-type'));
-    }
+    console.log(`[PROXY] Status: ${response.status}, Type: ${response.headers.get('content-type')}`);
+
+    // Robust stream piping with error handling
+    response.body.on('error', (err) => {
+      console.error('[PROXY] Stream error:', err);
+      res.end();
+    });
 
     response.body.pipe(res);
   } catch (error) {
-    console.error('Proxy error:', error);
-    res.status(500).send('Proxy error');
+    console.error('[PROXY] Error:', error);
+    if (!res.headersSent) {
+      res.status(500).send('Proxy internal error');
+    }
   }
 });
 

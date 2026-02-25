@@ -1,4 +1,6 @@
-const CACHE_NAME = 'gsi-insight-apk-v4';
+const CACHE_NAME = 'gsi-insight-apk-v5';
+
+// Routes and assets to pre-cache
 const ASSETS_TO_CACHE = [
   '/apk/',
   '/apk/index.html',
@@ -18,14 +20,18 @@ const ASSETS_TO_CACHE = [
   'https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs'
 ];
 
+// Helper to check if a URL is a navigation request to a page
+const isNavigationRequest = (request) => {
+  return request.mode === 'navigate' ||
+         (request.method === 'GET' && request.headers.get('accept').includes('text/html'));
+};
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('SW: Pre-caching routes and assets');
+      console.log('SW: Pre-caching all routes and assets');
       return Promise.allSettled(
-        ASSETS_TO_CACHE.map(url => {
-          return cache.add(url).catch(err => console.warn(`SW: Failed to cache ${url}`, err));
-        })
+        ASSETS_TO_CACHE.map(url => cache.add(url).catch(err => console.warn(`SW: Failed to cache ${url}`, err)))
       );
     })
   );
@@ -38,7 +44,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            console.log('SW: Clearing old cache', cacheName);
+            console.log('SW: Removing old cache', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -53,40 +59,59 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Skip dynamic DB API calls, but NOT the proxy (we want to cache media)
+  // Do not intercept dynamic database API calls
   if (url.pathname.includes('/db/')) return;
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      // 1. Return cached response if found
+
+      // 1. If it's a navigation request, try Network First, then Cache
+      if (isNavigationRequest(event.request)) {
+        return fetch(event.request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const responseToCache = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+              return networkResponse;
+            }
+            return cachedResponse || caches.match('/apk/index.html');
+          })
+          .catch(() => {
+            // Offline fallback: try the exact route, then the parent, then index.html
+            const fallbackPath = url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`;
+            return cachedResponse || caches.match(fallbackPath) || caches.match('/apk/index.html');
+          });
+      }
+
+      // 2. For static assets and proxied media, Cache First, then Network
       if (cachedResponse) {
         return cachedResponse;
       }
 
-      // 2. Otherwise fetch and cache
-      return fetch(event.request).then((response) => {
-        // Cache static assets, pages, AND proxied media
-        if (
-          response && response.status === 200 && (
-            url.pathname.startsWith('/apk/') ||
-            url.pathname.includes('_next/static') ||
-            url.pathname.includes('/api/proxy') || // Cache proxied media!
-            url.hostname === 'unpkg.com' ||
-            url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|woff2|json|pdf)$/)
-          )
-        ) {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+      return fetch(event.request).then((networkResponse) => {
+        // Only cache successful responses
+        if (!networkResponse || networkResponse.status !== 200) {
+          return networkResponse;
         }
-        return response;
-      }).catch((err) => {
-        // 3. Fallback for navigation requests
-        if (event.request.mode === 'navigate') {
-          // Check if we have the specific index.html for this route or the main one
-          const fallbackPath = url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`;
-          return caches.match(fallbackPath) || caches.match('/apk/index.html');
+
+        // Determine if we should cache this asset
+        const shouldCache =
+          url.pathname.startsWith('/apk/') ||
+          url.pathname.includes('_next/static') ||
+          url.pathname.includes('/api/proxy') || // Important: cache proxied media!
+          url.hostname === 'unpkg.com' ||
+          url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|woff2|json|pdf|mp4)$/);
+
+        if (shouldCache) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+        }
+
+        return networkResponse;
+      }).catch(() => {
+        // Final fallback for missing images or files when offline
+        if (url.pathname.match(/\.(png|jpg|jpeg|gif|svg)$/)) {
+          return caches.match('/apk/gsilogo.jpg');
         }
         return null;
       });

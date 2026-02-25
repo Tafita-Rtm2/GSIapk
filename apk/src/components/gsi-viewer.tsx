@@ -227,17 +227,22 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
         )}
 
         {type === 'video' && (
-          <div className="w-full h-full flex items-center justify-center bg-black rounded-3xl overflow-hidden shadow-2xl">
+          <div className="w-full h-full flex items-center justify-center bg-black rounded-3xl overflow-hidden shadow-2xl relative">
             <video
+              key={url}
               src={url}
-              className="w-full max-h-full"
+              className="w-full h-full object-contain"
               controls
               autoPlay
               playsInline
+              muted
               preload="auto"
               onError={(e) => {
-                console.error("Video error:", e);
-                onError?.("Format vidéo non supporté ou erreur de chargement.");
+                console.error("Video error event:", e);
+                const videoElement = e.currentTarget;
+                console.error("Video error code:", videoElement.error?.code);
+                console.error("Video error message:", videoElement.error?.message);
+                onError?.(`Erreur vidéo (${videoElement.error?.code || 'inconnue'}). Vérifiez votre connexion.`);
               }}
             >
               Votre navigateur ne supporte pas la lecture de vidéos.
@@ -249,15 +254,20 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
           <div className="flex flex-col items-center gap-4">
             <div className="overflow-auto max-w-full rounded-2xl shadow-xl">
                <img
+                 key={url}
                  src={url}
                  style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }}
                  className="h-auto transition-transform duration-200"
                  alt="Document"
-                 onLoad={() => { setLoading(false); onLoadComplete?.(); }}
-                 onError={(e) => {
-                   console.error("Image error:", e);
+                 onLoad={() => {
+                   console.log("Image loaded successfully");
                    setLoading(false);
-                   onError?.("Échec du chargement de l'image.");
+                   onLoadComplete?.();
+                 }}
+                 onError={(e) => {
+                   console.error("Image load error:", e);
+                   setLoading(false);
+                   onError?.("Échec du chargement de l'image. Vérifiez votre connexion.");
                  }}
                />
             </div>
