@@ -1111,13 +1111,21 @@ class GSIStoreClass {
 
       // 2. If not cached, download then open
       if (window.navigator.onLine) {
+        // Sur le web, on ne télécharge pas les vidéos/images en IndexedDB (trop lourd/lent)
+        // On les streame directement depuis l'URL distante.
+        if (!Capacitor.isNativePlatform() && (type === 'video' || type === 'image')) {
+          console.log(`GSIStore: Direct streaming for ${type} on web`);
+          dispatchViewer(absoluteUrl);
+          return;
+        }
+
         const fileName = absoluteUrl.split('/').pop() || (type === 'pdf' ? 'doc.pdf' : type === 'docx' ? 'doc.docx' : 'video.mp4');
         const path = await this.downloadPackFile(absoluteUrl, fileName, lessonId);
 
         // RECURSIVE CALL to use the newly cached logic
         return this.openPackFile(lessonId, url);
       } else {
-        // Stream directly if online (fallback)
+        // Stream directement si en ligne mais pas de cache dispo
         dispatchViewer(absoluteUrl);
       }
     } catch (e: any) {

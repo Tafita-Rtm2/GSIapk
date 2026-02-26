@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gsi-insight-apk-v8';
+const CACHE_NAME = 'gsi-insight-apk-v9';
 
 // Routes to pre-cache
 const ASSETS_TO_CACHE = [
@@ -90,12 +90,28 @@ self.addEventListener('fetch', (event) => {
           }
           return res;
         })
-        .catch(() => {
-          return caches.match(event.request).then((cached) => {
-             if (cached) return cached;
-             // Si on est offline et qu'on n'a pas la page, on renvoie l'index global
-             return caches.match('/apk/index.html');
-          });
+        .catch(async () => {
+          // Robust offline fallback for navigation
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+
+          // Try folder-based matching
+          const urlObj = new URL(event.request.url);
+          const path = urlObj.pathname;
+
+          // If path is /apk/login, try /apk/login/ or /apk/login/index.html
+          const alternates = [
+            path.endsWith('/') ? path : path + '/',
+            path.endsWith('/') ? path + 'index.html' : path + '/index.html',
+            '/apk/index.html'
+          ];
+
+          for (const alt of alternates) {
+            const match = await caches.match(alt);
+            if (match) return match;
+          }
+
+          return caches.match('/apk/index.html');
         })
     );
   } else {

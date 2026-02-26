@@ -31,79 +31,68 @@ app.get('/apk/api/config', (req, res) => {
   });
 });
 
+const https = require('https');
+const http = require('http');
+
 // Proxy for media assets to avoid CORS issues
-app.get('/apk/api/proxy', async (req, res) => {
-  const url = req.query.url;
-  if (!url) return res.status(400).send('URL is required');
+app.get('/apk/api/proxy', (req, res) => {
+  const targetUrl = req.query.url;
+  if (!targetUrl) return res.status(400).send('URL is required');
 
   // Sécurité SSRF : On n'autorise que les URLs provenant du domaine officiel
   const allowedBase = "https://groupegsi.mg";
-  if (!url.startsWith(allowedBase)) {
-    console.warn(`[PROXY] Blocked unauthorized URL: ${url}`);
+  if (!targetUrl.startsWith(allowedBase)) {
+    console.warn(`[PROXY] Blocked unauthorized URL: ${targetUrl}`);
     return res.status(403).send('URL non autorisée.');
   }
 
-  try {
-    const fetchOptions = {
-      method: 'GET',
-      compress: false, // Ne pas décompresser pour préserver les offsets (Range)
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    };
+  const parsedUrl = new URL(targetUrl);
+  const protocol = parsedUrl.protocol === 'https:' ? https : http;
 
-    // Forwarder le header Range si présent (crucial pour Safari/Chrome et les vidéos)
-    if (req.headers.range) {
-      fetchOptions.headers['Range'] = req.headers.range;
-    }
+  const options = {
+    method: 'GET',
+    headers: { ...req.headers }
+  };
 
-    const response = await fetch(url, fetchOptions);
+  // Nettoyage des headers sensibles
+  delete options.headers.host;
+  delete options.headers.connection;
+  delete options.headers.cookie;
 
-    // On propage le code de statut (ex: 206 Partial Content)
-    res.status(response.status);
+  // Assurer un User-Agent décent
+  options.headers['user-agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-    // Copier les headers essentiels
-    const safeHeaders = [
-      'content-type',
-      'content-length',
-      'content-range',
-      'accept-ranges',
-      'cache-control',
-      'etag',
-      'last-modified'
-    ];
+  const proxyReq = protocol.request(targetUrl, options, (proxyRes) => {
+    // On propage tous les headers de réponse de l'amont
+    const responseHeaders = { ...proxyRes.headers };
 
-    safeHeaders.forEach(header => {
-      const value = response.headers.get(header);
-      if (value) res.setHeader(header, value);
-    });
+    // On surcharge les headers critiques pour le web
+    responseHeaders['content-disposition'] = 'inline';
+    responseHeaders['access-control-allow-origin'] = '*';
+    responseHeaders['access-control-allow-methods'] = 'GET, OPTIONS';
+    responseHeaders['access-control-expose-headers'] = 'Content-Range, Content-Length, Accept-Ranges';
 
-    // Forcer l'affichage dans le navigateur (pas de téléchargement)
-    res.setHeader('Content-Disposition', 'inline');
-    // Autoriser le streaming cross-origin
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges');
+    // Retirer les headers qui pourraient bloquer l'affichage (CSP, etc.)
+    delete responseHeaders['content-security-policy'];
+    delete responseHeaders['x-frame-options'];
 
-    console.log(`[PROXY] Streaming: ${url} [Status: ${response.status}] [Range: ${req.headers.range || 'none'}]`);
+    res.writeHead(proxyRes.statusCode, responseHeaders);
 
-    response.body.pipe(res);
+    console.log(`[PROXY] Stream: ${targetUrl} [Status: ${proxyRes.statusCode}] [Range: ${req.headers.range || 'none'}]`);
 
-    response.body.on('error', (err) => {
-      console.error('[PROXY] Pipe Error:', err);
-      res.end();
-    });
+    proxyRes.pipe(res);
+  });
 
-    req.on('close', () => {
-      if (response.body.destroy) response.body.destroy();
-    });
+  proxyReq.on('error', (err) => {
+    console.error('[PROXY] Request Error:', err);
+    if (!res.headersSent) res.status(500).send('Proxy Error');
+  });
 
-  } catch (error) {
-    console.error('[PROXY] Error:', error);
-    if (!res.headersSent) {
-      res.status(500).send('Proxy internal error');
-    }
-  }
+  req.on('close', () => {
+    proxyReq.destroy();
+  });
+
+  proxyReq.end();
 });
 
 // Serve static files from the 'out' directory

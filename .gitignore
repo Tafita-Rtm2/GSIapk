@@ -55,3 +55,7 @@ web/node_modules/
 web/.next/
 apk/node_modules/
 apk/.next/
+apk/out/
+apk/node_modules/
+web/out/
+web/node_modules/

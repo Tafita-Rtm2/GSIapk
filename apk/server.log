@@ -1,2 +1,7 @@
+
+> gsi-insight-web-apk@0.1.0 start
+> node server.js
+
 Server is running on port 3000
 Access at http://localhost:3000/apk/
+Terminated
