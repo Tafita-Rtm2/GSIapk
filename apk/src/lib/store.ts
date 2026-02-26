@@ -884,50 +884,65 @@ class GSIStoreClass {
   getAbsoluteUrl(url: string | undefined): string {
     if (!url || url === "undefined" || url === "null") return "";
 
-    // 1. If it's already absolute, return as is.
-    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+    // 1. Data/Blob
+    if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+
+    // 2. Already Absolute URL
+    if (url.startsWith('http://') || url.startsWith('https://')) {
        return url;
     }
 
-    // 2. Detect raw text (non-path strings)
+    // 3. Detect raw text (non-path strings)
     if (url.includes(' ') && !url.startsWith('/') && !url.startsWith('files/') && !url.startsWith('api/')) {
        return url;
     }
 
-    // 3. Robust URL cleaning for GSI Database System v3.0.0
-    // L'API attend des URLs du type : API_BASE + /files/view/:id
-    let clean = url;
+    // 4. Robust URL cleaning for GSI Database System v3.0.0
+    let path = url;
 
-    // Si l'URL contient déjà le domaine, on la laisse telle quelle
-    if (clean.includes('groupegsi.mg')) return clean;
-
-    // Retirer les préfixes redondants
-    if (clean.startsWith('/')) clean = clean.substring(1);
-    if (clean.startsWith('api/')) clean = clean.substring(4);
-    if (clean.startsWith('/api/')) clean = clean.substring(5);
-
-    // S'assurer que le chemin commence bien par files/view pour les fichiers
-    // si ce n'est pas déjà le cas et que ça ressemble à un ID de fichier
-    if (!clean.startsWith('files/') && clean.length > 15 && !clean.includes('/')) {
-       clean = `files/view/${clean}`;
+    // Remove all possible domain prefixes if they are relative-like
+    if (path.includes('groupegsi.mg')) {
+       try {
+         const u = new URL(path);
+         path = u.pathname + u.search;
+       } catch(e) {}
     }
 
-    // On s'assure qu'API_BASE ne finit pas par un slash et que clean n'en a pas au début
-    const base = API_BASE.endsWith('/') ? API_BASE.slice(0, -1) : API_BASE;
-    const path = clean.startsWith('/') ? clean.substring(1) : clean;
+    // Retirer les préfixes redondants
+    path = path.replace(/^\/+/, ''); // Remove leading slashes
+    path = path.replace(/^rtmggmg\//, '');
+    path = path.replace(/^api\//, '');
+    path = path.replace(/^\/+/, '');
 
+    // S'assurer que le chemin commence bien par files/view pour les IDs de fichiers
+    if (!path.startsWith('files/') && !path.includes('/') && path.length > 10) {
+       path = `files/view/${path}`;
+    }
+
+    // On s'assure qu'API_BASE ne finit pas par un slash
+    const base = API_BASE.endsWith('/') ? API_BASE.slice(0, -1) : API_BASE;
     return `${base}/${path}`;
   }
 
   getMediaUrl(url: string | undefined): string {
+    if (!url) return "";
+
+    // Si c'est déjà un blob ou de la donnée embarquée, on ne touche à rien
+    if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+
     const absolute = this.getAbsoluteUrl(url);
-    if (!absolute || Capacitor.isNativePlatform() || absolute.startsWith('blob:') || absolute.startsWith('data:')) {
-      return absolute;
+    if (!absolute) return "";
+
+    // Sur Mobile (Capacitor), on utilise l'URL absolue directement
+    if (Capacitor.isNativePlatform()) return absolute;
+
+    // Sur le Web, on force TOUT le trafic média distant via le proxy local /apk/api/proxy
+    // pour garantir le support des headers Range et bypasser CORS.
+    if (absolute.startsWith('http')) {
+      return `/apk/api/proxy?url=${encodeURIComponent(absolute)}`;
     }
 
-    // On utilise systématiquement le proxy pour les ressources distantes sur le web
-    // pour garantir le bon passage des headers (CORS, Content-Type, etc.)
-    return `/apk/api/proxy?url=${encodeURIComponent(absolute)}`;
+    return absolute;
   }
 
   getStudentQrData(user: User): string {

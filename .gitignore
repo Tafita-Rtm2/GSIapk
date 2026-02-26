@@ -17,7 +17,8 @@
 /.next/
 /out/
 web/out/
-apk/out/
+# apk/out/ is explicitly included for deployment
+!apk/out/
 
 # production
 /build

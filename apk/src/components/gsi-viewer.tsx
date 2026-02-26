@@ -235,9 +235,11 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
               controls
               autoPlay
               playsInline
+              crossOrigin="anonymous"
               preload="auto"
               controlsList="nodownload"
               disablePictureInPicture
+              onLoadedData={() => setLoading(false)}
               onError={(e) => {
                 const v = e.currentTarget;
                 const err = v.error;
@@ -270,6 +272,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
                  key={url}
                  src={url}
                  draggable={false}
+                 crossOrigin="anonymous"
                  style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }}
                  className="h-auto transition-transform duration-200"
                  alt="Document"
