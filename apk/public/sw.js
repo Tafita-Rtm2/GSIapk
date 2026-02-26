@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gsi-insight-apk-v9';
+const CACHE_NAME = 'gsi-insight-apk-v10';
 
 // Routes to pre-cache
 const ASSETS_TO_CACHE = [

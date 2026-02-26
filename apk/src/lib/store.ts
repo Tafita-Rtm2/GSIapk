@@ -895,18 +895,28 @@ class GSIStoreClass {
     }
 
     // 3. Robust URL cleaning for GSI Database System v3.0.0
-    // All endpoints like files/view are under the API base.
+    // L'API attend des URLs du type : API_BASE + /files/view/:id
     let clean = url;
-    if (clean.startsWith('/')) clean = clean.substring(1);
 
-    // Avoid double /api if present in the source string
-    if (clean.startsWith('api/')) {
-       clean = clean.substring(4);
+    // Si l'URL contient déjà le domaine, on la laisse telle quelle
+    if (clean.includes('groupegsi.mg')) return clean;
+
+    // Retirer les préfixes redondants
+    if (clean.startsWith('/')) clean = clean.substring(1);
+    if (clean.startsWith('api/')) clean = clean.substring(4);
+    if (clean.startsWith('/api/')) clean = clean.substring(5);
+
+    // S'assurer que le chemin commence bien par files/view pour les fichiers
+    // si ce n'est pas déjà le cas et que ça ressemble à un ID de fichier
+    if (!clean.startsWith('files/') && clean.length > 15 && !clean.includes('/')) {
+       clean = `files/view/${clean}`;
     }
 
-    // Use API_BASE as the root (e.g. https://groupegsi.mg/rtmggmg/api)
-    // This ensures URLs like .../api/files/view/:id match the documentation.
-    return `${API_BASE}/${clean}`;
+    // On s'assure qu'API_BASE ne finit pas par un slash et que clean n'en a pas au début
+    const base = API_BASE.endsWith('/') ? API_BASE.slice(0, -1) : API_BASE;
+    const path = clean.startsWith('/') ? clean.substring(1) : clean;
+
+    return `${base}/${path}`;
   }
 
   getMediaUrl(url: string | undefined): string {

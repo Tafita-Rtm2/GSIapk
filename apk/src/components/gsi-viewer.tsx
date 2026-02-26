@@ -240,15 +240,22 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
               disablePictureInPicture
               onError={(e) => {
                 const v = e.currentTarget;
-                console.error("Video Error Details:", {
-                  code: v.error?.code,
-                  message: v.error?.message,
-                  src: v.src
+                const err = v.error;
+                console.error("GSI Video Error:", {
+                  code: err?.code,
+                  message: err?.message,
+                  src: v.src,
+                  readyState: v.readyState,
+                  networkState: v.networkState
                 });
-                // Si l'erreur est liée au chargement (code 4 ou source non supportée),
-                // on peut tenter d'afficher un message plus clair.
-                const msg = v.error?.code === 4 ? "Source non supportée ou lien expiré." : `Erreur lecture (${v.error?.code || '?'})`;
-                onError?.(`${msg}. Assurez-vous d'être en ligne.`);
+
+                let msg = "Échec de lecture vidéo.";
+                if (err?.code === 1) msg = "Chargement interrompu.";
+                if (err?.code === 2) msg = "Erreur réseau.";
+                if (err?.code === 3) msg = "Vidéo corrompue.";
+                if (err?.code === 4) msg = "Format non supporté ou accès refusé.";
+
+                onError?.(`${msg} (Code: ${err?.code || '?'}). Vérifiez votre connexion.`);
               }}
             >
               Votre navigateur ne supporte pas la lecture de vidéos.
