@@ -1,7 +1,6 @@
-const CACHE_NAME = 'gsi-insight-apk-v7';
+const CACHE_NAME = 'gsi-insight-apk-v8';
 
 // Routes to pre-cache
-// IMPORTANT: We cache both the folder and the index.html for each route
 const ASSETS_TO_CACHE = [
   '/apk/',
   '/apk/index.html',
@@ -59,18 +58,27 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-
   const url = new URL(event.request.url);
 
-  // BYPASS for Range requests (streaming) to avoid SW issues
+  // --- BYPASS CRITIQUE POUR LES MÉDIAS (PHOTO/VIDEO) ---
+  // On ne laisse JAMAIS le Service Worker gérer les appels au proxy api/proxy
+  // car Chrome/Safari bloquent le streaming (Range requests) via SW.
+  if (url.pathname.includes('/api/proxy')) {
+    return; // Laisse le navigateur gérer directement la requête réseau
+  }
+
+  // Bypass for Range requests (just in case)
   if (event.request.headers.get('range')) return;
 
-  // BYPASS for dynamic DB calls
+  // Bypass for dynamic DB calls
   if (url.pathname.includes('/db/')) return;
 
+  if (event.request.method !== 'GET') return;
+
   // STRATEGY: Network First for HTML, Cache First for assets
-  const isHtml = event.request.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('.html');
+  const isHtml = event.request.mode === 'navigate' ||
+                 url.pathname.endsWith('/') ||
+                 url.pathname.endsWith('.html');
 
   if (isHtml) {
     event.respondWith(
@@ -83,10 +91,9 @@ self.addEventListener('fetch', (event) => {
           return res;
         })
         .catch(() => {
-          // Fallback to cache
           return caches.match(event.request).then((cached) => {
              if (cached) return cached;
-             // Ultimate fallback: root index.html
+             // Si on est offline et qu'on n'a pas la page, on renvoie l'index global
              return caches.match('/apk/index.html');
           });
         })
@@ -97,10 +104,8 @@ self.addEventListener('fetch', (event) => {
         if (cached) return cached;
 
         return fetch(event.request).then((res) => {
-          // Cache successful static assets and proxied media
           if (res && res.status === 200 && (
               url.pathname.includes('_next/static') ||
-              url.pathname.includes('/api/proxy') ||
               url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|woff2|json|pdf)$/)
           )) {
             const copy = res.clone();
@@ -108,7 +113,6 @@ self.addEventListener('fetch', (event) => {
           }
           return res;
         }).catch(() => {
-           // Fallback for images
            if (url.pathname.match(/\.(png|jpg|jpeg|gif|svg)$/)) {
              return caches.match('/apk/gsilogo.jpg');
            }

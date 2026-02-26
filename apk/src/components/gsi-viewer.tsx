@@ -230,12 +230,13 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
           <div className="w-full h-full flex items-center justify-center bg-black rounded-3xl overflow-hidden shadow-2xl relative" onContextMenu={(e) => e.preventDefault()}>
             <video
               key={url}
+              src={url}
               className="w-full h-full object-contain"
               controls
               autoPlay
               playsInline
               muted
-              preload="metadata"
+              preload="auto"
               controlsList="nodownload"
               disablePictureInPicture
               onError={(e) => {
@@ -245,12 +246,12 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
                   message: v.error?.message,
                   src: v.src
                 });
-                onError?.(`Lecture impossible (Code ${v.error?.code || '?'}). Tentez de rafraîchir.`);
+                // Si l'erreur est liée au chargement (code 4 ou source non supportée),
+                // on peut tenter d'afficher un message plus clair.
+                const msg = v.error?.code === 4 ? "Source non supportée ou lien expiré." : `Erreur lecture (${v.error?.code || '?'})`;
+                onError?.(`${msg}. Assurez-vous d'être en ligne.`);
               }}
             >
-              <source src={url} type="video/mp4" />
-              <source src={url} type="video/webm" />
-              <source src={url} type="video/ogg" />
               Votre navigateur ne supporte pas la lecture de vidéos.
             </video>
           </div>

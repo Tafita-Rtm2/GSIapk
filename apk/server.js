@@ -43,59 +43,58 @@ app.get('/apk/api/proxy', async (req, res) => {
     return res.status(403).send('URL non autorisée.');
   }
 
-  console.log(`[PROXY] Fetching: ${url}`);
-
   try {
     const fetchOptions = {
       method: 'GET',
-      compress: false, // TRÈS IMPORTANT : Ne pas décompresser pour garder les Content-Length/Range intacts
+      compress: false, // Ne pas décompresser pour préserver les offsets (Range)
       headers: {
-        'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       }
     };
 
-    // On transmet les headers critiques pour le streaming (Range)
-    if (req.headers.range) fetchOptions.headers.range = req.headers.range;
-    if (req.headers.accept) fetchOptions.headers.accept = req.headers.accept;
+    // Forwarder le header Range si présent (crucial pour Safari/Chrome et les vidéos)
+    if (req.headers.range) {
+      fetchOptions.headers['Range'] = req.headers.range;
+    }
 
     const response = await fetch(url, fetchOptions);
 
-    // On recopie le statut et tous les headers pertinents
+    // On propage le code de statut (ex: 206 Partial Content)
     res.status(response.status);
 
-    const headersToCopy = [
+    // Copier les headers essentiels
+    const safeHeaders = [
       'content-type',
       'content-length',
       'content-range',
       'accept-ranges',
       'cache-control',
-      'last-modified',
       'etag',
-      'vary'
+      'last-modified'
     ];
 
-    headersToCopy.forEach(h => {
-      const val = response.headers.get(h);
-      if (val) res.setHeader(h, val);
+    safeHeaders.forEach(header => {
+      const value = response.headers.get(header);
+      if (value) res.setHeader(header, value);
     });
 
-    // Force inline pour éviter le téléchargement, autorise le visionnage
+    // Forcer l'affichage dans le navigateur (pas de téléchargement)
     res.setHeader('Content-Disposition', 'inline');
+    // Autoriser le streaming cross-origin
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges');
 
-    console.log(`[PROXY] Fetching ${url} | Status: ${response.status} | Range: ${req.headers.range || 'none'}`);
+    console.log(`[PROXY] Streaming: ${url} [Status: ${response.status}] [Range: ${req.headers.range || 'none'}]`);
 
-    // Piping direct du flux
     response.body.pipe(res);
 
     response.body.on('error', (err) => {
-      console.error('[PROXY] Stream error:', err);
+      console.error('[PROXY] Pipe Error:', err);
       res.end();
     });
 
     req.on('close', () => {
-      // Annuler le fetch si le client ferme la connexion
       if (response.body.destroy) response.body.destroy();
     });
 
