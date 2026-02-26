@@ -15,9 +15,9 @@
 
 # next.js
 /.next/
-# /out/ is allowed for the web folder as requested by the user
-!web/out/
-!apk/out/
+/out/
+web/out/
+apk/out/
 
 # production
 /build
@@ -55,7 +55,3 @@ web/node_modules/
 web/.next/
 apk/node_modules/
 apk/.next/
-apk/out/
-apk/node_modules/
-web/out/
-web/node_modules/

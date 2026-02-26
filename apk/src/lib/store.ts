@@ -144,8 +144,6 @@ class GSIStoreClass {
         const config = await res.json();
         if (config.API_BASE) API_BASE = config.API_BASE;
         if (config.MEDIA_BASE) MEDIA_BASE = config.MEDIA_BASE;
-        if (config.ADMIN_CODE) ADMIN_CODE = config.ADMIN_CODE;
-        if (config.PROF_PASS) PROF_PASS = config.PROF_PASS;
         console.log("GSIStore: Web Config Loaded", { API_BASE, MEDIA_BASE });
       }
     } catch (e) {
@@ -892,21 +890,23 @@ class GSIStoreClass {
     }
 
     // 2. Detect raw text (non-path strings)
-    // If it has spaces and doesn't start with / or files/, it's likely raw text
-    if (url.includes(' ') && !url.startsWith('/') && !url.startsWith('files/')) {
+    if (url.includes(' ') && !url.startsWith('/') && !url.startsWith('files/') && !url.startsWith('api/')) {
        return url;
     }
 
-    // 3. Handle special case for files/view
-    if (url.startsWith('files/view/') || url.startsWith('api/files/view/') || url.startsWith('/api/files/view/')) {
-       let path = url.replace('api/', '').replace('/api/', '');
-       // En mode web, on s'assure de ne pas avoir de double /api/ si on est sur le même domaine
-       return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+    // 3. Robust URL cleaning for GSI Database System v3.0.0
+    // All endpoints like files/view are under the API base.
+    let clean = url;
+    if (clean.startsWith('/')) clean = clean.substring(1);
+
+    // Avoid double /api if present in the source string
+    if (clean.startsWith('api/')) {
+       clean = clean.substring(4);
     }
 
-    // 4. For relative paths from the custom API
-    const base = MEDIA_BASE;
-    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+    // Use API_BASE as the root (e.g. https://groupegsi.mg/rtmggmg/api)
+    // This ensures URLs like .../api/files/view/:id match the documentation.
+    return `${API_BASE}/${clean}`;
   }
 
   getMediaUrl(url: string | undefined): string {

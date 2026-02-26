@@ -21,13 +21,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// Config API for the frontend
+// Config API for the frontend (Safe public config)
 app.get('/apk/api/config', (req, res) => {
   res.json({
     API_BASE: process.env.API_BASE || "https://groupegsi.mg/rtmggmg/api",
-    MEDIA_BASE: process.env.MEDIA_BASE || "https://groupegsi.mg/rtmggmg",
-    ADMIN_CODE: process.env.ADMIN_CODE,
-    PROF_PASS: process.env.PROF_PASS
+    MEDIA_BASE: process.env.MEDIA_BASE || "https://groupegsi.mg/rtmggmg"
   });
 });
 
