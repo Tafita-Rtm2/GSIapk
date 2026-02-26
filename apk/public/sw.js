@@ -1,7 +1,7 @@
-const CACHE_NAME = 'gsi-insight-apk-v6';
+const CACHE_NAME = 'gsi-insight-apk-v7';
 
-// Routes and assets to pre-cache
-// IMPORTANT: Use trailing slashes for directory routes to match Next.js output
+// Routes to pre-cache
+// IMPORTANT: We cache both the folder and the index.html for each route
 const ASSETS_TO_CACHE = [
   '/apk/',
   '/apk/index.html',
@@ -30,22 +30,12 @@ const ASSETS_TO_CACHE = [
   'https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs'
 ];
 
-const isNavigationRequest = (request) => {
-  return request.mode === 'navigate' ||
-         (request.method === 'GET' && request.headers.get('accept') && request.headers.get('accept').includes('text/html'));
-};
-
-const isStaticAsset = (url) => {
-  return url.pathname.includes('_next/static') ||
-         url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|woff2|json|pdf|mp4)$/);
-};
-
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('SW: Pre-caching routes and assets');
+      console.log('SW: Pre-caching core routes');
       return Promise.allSettled(
-        ASSETS_TO_CACHE.map(url => cache.add(url).catch(err => console.warn(`SW: Failed to cache ${url}`, err)))
+        ASSETS_TO_CACHE.map(url => cache.add(url).catch(err => console.warn(`SW: Pre-cache failed for ${url}`)))
       );
     })
   );
@@ -54,12 +44,12 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then((keys) => {
       return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('SW: Removing old cache', cacheName);
-            return caches.delete(cacheName);
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            console.log('SW: Cleaning old cache', key);
+            return caches.delete(key);
           }
         })
       );
@@ -73,52 +63,58 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Bypass SW for Range requests (common for video) to avoid 206 Partial Content issues
-  if (event.request.headers.get('range')) {
-    return;
-  }
+  // BYPASS for Range requests (streaming) to avoid SW issues
+  if (event.request.headers.get('range')) return;
 
-  // Bypass SW for dynamic API calls
+  // BYPASS for dynamic DB calls
   if (url.pathname.includes('/db/')) return;
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
+  // STRATEGY: Network First for HTML, Cache First for assets
+  const isHtml = event.request.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('.html');
 
-      // 1. Navigation requests: Network First, Fallback to Cache
-      if (isNavigationRequest(event.request)) {
-        return fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              const responseToCache = networkResponse.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
-              return networkResponse;
-            }
-            return cachedResponse || caches.match('/apk/index.html');
-          })
-          .catch(() => {
-            // Try exact match, then folder match, then main index
-            const folderPath = url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`;
-            const indexInFolder = folderPath + 'index.html';
-            return cachedResponse || caches.match(folderPath) || caches.match(indexInFolder) || caches.match('/apk/index.html');
+  if (isHtml) {
+    event.respondWith(
+      fetch(event.request)
+        .then((res) => {
+          if (res.status === 200) {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return res;
+        })
+        .catch(() => {
+          // Fallback to cache
+          return caches.match(event.request).then((cached) => {
+             if (cached) return cached;
+             // Ultimate fallback: root index.html
+             return caches.match('/apk/index.html');
           });
-      }
+        })
+    );
+  } else {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
 
-      // 2. Static Assets & Proxied Media: Cache First, Fallback to Network
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-
-      return fetch(event.request).then((networkResponse) => {
-        // Cache successful responses for assets
-        if (networkResponse && networkResponse.status === 200 && (isStaticAsset(url) || url.pathname.includes('/api/proxy'))) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
-        }
-        return networkResponse;
-      }).catch(() => {
-        // Silent fail for assets
-        return null;
-      });
-    })
-  );
+        return fetch(event.request).then((res) => {
+          // Cache successful static assets and proxied media
+          if (res && res.status === 200 && (
+              url.pathname.includes('_next/static') ||
+              url.pathname.includes('/api/proxy') ||
+              url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|woff2|json|pdf)$/)
+          )) {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return res;
+        }).catch(() => {
+           // Fallback for images
+           if (url.pathname.match(/\.(png|jpg|jpeg|gif|svg)$/)) {
+             return caches.match('/apk/gsilogo.jpg');
+           }
+           return null;
+        });
+      })
+    );
+  }
 });

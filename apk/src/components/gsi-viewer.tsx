@@ -230,23 +230,27 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
           <div className="w-full h-full flex items-center justify-center bg-black rounded-3xl overflow-hidden shadow-2xl relative" onContextMenu={(e) => e.preventDefault()}>
             <video
               key={url}
-              src={url}
               className="w-full h-full object-contain"
               controls
               autoPlay
               playsInline
               muted
-              preload="auto"
+              preload="metadata"
               controlsList="nodownload"
               disablePictureInPicture
               onError={(e) => {
-                console.error("Video error event:", e);
-                const videoElement = e.currentTarget;
-                console.error("Video error code:", videoElement.error?.code);
-                console.error("Video error message:", videoElement.error?.message);
-                onError?.(`Erreur vidéo (${videoElement.error?.code || 'inconnue'}). Vérifiez votre connexion.`);
+                const v = e.currentTarget;
+                console.error("Video Error Details:", {
+                  code: v.error?.code,
+                  message: v.error?.message,
+                  src: v.src
+                });
+                onError?.(`Lecture impossible (Code ${v.error?.code || '?'}). Tentez de rafraîchir.`);
               }}
             >
+              <source src={url} type="video/mp4" />
+              <source src={url} type="video/webm" />
+              <source src={url} type="video/ogg" />
               Votre navigateur ne supporte pas la lecture de vidéos.
             </video>
           </div>

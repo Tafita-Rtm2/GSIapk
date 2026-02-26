@@ -9,6 +9,18 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Middleware for CORS (essential for some browsers)
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type,Range');
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // Config API for the frontend
 app.get('/apk/api/config', (req, res) => {
   res.json({
@@ -36,20 +48,19 @@ app.get('/apk/api/proxy', async (req, res) => {
   try {
     const fetchOptions = {
       method: 'GET',
+      compress: false, // TRÈS IMPORTANT : Ne pas décompresser pour garder les Content-Length/Range intacts
       headers: {
         'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0'
       }
     };
 
-    // Forward critical headers for streaming
-    const forwardHeaders = ['range', 'accept', 'accept-encoding', 'connection'];
-    forwardHeaders.forEach(h => {
-      if (req.headers[h]) fetchOptions.headers[h] = req.headers[h];
-    });
+    // On transmet les headers critiques pour le streaming (Range)
+    if (req.headers.range) fetchOptions.headers.range = req.headers.range;
+    if (req.headers.accept) fetchOptions.headers.accept = req.headers.accept;
 
     const response = await fetch(url, fetchOptions);
 
-    // Copy status and all relevant headers from upstream
+    // On recopie le statut et tous les headers pertinents
     res.status(response.status);
 
     const headersToCopy = [
@@ -59,7 +70,8 @@ app.get('/apk/api/proxy', async (req, res) => {
       'accept-ranges',
       'cache-control',
       'last-modified',
-      'etag'
+      'etag',
+      'vary'
     ];
 
     headersToCopy.forEach(h => {
@@ -67,21 +79,26 @@ app.get('/apk/api/proxy', async (req, res) => {
       if (val) res.setHeader(h, val);
     });
 
-    // Force inline disposition pour éviter le téléchargement forcé et permettre la lecture
+    // Force inline pour éviter le téléchargement, autorise le visionnage
     res.setHeader('Content-Disposition', 'inline');
-    // Autoriser CORS pour le contenu proxifié
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges');
 
-    console.log(`[PROXY] Status: ${response.status}, Type: ${response.headers.get('content-type')}`);
+    console.log(`[PROXY] Fetching ${url} | Status: ${response.status} | Range: ${req.headers.range || 'none'}`);
 
-    // Robust stream piping with error handling
+    // Piping direct du flux
+    response.body.pipe(res);
+
     response.body.on('error', (err) => {
       console.error('[PROXY] Stream error:', err);
-      if (!res.headersSent) res.status(500).end();
-      else res.end();
+      res.end();
     });
 
-    response.body.pipe(res);
+    req.on('close', () => {
+      // Annuler le fetch si le client ferme la connexion
+      if (response.body.destroy) response.body.destroy();
+    });
+
   } catch (error) {
     console.error('[PROXY] Error:', error);
     if (!res.headersSent) {
