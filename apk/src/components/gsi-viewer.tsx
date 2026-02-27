@@ -227,67 +227,48 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
         )}
 
         {type === 'video' && (
-          <div className="w-full h-full flex items-center justify-center bg-black rounded-3xl overflow-hidden shadow-2xl relative group" onContextMenu={(e) => e.preventDefault()}>
-            {/* Direct Play Experience with standard HTML5 */}
+          <div className="w-full h-full flex items-center justify-center bg-black overflow-hidden relative" onContextMenu={(e) => e.preventDefault()}>
             <video
               key={url}
+              src={url}
               className="w-full h-full object-contain"
               controls
               autoPlay
               playsInline
-              crossOrigin="anonymous"
               preload="auto"
               controlsList="nodownload"
               onLoadedData={() => setLoading(false)}
               onError={(e) => {
                 const v = e.currentTarget;
-                console.error("GSI Stream Error:", v.error?.code, v.src);
-                // Fallback to direct raw URL if proxy fails or just try to reload
-                if (v.src.includes('proxy')) {
+                console.error("GSI Media Error:", v.error?.code, v.src);
+                setLoading(false);
+                // Simple auto-retry without complex logic
+                if (v.src.includes('proxy') && v.error?.code === 4) {
                    const rawUrl = new URL(v.src).searchParams.get('url');
-                   if (rawUrl) {
-                      console.log("Retrying with raw URL...");
-                      v.src = rawUrl;
-                   }
+                   if (rawUrl) v.src = rawUrl;
                 }
               }}
             >
-              <source src={url} type="video/mp4" />
-              <source src={url} type="video/webm" />
-              <source src={url} type="video/quicktime" />
-              Votre navigateur ne supporte pas le streaming direct.
+              Votre navigateur ne supporte pas la lecture directe.
             </video>
-
-            {/* Streaming status overlay */}
-            <div className="absolute top-4 right-4 bg-green-500/20 backdrop-blur-md px-3 py-1 rounded-full border border-green-500/30 opacity-0 group-hover:opacity-100 transition-opacity">
-               <p className="text-[8px] font-black text-green-400 uppercase tracking-[0.2em]">Live Stream Active</p>
-            </div>
           </div>
         )}
 
         {type === 'image' && (
-          <div className="flex flex-col items-center gap-4 group" onContextMenu={(e) => e.preventDefault()}>
-            <div className="overflow-auto max-w-full rounded-2xl shadow-2xl bg-white p-2">
+          <div className="flex flex-col items-center p-2" onContextMenu={(e) => e.preventDefault()}>
+            <div className="overflow-auto max-w-full bg-white shadow-lg border border-gray-100">
                <img
                  key={url}
                  src={url}
                  draggable={false}
-                 crossOrigin="anonymous"
                  style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }}
-                 className="h-auto transition-all duration-300 rounded-xl"
-                 alt="Content View"
+                 className="h-auto block mx-auto"
+                 alt="Content"
                  onLoad={() => {
                    setLoading(false);
                    onLoadComplete?.();
                  }}
-                 onError={(e) => {
-                   const img = e.currentTarget;
-                   if (img.src.includes('proxy')) {
-                      const rawUrl = new URL(img.src).searchParams.get('url');
-                      if (rawUrl) img.src = rawUrl;
-                   }
-                   setLoading(false);
-                 }}
+                 onError={() => setLoading(false)}
                />
             </div>
             {/* Zoom Controls for Image */}

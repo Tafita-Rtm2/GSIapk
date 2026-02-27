@@ -33,7 +33,7 @@ const https = require('https');
 const http = require('http');
 
 // Proxy for media assets to avoid CORS issues
-app.get('/apk/api/proxy', (req, res) => {
+app.get('/apk/api/proxy', async (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl) return res.status(400).send('URL is required');
 
@@ -44,53 +44,70 @@ app.get('/apk/api/proxy', (req, res) => {
     return res.status(403).send('URL non autorisée.');
   }
 
-  const parsedUrl = new URL(targetUrl);
-  const protocol = parsedUrl.protocol === 'https:' ? https : http;
+  try {
+    const fetchOptions = {
+      method: 'GET',
+      headers: {
+        ...req.headers,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      redirect: 'follow',
+      compress: false // CRITICAL: Do not decompress to keep original headers valid
+    };
 
-  const options = {
-    method: 'GET',
-    headers: { ...req.headers }
-  };
+    // Nettoyage des headers entrants
+    delete fetchOptions.headers.host;
+    delete fetchOptions.headers.connection;
+    delete fetchOptions.headers.cookie;
+    delete fetchOptions.headers.referer;
 
-  // Nettoyage des headers sensibles
-  delete options.headers.host;
-  delete options.headers.connection;
-  delete options.headers.cookie;
+    const response = await fetch(targetUrl, fetchOptions);
 
-  // Assurer un User-Agent décent
-  options.headers['user-agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    // Status Code propagation
+    res.status(response.status);
 
-  const proxyReq = protocol.request(targetUrl, options, (proxyRes) => {
-    // On propage tous les headers de réponse de l'amont
-    const responseHeaders = { ...proxyRes.headers };
+    // Headers extraction and cleanup
+    const skipHeaders = [
+      'content-security-policy',
+      'x-frame-options',
+      'access-control-allow-origin',
+      'set-cookie',
+      'transfer-encoding',
+      'connection'
+    ];
 
-    // On surcharge les headers critiques pour le web
-    responseHeaders['content-disposition'] = 'inline';
-    responseHeaders['access-control-allow-origin'] = '*';
-    responseHeaders['access-control-allow-methods'] = 'GET, OPTIONS';
-    responseHeaders['access-control-expose-headers'] = 'Content-Range, Content-Length, Accept-Ranges';
+    response.headers.forEach((value, name) => {
+      if (!skipHeaders.includes(name.toLowerCase())) {
+        res.setHeader(name, value);
+      }
+    });
 
-    // Retirer les headers qui pourraient bloquer l'affichage (CSP, etc.)
-    delete responseHeaders['content-security-policy'];
-    delete responseHeaders['x-frame-options'];
+    // Surcharger les headers pour le fonctionnement optimal web
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges');
 
-    res.writeHead(proxyRes.statusCode, responseHeaders);
+    console.log(`[PROXY] Streaming: ${targetUrl} [Status: ${response.status}] [Range: ${req.headers.range || 'none'}]`);
 
-    console.log(`[PROXY] Stream: ${targetUrl} [Status: ${proxyRes.statusCode}] [Range: ${req.headers.range || 'none'}]`);
+    response.body.pipe(res);
 
-    proxyRes.pipe(res);
-  });
+    response.body.on('error', (err) => {
+      console.error('[PROXY] Pipe Error:', err);
+      res.end();
+    });
 
-  proxyReq.on('error', (err) => {
-    console.error('[PROXY] Request Error:', err);
-    if (!res.headersSent) res.status(500).send('Proxy Error');
-  });
+    req.on('close', () => {
+      if (response.body.destroy) response.body.destroy();
+    });
 
-  req.on('close', () => {
-    proxyReq.destroy();
-  });
-
-  proxyReq.end();
+  } catch (error) {
+    console.error('[PROXY] Error:', error);
+    if (!res.headersSent) {
+      res.status(500).send('Proxy internal error');
+    }
+  }
 });
 
 // Serve static files from the 'out' directory
