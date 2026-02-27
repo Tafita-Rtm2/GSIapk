@@ -29,9 +29,6 @@ app.get('/apk/api/config', (req, res) => {
   });
 });
 
-const https = require('https');
-const http = require('http');
-
 // Proxy for media assets to avoid CORS issues
 app.get('/apk/api/proxy', async (req, res) => {
   let targetUrl = req.query.url;
@@ -90,7 +87,12 @@ app.get('/apk/api/proxy', async (req, res) => {
     }
 
     // --- STREAMING OUTPUT ---
-    res.status(response.status);
+    // Handle 206 Partial Content for video seeking
+    if (response.status === 206 || req.headers.range) {
+      res.status(response.status);
+    } else {
+      res.status(response.status);
+    }
 
     const skipHeaders = [
       'content-security-policy', 'x-frame-options', 'access-control-allow-origin',
@@ -109,14 +111,32 @@ app.get('/apk/api/proxy', async (req, res) => {
     res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type, Accept');
     res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges, Content-Type');
 
-    const finalContentType = response.headers.get('content-type') || "";
-    if (finalContentType.includes('video') || finalContentType.includes('audio')) {
+    const finalContentType = (response.headers.get('content-type') || "").toLowerCase();
+    if (finalContentType.includes('video') || finalContentType.includes('audio') || finalContentType.includes('pdf')) {
        res.setHeader('Accept-Ranges', 'bytes');
     }
 
     console.log(`[PROXY] Streaming binary: ${targetUrl} [Status: ${response.status}] [Type: ${finalContentType}]`);
 
-    response.body.pipe(res);
+    // Use response.body.pipe for Node v18+ fetch (via undici or node-fetch)
+    if (response.body && typeof response.body.pipe === 'function') {
+      response.body.pipe(res);
+    } else {
+      // Handle cases where body might be a ReadableStream (standard fetch)
+      const reader = response.body.getReader();
+      async function stream() {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(value);
+        }
+        res.end();
+      }
+      stream().catch(err => {
+        console.error('[PROXY] Stream Error:', err);
+        res.end();
+      });
+    }
 
     response.body.on('error', (err) => {
       console.error('[PROXY] Pipe Error:', err);

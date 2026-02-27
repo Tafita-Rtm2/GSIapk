@@ -18,9 +18,7 @@ interface ChatMessage {
 
 export default function ChatPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "assistant", content: "Bonjour ! Je suis Insight, votre assistant académique GSI. Comment puis-je vous aider aujourd'hui ?" },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
@@ -30,11 +28,24 @@ export default function ChatPage() {
     const currentUser = GSIStore.getCurrentUser();
     if (currentUser) {
       setUser(currentUser);
-      setMessages([
-        { role: "assistant", content: `Bonjour ${currentUser.fullName.split(' ')[0]} ! Je suis Insight, votre assistant académique GSI. Comment puis-je vous aider aujourd'hui ?` },
-      ]);
     }
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const unsub = GSIStore.subscribeAiMessages((msgs) => {
+      if (msgs.length === 0) {
+        const welcome: ChatMessage = {
+          role: "assistant",
+          content: `Bonjour ${user.fullName.split(' ')[0]} ! Je suis Insight, votre assistant académique GSI. Comment puis-je vous aider aujourd'hui ?`
+        };
+        GSIStore.setAiMessages([welcome]);
+      } else {
+        setMessages(msgs);
+      }
+    });
+    return unsub;
+  }, [user]);
 
   const handleSend = async () => {
     if ((!input.trim() && !attachedImage) || isTyping) return;
@@ -48,7 +59,7 @@ export default function ChatPage() {
       image: currentImage
     }];
 
-    setMessages(newMessages);
+    GSIStore.setAiMessages(newMessages);
     setInput("");
     setAttachedImage(null);
     setIsTyping(true);
@@ -111,11 +122,11 @@ export default function ChatPage() {
       });
 
       const responseText = completion.choices[0].message.content || "Je n'ai pas pu générer de réponse.";
-      setMessages([...newMessages, { role: "assistant", content: responseText }]);
+      GSIStore.setAiMessages([...newMessages, { role: "assistant", content: responseText }]);
 
     } catch (err: any) {
       toast.error(err.message);
-      setMessages([...newMessages, { role: "assistant", content: "Désolée, j'ai une difficulté technique (OpenAI). Vérifiez la clé API ou votre connexion." }]);
+      GSIStore.setAiMessages([...newMessages, { role: "assistant", content: "Désolée, j'ai une difficulté technique (OpenAI). Vérifiez la clé API ou votre connexion." }]);
     } finally {
       setIsTyping(false);
     }

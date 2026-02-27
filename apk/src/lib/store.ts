@@ -7,8 +7,6 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { toast } from 'sonner';
 
 // --- CONFIGURATION ---
-// IMPORTANT: Assurez-vous que ces URLs correspondent exactement à votre config serveur.
-// Un slash manquant ou un domaine sans 'www' peut causer des erreurs 301.
 let API_BASE = "https://groupegsi.mg/rtmggmg/api";
 let MEDIA_BASE = "https://groupegsi.mg/rtmggmg";
 
@@ -102,7 +100,9 @@ interface State {
   announcements: Announcement[];
   schedules: Record<string, StructuredSchedule>;
   messages: ChatMessage[];
+  aiMessages: any[];
   reminders: Reminder[];
+  deletedAnnouncementIds: string[];
 }
 
 const initialState: State = {
@@ -115,7 +115,9 @@ const initialState: State = {
   announcements: [],
   schedules: {},
   messages: [],
-  reminders: []
+  aiMessages: [],
+  reminders: [],
+  deletedAnnouncementIds: []
 };
 
 class GSIStoreClass {
@@ -138,17 +140,13 @@ class GSIStoreClass {
   private async initWebConfig() {
     if (Capacitor.isNativePlatform()) return;
     try {
-      // On tente de récupérer la config du serveur local (Express)
       const res = await fetch('/apk/api/config');
       if (res.ok) {
         const config = await res.json();
         if (config.API_BASE) API_BASE = config.API_BASE;
         if (config.MEDIA_BASE) MEDIA_BASE = config.MEDIA_BASE;
-        console.log("GSIStore: Web Config Loaded", { API_BASE, MEDIA_BASE });
       }
-    } catch (e) {
-      console.warn("GSIStore: Failed to fetch web config, using defaults.");
-    }
+    } catch (e) {}
   }
 
   private hydrate() {
@@ -156,13 +154,10 @@ class GSIStoreClass {
       const saved = localStorage.getItem('gsi_v8_master');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Deep merge to preserve structure if interface changes
         this.state = { ...initialState, ...parsed };
       }
       if (this.state.users.length === 0) this.generateMockData();
-    } catch (e) {
-      console.error("Hydration failed", e);
-    }
+    } catch (e) {}
   }
 
   private generateMockData() {
@@ -196,9 +191,7 @@ class GSIStoreClass {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('gsi_v8_master', JSON.stringify(this.state));
-      } catch (e) {
-        console.error("Failed to save GSIStore state", e);
-      }
+      } catch (e) {}
     }
   }
 
@@ -214,27 +207,22 @@ class GSIStoreClass {
   }
 
   private startGlobalSync() {
-    // Initial aggressive sync
     this.syncAll().then(() => {
        this.autoDownloadEssentials();
     });
 
-    // Sync remote config (Admin/Prof codes)
     this.syncRemoteConfig();
 
-    // Background polling for general data
     setInterval(() => {
        this.syncAll();
     }, 30000);
 
-    // Background polling for chat (Faster for better UX)
     setInterval(() => {
        if (this.state.currentUser) {
          this.fetchChatMessages();
        }
     }, 8000);
 
-    // Background polling for announcements/notifications
     setInterval(() => {
       if (this.state.currentUser) {
         this.fetchCollection('announcements', 'announcements');
@@ -246,7 +234,6 @@ class GSIStoreClass {
      if (!this.state.currentUser) return;
      const { campus, niveau } = this.state.currentUser;
 
-     // Auto-download current schedule if structured
      const sched = this.state.schedules[`${campus}_${niveau}`];
      if (sched && (sched.fileUrl || sched.url)) {
         try {
@@ -270,7 +257,6 @@ class GSIStoreClass {
   }
 
   private async cleanOfflineFiles() {
-     // Delete offline files for lessons/assignments that are no longer in the cloud
      const progress = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
      const downloaded = JSON.parse(localStorage.getItem('gsi_downloaded') || '{}');
 
@@ -279,7 +265,6 @@ class GSIStoreClass {
 
      for (const id in downloaded) {
         if (!cloudLessonIds.has(id) && !cloudAssignmentIds.has(id)) {
-           console.log(`GSIStore: Cleaning up deleted content ${id}`);
            if (progress[id]?.localPath) {
               try {
                  await Filesystem.deleteFile({ path: progress[id].localPath, directory: Directory.Data });
@@ -300,7 +285,6 @@ class GSIStoreClass {
     const data = await this.apiCall(`/db/messages?q=${q}&s={"timestamp":-1}&l=60`);
     if (data && Array.isArray(data)) {
       const newMessages = data.reverse();
-      // Only update if something changed
       if (JSON.stringify(newMessages) !== JSON.stringify(this.state.messages)) {
         this.state.messages = newMessages;
         this.notify('messages', this.state.messages);
@@ -313,9 +297,6 @@ class GSIStoreClass {
   private async apiCall(endpoint: string, method = 'GET', body?: any, redirectCount = 0): Promise<any> {
     if (redirectCount > 3) return null;
 
-    // SMART CACHING:
-    // - 3 seconds for messages/chat
-    // - 5 minutes (300000ms) for stable academic data to maximize speed
     const cacheTime = endpoint.includes('messages') ? 3000 : 300000;
 
     if (method === 'GET' && this.apiCache[endpoint] && (Date.now() - this.apiCache[endpoint].ts < cacheTime)) {
@@ -341,7 +322,6 @@ class GSIStoreClass {
         };
         response = await CapacitorHttp.request(options);
 
-        // Manual Redirect Handling for 301/302/307/308
         if (response.status >= 300 && response.status < 400) {
           const location = response.headers['Location'] || response.headers['location'];
           if (location) {
@@ -380,43 +360,47 @@ class GSIStoreClass {
     } catch (e: any) {
       this.syncingCount = Math.max(0, this.syncingCount - 1);
       if (this.syncingCount === 0) this.notify('sync_status', false);
-      console.warn(`API call to ${endpoint} failed:`, e);
       return null;
     }
   }
 
   private async fetchCollection(key: keyof State, collectionName: string, queryParams = "") {
-    // If queryParams has a q=, we should ensure it's encoded if not already,
-    // but usually it's passed already formed.
     const data = await this.apiCall(`/db/${collectionName}${queryParams}`);
     if (data) {
       const cloudData = Array.isArray(data) ? data : [];
       const currentLocal = this.state[key];
 
       let merged: any;
+
+      // HARD DELETE SYNC: Students consume lessons, assignments, announcements, grades.
+      // We overwrite with cloud data to propagate deletions.
+      const isConsumable = ['lessons', 'assignments', 'announcements', 'grades'].includes(key as string);
+
       if (Array.isArray(currentLocal)) {
-         const cloudIds = new Set(cloudData.map((d: any) => d.id));
-         const localOnly = currentLocal.filter(item => !cloudIds.has(item.id));
-         merged = [...cloudData, ...localOnly];
+         if (isConsumable) {
+            merged = cloudData;
+         } else {
+            const cloudIds = new Set(cloudData.map((d: any) => d.id));
+            const localOnly = (currentLocal as any[]).filter(item => !cloudIds.has(item.id));
+            merged = [...cloudData, ...localOnly];
+         }
       } else {
-         merged = { ...currentLocal };
+         merged = isConsumable ? {} : { ...currentLocal };
          cloudData.forEach((d: any) => {
             if (key === 'schedules') {
                const schedKey = `${d.campus}_${d.niveau}`;
-               merged[schedKey] = d;
+               (merged as any)[schedKey] = d;
             } else {
-               merged[d.id] = d;
+               (merged as any)[d.id] = d;
             }
          });
       }
 
       (this.state[key] as any) = merged;
 
-      // Sync currentUser if it's in the users collection
       if (key === 'users' && this.state.currentUser) {
         const updatedSelf = (merged as User[]).find(u => u.id === this.state.currentUser!.id);
         if (updatedSelf) {
-          // Merge but keep local password if cloud doesn't have it (for mock auth)
           this.state.currentUser = { ...this.state.currentUser, ...updatedSelf };
           this.notify('auth', this.state.currentUser);
         }
@@ -469,7 +453,6 @@ class GSIStoreClass {
        this.setCurrentUser(user);
        return user;
     }
-    // Check local fallback (mock accounts)
     const local = this.state.users.find(u => u.email === email && u.password === password);
     if (local) {
        this.setCurrentUser(local);
@@ -479,7 +462,6 @@ class GSIStoreClass {
   }
 
   async register(user: User): Promise<User | null> {
-    // Ensure photo is handled if present
     const res = await this.apiCall('/db/users', 'POST', user);
     if (res) {
        const finalUser = { ...user, ...res };
@@ -497,7 +479,6 @@ class GSIStoreClass {
      const q = encodeURIComponent(JSON.stringify({ email }));
      const data = await this.apiCall(`/db/users?q=${q}`);
      if (data && Array.isArray(data) && data.length > 0) {
-        // Simulated success
         return true;
      }
      return false;
@@ -562,7 +543,13 @@ class GSIStoreClass {
   subscribeAnnouncements(cb: (as: Announcement[]) => void) {
     if (!this.listeners['announcements']) this.listeners['announcements'] = [];
     this.listeners['announcements'].push(cb);
-    cb(this.state.announcements);
+
+    const applyLocalDelete = (data: Announcement[]) => {
+      const deleted = this.state.deletedAnnouncementIds || [];
+      cb(data.filter(a => !deleted.includes(a.id)));
+    };
+
+    applyLocalDelete(this.state.announcements);
     this.fetchCollection('announcements', 'announcements');
     return () => { this.listeners['announcements'] = this.listeners['announcements']?.filter(l => l !== cb); };
   }
@@ -601,6 +588,19 @@ class GSIStoreClass {
     cb(this.state.messages);
     this.fetchChatMessages();
     return () => { this.listeners['messages'] = this.listeners['messages']?.filter(l => l !== cb); };
+  }
+
+  subscribeAiMessages(cb: (ms: any[]) => void) {
+    if (!this.listeners['ai_messages']) this.listeners['ai_messages'] = [];
+    this.listeners['ai_messages'].push(cb);
+    cb(this.state.aiMessages || []);
+    return () => { this.listeners['ai_messages'] = this.listeners['ai_messages']?.filter(l => l !== cb); };
+  }
+
+  setAiMessages(msgs: any[]) {
+    this.state.aiMessages = msgs;
+    this.save();
+    this.notify('ai_messages', msgs);
   }
 
   subscribeSyncStatus(cb: (isSyncing: boolean) => void) {
@@ -700,6 +700,15 @@ class GSIStoreClass {
   }
 
   async deleteAnnouncement(id: string) {
+    const user = this.state.currentUser;
+    // If student, just hide it locally
+    if (user?.role === 'student') {
+       this.state.deletedAnnouncementIds = [...(this.state.deletedAnnouncementIds || []), id];
+       this.save();
+       this.notify('announcements', this.state.announcements);
+       return;
+    }
+
     const ann = this.state.announcements.find(a => a.id === id);
     this.state.announcements = this.state.announcements.filter(a => a.id !== id);
     this.save();
@@ -747,7 +756,6 @@ class GSIStoreClass {
     this.notify('users', this.state.users);
     this.notify('auth', this.state.currentUser);
 
-    // Also update cloud immediately if _id exists
     const targetId = user._id;
     if (targetId) {
        await this.apiCall(`/db/users/${targetId}`, 'PATCH', user);
@@ -884,35 +892,29 @@ class GSIStoreClass {
   getAbsoluteUrl(url: string | undefined): string {
     if (!url || url === "undefined" || url === "null") return "";
 
-    // 1. Instant Data/Blob
     if (url.startsWith('data:') || url.startsWith('blob:')) return url;
 
-    // 2. Already Absolute GSI URL
     if (url.startsWith('http://') || url.startsWith('https://')) {
        if (url.includes('groupegsi.mg') && !url.includes('/api/')) {
-          // If it's a domain URL but missing /api/, fix it
           return url.replace('rtmggmg/', 'rtmggmg/api/');
        }
        return url;
     }
 
-    // 3. Detect raw text (NOT a file ID)
-    if (url.includes(' ') && !url.startsWith('/') && !url.startsWith('files/') && !url.startsWith('api/')) {
+    if (url.includes(' ') && !url.startsWith('/') && !url.startsWith('files/') && !url.startsWith('api/') && url.length > 20) {
        return url;
     }
 
-    // 4. GSI Database System v3.0.0 Standard Path Resolution
     let clean = url;
-
-    // Remove all legacy/redundant prefixes
     clean = clean.replace(/^\/+/, '');
     clean = clean.replace(/^rtmggmg\//, '');
     clean = clean.replace(/^api\//, '');
     clean = clean.replace(/^\/+/, '');
 
-    // If it's a raw ID, wrap it in the viewer endpoint
-    if (!clean.includes('/') && clean.length > 5) {
-       clean = `files/view/${clean}`;
+    if (!clean.includes('files/view/') && !clean.includes('http')) {
+       if (!clean.includes('/') && clean.length > 5) {
+         clean = `files/view/${clean}`;
+       }
     }
 
     const base = API_BASE.endsWith('/') ? API_BASE.slice(0, -1) : API_BASE;
@@ -922,21 +924,14 @@ class GSIStoreClass {
   getMediaUrl(url: string | undefined): string {
     if (!url) return "";
 
-    // 1. Instant Data/Blob (Direct Play)
     if (url.startsWith('blob:') || url.startsWith('data:')) return url;
 
-    // 2. Build Absolute URL
     const absolute = this.getAbsoluteUrl(url);
     if (!absolute) return "";
 
-    // 3. Mobile handling
     if (Capacitor.isNativePlatform()) return absolute;
 
-    // 4. Web Streaming Experience (Social Media Like)
-    // On privilégie le proxy pour assurer la lecture en ligne directe sans téléchargement préalable
-    // et pour forcer le support du streaming (Range headers)
     if (absolute.startsWith('http')) {
-      // Direct stream with proxy for maximum reliability
       return `/apk/api/proxy?url=${encodeURIComponent(absolute)}`;
     }
 
@@ -959,7 +954,6 @@ class GSIStoreClass {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
-      // Ensure we pass the intended path if the server supports it
       formData.append('file', file, file.name);
       formData.append('path', path);
 
@@ -972,18 +966,14 @@ class GSIStoreClass {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const response = JSON.parse(xhr.responseText);
-            // Enhanced robustness for different API response formats
             const url = response.viewUrl || response.downloadUrl || response.url || response.path || (response.data && response.data.url);
-            if (url) {
-              resolve(url);
-            } else {
-              reject(new Error("Upload succeeded but no URL returned in response"));
-            }
+            if (url) resolve(url);
+            else reject(new Error("No URL in response"));
           } catch (e) {
-            reject(new Error("Failed to parse upload response: " + xhr.responseText));
+            reject(new Error("Failed to parse response"));
           }
         } else {
-          reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.responseText}`));
+          reject(new Error(`Upload failed with status ${xhr.status}`));
         }
       });
       xhr.addEventListener('error', () => reject(new Error("Network error during upload")));
@@ -1024,7 +1014,7 @@ class GSIStoreClass {
         }
 
         if (response.status !== 200) throw new Error(`Erreur serveur (${response.status})`);
-        base64Data = response.data; // CapacitorHttp with responseType: 'blob' returns base64 on native
+        base64Data = response.data;
         contentType = response.headers['Content-Type'] || response.headers['content-type'] || "";
       } else {
         const response = await fetch(absoluteUrl);
@@ -1061,26 +1051,21 @@ class GSIStoreClass {
   async openPackFile(lessonId: string, url: string): Promise<void> {
     const lowUrl = (url || "").toLowerCase();
 
-    // 1. Determine type BEFORE calling getAbsoluteUrl
     let type: 'pdf' | 'docx' | 'video' | 'image' | 'text' = 'pdf';
 
     if (lowUrl.endsWith('.pdf') || lowUrl.includes('/pdf')) type = 'pdf';
     else if (lowUrl.endsWith('.docx') || lowUrl.includes('word')) type = 'docx';
     else if (lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/)) type = 'video';
     else if (lowUrl.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)$/) || lowUrl.includes('photo') || lowUrl.includes('image')) type = 'image';
-    // If it looks like a file path or ID, it's definitely not raw text
     else if (url.includes('files/') || url.includes('api/') || (url.length > 8 && !url.includes(' ') && !url.includes('.'))) {
-       // Default to image if we can't be sure, as it's more likely to be an image or handled by the viewer
        type = 'image';
     }
     else if (!url.startsWith('http') && !url.startsWith('/') && !url.startsWith('files/') && !url.startsWith('api/')) type = 'text';
 
-    // IMPORTANT: Even for unknown types that aren't raw text, we treat them as media
     const absoluteUrl = type === 'text' ? url : this.getMediaUrl(url);
     const progress = this.getProgress(lessonId);
     const mime = (progress?.mimeType || "").toLowerCase();
 
-    // Re-verify type if mime exists
     if (mime.includes('pdf')) type = 'pdf';
     else if (mime.includes('word') || mime.includes('docx')) type = 'docx';
     else if (mime.includes('video')) type = 'video';
@@ -1100,61 +1085,40 @@ class GSIStoreClass {
     }
 
     try {
-      // 1. Check for cached/downloaded file
       if (progress?.localPath) {
         try {
           const path = progress.localPath;
-          const stats = await Filesystem.stat({ path, directory: Directory.Data });
-
-          // Debug trace for local file
-          console.log(`GSIStore: Found local file at ${path}, size: ${stats.size}`);
-
-          // FOR MULTIMEDIA: Use file URI directly (better for large videos/images)
           if (type === 'video' || type === 'image') {
              const fileUri = await Filesystem.getUri({ path, directory: Directory.Data });
              dispatchViewer(Capacitor.convertFileSrc(fileUri.uri));
              return;
           }
-
-          // FOR DOCUMENTS: Use Blob (better for Render Engines like PDF.js/Mammoth)
           const file = await Filesystem.readFile({ path, directory: Directory.Data });
           const dataStr = typeof file.data === 'string' ? file.data : '';
-
           let actualMime = progress.mimeType || mime;
           if (!actualMime) {
              actualMime = type === 'pdf' ? 'application/pdf' :
                           type === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' :
                           type === 'video' ? 'video/mp4' : 'image/jpeg';
           }
-
           const blob = this.b64toBlob(dataStr, actualMime);
           const blobUrl = URL.createObjectURL(blob);
-          console.log(`GSIStore: Dispatched Blob URL for ${type}`);
           dispatchViewer(blobUrl);
           return;
         } catch (e) {
-          console.warn("GSIStore: Local file check failed, re-downloading...", e);
           this.setDownloaded(lessonId, false);
         }
       }
 
-      // 2. If not cached, download then open
       if (window.navigator.onLine) {
-        // Sur le web, on ne télécharge pas les vidéos/images en IndexedDB (trop lourd/lent)
-        // On les streame directement depuis l'URL distante.
         if (!Capacitor.isNativePlatform() && (type === 'video' || type === 'image')) {
-          console.log(`GSIStore: Direct streaming for ${type} on web`);
           dispatchViewer(absoluteUrl);
           return;
         }
-
         const fileName = absoluteUrl.split('/').pop() || (type === 'pdf' ? 'doc.pdf' : type === 'docx' ? 'doc.docx' : 'video.mp4');
         const path = await this.downloadPackFile(absoluteUrl, fileName, lessonId);
-
-        // RECURSIVE CALL to use the newly cached logic
         return this.openPackFile(lessonId, url);
       } else {
-        // Stream directement si en ligne mais pas de cache dispo
         dispatchViewer(absoluteUrl);
       }
     } catch (e: any) {
@@ -1196,7 +1160,6 @@ class GSIStoreClass {
     return local || null;
   }
 
-  // --- CACHE & UTILS ---
   async getUsers() { return this.state.users; }
   async getLessons() { return this.state.lessons; }
   async getAssignments() { return this.state.assignments; }
@@ -1210,7 +1173,6 @@ class GSIStoreClass {
     all[id] = { ...(all[id] || {}), ...p, ts: Date.now() };
     localStorage.setItem('gsi_progress', JSON.stringify(all));
     this.notify('progress', all);
-    // Broadcast for cross-tab or component updates
     window.dispatchEvent(new CustomEvent('gsi_progress_updated', { detail: all }));
   }
 
