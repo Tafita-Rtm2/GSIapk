@@ -32,58 +32,27 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    let active = true;
-
-    async function init() {
-      if (!url) {
-         setLoading(false);
-         onError?.("Aucun contenu à afficher.");
-         return;
-      }
-
-      setDisplayUrl(url);
-      console.log(`GSIViewer: Loading ${type} from ${url.substring(0, 50)}...`);
-      setLoading(true);
-
-      let targetUrl = url;
-
-      // Check if URL returns JSON (GSI API v3 sometimes returns {data: 'base64'} or {url: '...'})
-      if ((type === 'image' || type === 'video') && url.startsWith('http')) {
-        try {
-          const check = await fetch(url);
-          const contentType = check.headers.get('content-type');
-          if (contentType?.includes('application/json')) {
-             const json = await check.json();
-             const extracted = json.viewUrl || json.url || json.data || json.path;
-             if (extracted && extracted !== url) {
-                console.log("GSIViewer: Extracted new target from JSON");
-                targetUrl = GSIStore.getMediaUrl(extracted);
-                if (active) setDisplayUrl(targetUrl);
-             }
-          }
-        } catch(e) {}
-      }
-
-      if (!active) return;
-
-      const progress = GSIStore.getProgress(id);
-      const startPage = progress?.currentPage || 1;
-
-      if (type === 'pdf') {
-        renderPdf(startPage, scale, targetUrl);
-      } else if (type === 'docx') {
-        renderDocx(targetUrl);
-      } else if (type === 'video' || type === 'image' || type === 'text') {
-        setLoading(false);
-        onLoadComplete?.();
-      } else {
-        setLoading(false);
-        onError?.("Type de fichier non reconnu.");
-      }
+    if (!url) {
+       setLoading(false);
+       onError?.("Aucun contenu à afficher.");
+       return;
     }
 
-    init();
-    return () => { active = false; };
+    setDisplayUrl(url);
+    console.log(`GSIViewer: Direct play for ${type} from ${url.substring(0, 50)}...`);
+
+    // For images and videos, we rely on the Smart Proxy to handle any JSON wrapping
+    // This allows us to use pure HTML5 elements for maximum reliability.
+    if (type === 'image' || type === 'video' || type === 'text') {
+       setLoading(type === 'image'); // Video has its own loading event
+       onLoadComplete?.();
+    } else {
+       setLoading(true);
+       const progress = GSIStore.getProgress(id);
+       const startPage = progress?.currentPage || 1;
+       if (type === 'pdf') renderPdf(startPage);
+       else if (type === 'docx') renderDocx();
+    }
   }, [url, type]);
 
   const renderPdf = async (pageNum = 1, currentScale = scale, targetUrl = displayUrl) => {

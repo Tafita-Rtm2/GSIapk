@@ -884,45 +884,39 @@ class GSIStoreClass {
   getAbsoluteUrl(url: string | undefined): string {
     if (!url || url === "undefined" || url === "null") return "";
 
-    // 1. Data/Blob
+    // 1. Instant Data/Blob
     if (url.startsWith('data:') || url.startsWith('blob:')) return url;
 
-    // 2. Already Absolute URL
+    // 2. Already Absolute GSI URL
     if (url.startsWith('http://') || url.startsWith('https://')) {
+       if (url.includes('groupegsi.mg') && !url.includes('/api/')) {
+          // If it's a domain URL but missing /api/, fix it
+          return url.replace('rtmggmg/', 'rtmggmg/api/');
+       }
        return url;
     }
 
-    // 3. Detect raw text (non-path strings)
+    // 3. Detect raw text (NOT a file ID)
     if (url.includes(' ') && !url.startsWith('/') && !url.startsWith('files/') && !url.startsWith('api/')) {
        return url;
     }
 
-    // 4. Robust URL cleaning for GSI Database System v3.0.0
-    let path = url;
+    // 4. GSI Database System v3.0.0 Standard Path Resolution
+    let clean = url;
 
-    // Remove all possible domain prefixes if they are relative-like
-    if (path.includes('groupegsi.mg')) {
-       try {
-         const u = new URL(path);
-         path = u.pathname + u.search;
-       } catch(e) {}
+    // Remove all legacy/redundant prefixes
+    clean = clean.replace(/^\/+/, '');
+    clean = clean.replace(/^rtmggmg\//, '');
+    clean = clean.replace(/^api\//, '');
+    clean = clean.replace(/^\/+/, '');
+
+    // If it's a raw ID, wrap it in the viewer endpoint
+    if (!clean.includes('/') && clean.length > 5) {
+       clean = `files/view/${clean}`;
     }
 
-    // Retirer les préfixes redondants
-    path = path.replace(/^\/+/, ''); // Remove leading slashes
-    path = path.replace(/^rtmggmg\//, '');
-    path = path.replace(/^api\//, '');
-    path = path.replace(/^\/+/, '');
-
-    // S'assurer que le chemin commence bien par files/view pour les IDs de fichiers
-    // GSI Database System v3.0.0 uses /api/files/view/:id
-    if (!path.startsWith('files/') && !path.includes('/') && path.length > 8 && !path.includes('?')) {
-       path = `files/view/${path}`;
-    }
-
-    // On s'assure qu'API_BASE ne finit pas par un slash
     const base = API_BASE.endsWith('/') ? API_BASE.slice(0, -1) : API_BASE;
-    return `${base}/${path}`;
+    return `${base}/${clean}`;
   }
 
   getMediaUrl(url: string | undefined): string {

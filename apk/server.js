@@ -34,7 +34,7 @@ const http = require('http');
 
 // Proxy for media assets to avoid CORS issues
 app.get('/apk/api/proxy', async (req, res) => {
-  const targetUrl = req.query.url;
+  let targetUrl = req.query.url;
   if (!targetUrl) return res.status(400).send('URL is required');
 
   // Sécurité SSRF : On n'autorise que les URLs provenant du domaine officiel
@@ -48,32 +48,53 @@ app.get('/apk/api/proxy', async (req, res) => {
     const fetchOptions = {
       method: 'GET',
       headers: {
-        ...req.headers,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': '*/*'
       },
       redirect: 'follow',
-      compress: false // CRITICAL: Do not decompress to keep original headers valid
+      compress: false
     };
 
-    // Nettoyage des headers entrants
-    delete fetchOptions.headers.host;
-    delete fetchOptions.headers.connection;
-    delete fetchOptions.headers.cookie;
-    delete fetchOptions.headers.referer;
+    if (req.headers.range) fetchOptions.headers['Range'] = req.headers.range;
 
-    const response = await fetch(targetUrl, fetchOptions);
+    let response = await fetch(targetUrl, fetchOptions);
 
-    // Status Code propagation
+    // --- SMART RESOLVER ---
+    // We check the content type. If it's JSON, we must resolve it.
+    let contentType = response.headers.get('content-type') || "";
+
+    if (contentType.includes('application/json')) {
+      const json = await response.json();
+      console.log(`[PROXY] Detected JSON response from API. Resolving...`);
+
+      const realData = json.viewUrl || json.url || json.data || json.path || (json.data && json.data.url);
+
+      if (realData) {
+        if (typeof realData === 'string' && realData.startsWith('http')) {
+          console.log(`[PROXY] Re-fetching nested URL: ${realData}`);
+          targetUrl = realData;
+          response = await fetch(targetUrl, fetchOptions);
+          contentType = response.headers.get('content-type') || "";
+        } else if (typeof realData === 'string' && realData.startsWith('data:')) {
+          console.log(`[PROXY] Serving base64 data from JSON`);
+          const matches = realData.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+          if (matches && matches.length === 3) {
+            res.setHeader('Content-Type', matches[1]);
+            const buffer = Buffer.from(matches[2], 'base64');
+            res.setHeader('Content-Length', buffer.length);
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            return res.send(buffer);
+          }
+        }
+      }
+    }
+
+    // --- STREAMING OUTPUT ---
     res.status(response.status);
 
-    // Headers extraction and cleanup
     const skipHeaders = [
-      'content-security-policy',
-      'x-frame-options',
-      'access-control-allow-origin',
-      'set-cookie',
-      'transfer-encoding',
-      'connection'
+      'content-security-policy', 'x-frame-options', 'access-control-allow-origin',
+      'set-cookie', 'transfer-encoding', 'connection'
     ];
 
     response.headers.forEach((value, name) => {
@@ -82,20 +103,18 @@ app.get('/apk/api/proxy', async (req, res) => {
       }
     });
 
-    // Surcharger les headers pour le fonctionnement optimal web
     res.setHeader('Content-Disposition', 'inline');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type, Accept');
     res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges, Content-Type');
 
-    // Forcer Accept-Ranges pour les médias connus si manquant
-    const contentType = response.headers.get('content-type') || "";
-    if (contentType.includes('video') || contentType.includes('audio')) {
+    const finalContentType = response.headers.get('content-type') || "";
+    if (finalContentType.includes('video') || finalContentType.includes('audio')) {
        res.setHeader('Accept-Ranges', 'bytes');
     }
 
-    console.log(`[PROXY] Streaming: ${targetUrl} [Status: ${response.status}] [Range: ${req.headers.range || 'none'}]`);
+    console.log(`[PROXY] Streaming binary: ${targetUrl} [Status: ${response.status}] [Type: ${finalContentType}]`);
 
     response.body.pipe(res);
 
@@ -109,7 +128,7 @@ app.get('/apk/api/proxy', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[PROXY] Error:', error);
+    console.error('[PROXY] Global Error:', error);
     if (!res.headersSent) {
       res.status(500).send('Proxy internal error');
     }
