@@ -138,6 +138,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* App Content Frame: Full width on mobile, max-w-md on desktop */}
         <div className="w-full lg:max-w-md h-full bg-white shadow-2xl relative flex flex-col overflow-hidden">
+          {!isOnline && (
+             <div className="bg-red-500 text-white text-[9px] font-black uppercase tracking-[0.2em] py-2 px-4 flex items-center justify-center gap-2 animate-in slide-in-from-top duration-500 z-[50]">
+                <WifiOff size={12} />
+                Mode Hors-Ligne — Accès limité aux fichiers enregistrés
+             </div>
+          )}
           <main className="flex-1 overflow-y-auto pb-24">
             {children}
           </main>

@@ -295,6 +295,10 @@ class GSIStoreClass {
   // --- API HELPERS ---
 
   private async apiCall(endpoint: string, method = 'GET', body?: any, redirectCount = 0): Promise<any> {
+    if (typeof window !== 'undefined' && !window.navigator.onLine && method === 'GET') {
+       return this.apiCache[endpoint]?.data || null;
+    }
+
     if (redirectCount > 3) return null;
 
     const cacheTime = endpoint.includes('messages') ? 3000 : 300000;
@@ -356,6 +360,9 @@ class GSIStoreClass {
         }
         return response.data;
       }
+
+      if (method === 'GET' && this.apiCache[endpoint]) return this.apiCache[endpoint].data;
+
       return null;
     } catch (e: any) {
       this.syncingCount = Math.max(0, this.syncingCount - 1);
@@ -365,6 +372,11 @@ class GSIStoreClass {
   }
 
   private async fetchCollection(key: keyof State, collectionName: string, queryParams = "") {
+    if (typeof window !== 'undefined' && !window.navigator.onLine) {
+       this.notify(key as string, this.state[key]);
+       return;
+    }
+
     const data = await this.apiCall(`/db/${collectionName}${queryParams}`);
     if (data) {
       const cloudData = Array.isArray(data) ? data : [];
