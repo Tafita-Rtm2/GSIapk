@@ -24,6 +24,7 @@ interface GSIViewerProps {
 
 export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerProps) {
   const [loading, setLoading] = useState(true);
+  const [displayUrl, setDisplayUrl] = useState(url);
   const [pdfData, setPdfData] = useState<{ numPages: number; currentPage: number } | null>(null);
   const [scale, setScale] = useState(1.5);
   const [docxHtml, setDocxHtml] = useState<string | null>(null);
@@ -31,36 +32,65 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (!url) {
-       setLoading(false);
-       onError?.("Aucun contenu à afficher.");
-       return;
+    let active = true;
+
+    async function init() {
+      if (!url) {
+         setLoading(false);
+         onError?.("Aucun contenu à afficher.");
+         return;
+      }
+
+      setDisplayUrl(url);
+      console.log(`GSIViewer: Loading ${type} from ${url.substring(0, 50)}...`);
+      setLoading(true);
+
+      let targetUrl = url;
+
+      // Check if URL returns JSON (GSI API v3 sometimes returns {data: 'base64'} or {url: '...'})
+      if ((type === 'image' || type === 'video') && url.startsWith('http')) {
+        try {
+          const check = await fetch(url);
+          const contentType = check.headers.get('content-type');
+          if (contentType?.includes('application/json')) {
+             const json = await check.json();
+             const extracted = json.viewUrl || json.url || json.data || json.path;
+             if (extracted && extracted !== url) {
+                console.log("GSIViewer: Extracted new target from JSON");
+                targetUrl = GSIStore.getMediaUrl(extracted);
+                if (active) setDisplayUrl(targetUrl);
+             }
+          }
+        } catch(e) {}
+      }
+
+      if (!active) return;
+
+      const progress = GSIStore.getProgress(id);
+      const startPage = progress?.currentPage || 1;
+
+      if (type === 'pdf') {
+        renderPdf(startPage, scale, targetUrl);
+      } else if (type === 'docx') {
+        renderDocx(targetUrl);
+      } else if (type === 'video' || type === 'image' || type === 'text') {
+        setLoading(false);
+        onLoadComplete?.();
+      } else {
+        setLoading(false);
+        onError?.("Type de fichier non reconnu.");
+      }
     }
 
-    console.log(`GSIViewer: Loading ${type} from ${url.substring(0, 50)}...`);
-    setLoading(true);
-
-    const progress = GSIStore.getProgress(id);
-    const startPage = progress?.currentPage || 1;
-
-    if (type === 'pdf') {
-      renderPdf(startPage);
-    } else if (type === 'docx') {
-      renderDocx();
-    } else if (type === 'video' || type === 'image' || type === 'text') {
-      setLoading(false);
-      onLoadComplete?.();
-    } else {
-      setLoading(false);
-      onError?.("Type de fichier non reconnu.");
-    }
+    init();
+    return () => { active = false; };
   }, [url, type]);
 
-  const renderPdf = async (pageNum = 1, currentScale = scale) => {
+  const renderPdf = async (pageNum = 1, currentScale = scale, targetUrl = displayUrl) => {
     try {
       // Pour les PDFs, on passe l'URL directement à PDF.js si c'est possible
       // cela permet une meilleure gestion du streaming et du cache par le navigateur
-      const loadingTask = pdfjsLib.getDocument(url);
+      const loadingTask = pdfjsLib.getDocument(targetUrl);
       const pdf = await loadingTask.promise;
       setPdfData({ numPages: pdf.numPages, currentPage: pageNum });
 
@@ -91,10 +121,10 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
     }
   };
 
-  const renderDocx = async () => {
+  const renderDocx = async (targetUrl = displayUrl) => {
     try {
-      console.log("GSIViewer: Rendering DOCX from", url);
-      const response = await fetch(url);
+      console.log("GSIViewer: Rendering DOCX from", targetUrl);
+      const response = await fetch(targetUrl);
       if (!response.ok) throw new Error(`HTTP ${response.status} - Échec du chargement du fichier.`);
       const arrayBuffer = await response.arrayBuffer();
 
@@ -229,8 +259,8 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
         {type === 'video' && (
           <div className="w-full h-full flex items-center justify-center bg-black overflow-hidden relative" onContextMenu={(e) => e.preventDefault()}>
             <video
-              key={url}
-              src={url}
+              key={displayUrl}
+              src={displayUrl}
               className="w-full h-full object-contain"
               controls
               autoPlay
@@ -258,8 +288,8 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
           <div className="flex flex-col items-center p-2" onContextMenu={(e) => e.preventDefault()}>
             <div className="overflow-auto max-w-full bg-white shadow-lg border border-gray-100">
                <img
-                 key={url}
-                 src={url}
+                 key={displayUrl}
+                 src={displayUrl}
                  draggable={false}
                  style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }}
                  className="h-auto block mx-auto"

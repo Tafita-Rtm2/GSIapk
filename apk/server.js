@@ -86,8 +86,14 @@ app.get('/apk/api/proxy', async (req, res) => {
     res.setHeader('Content-Disposition', 'inline');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type');
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges');
+    res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type, Accept');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges, Content-Type');
+
+    // Forcer Accept-Ranges pour les médias connus si manquant
+    const contentType = response.headers.get('content-type') || "";
+    if (contentType.includes('video') || contentType.includes('audio')) {
+       res.setHeader('Accept-Ranges', 'bytes');
+    }
 
     console.log(`[PROXY] Streaming: ${targetUrl} [Status: ${response.status}] [Range: ${req.headers.range || 'none'}]`);
 

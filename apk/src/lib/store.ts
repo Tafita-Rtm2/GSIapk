@@ -915,7 +915,8 @@ class GSIStoreClass {
     path = path.replace(/^\/+/, '');
 
     // S'assurer que le chemin commence bien par files/view pour les IDs de fichiers
-    if (!path.startsWith('files/') && !path.includes('/') && path.length > 10) {
+    // GSI Database System v3.0.0 uses /api/files/view/:id
+    if (!path.startsWith('files/') && !path.includes('/') && path.length > 8 && !path.includes('?')) {
        path = `files/view/${path}`;
     }
 
@@ -1066,15 +1067,21 @@ class GSIStoreClass {
   async openPackFile(lessonId: string, url: string): Promise<void> {
     const lowUrl = (url || "").toLowerCase();
 
-    // 1. Determine type BEFORE calling getAbsoluteUrl to avoid mangling raw text
+    // 1. Determine type BEFORE calling getAbsoluteUrl
     let type: 'pdf' | 'docx' | 'video' | 'image' | 'text' = 'pdf';
 
     if (lowUrl.endsWith('.pdf') || lowUrl.includes('/pdf')) type = 'pdf';
     else if (lowUrl.endsWith('.docx') || lowUrl.includes('word')) type = 'docx';
     else if (lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/)) type = 'video';
-    else if (lowUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/) || lowUrl.includes('photo')) type = 'image';
-    else if (!url.startsWith('http') && !url.startsWith('/') && !url.startsWith('files/')) type = 'text';
+    else if (lowUrl.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)$/) || lowUrl.includes('photo') || lowUrl.includes('image')) type = 'image';
+    // If it looks like a file path or ID, it's definitely not raw text
+    else if (url.includes('files/') || url.includes('api/') || (url.length > 8 && !url.includes(' ') && !url.includes('.'))) {
+       // Default to image if we can't be sure, as it's more likely to be an image or handled by the viewer
+       type = 'image';
+    }
+    else if (!url.startsWith('http') && !url.startsWith('/') && !url.startsWith('files/') && !url.startsWith('api/')) type = 'text';
 
+    // IMPORTANT: Even for unknown types that aren't raw text, we treat them as media
     const absoluteUrl = type === 'text' ? url : this.getMediaUrl(url);
     const progress = this.getProgress(lessonId);
     const mime = (progress?.mimeType || "").toLowerCase();
