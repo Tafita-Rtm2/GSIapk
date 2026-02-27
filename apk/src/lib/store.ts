@@ -927,18 +927,21 @@ class GSIStoreClass {
   getMediaUrl(url: string | undefined): string {
     if (!url) return "";
 
-    // Si c'est déjà un blob ou de la donnée embarquée, on ne touche à rien
+    // 1. Instant Data/Blob (Direct Play)
     if (url.startsWith('blob:') || url.startsWith('data:')) return url;
 
+    // 2. Build Absolute URL
     const absolute = this.getAbsoluteUrl(url);
     if (!absolute) return "";
 
-    // Sur Mobile (Capacitor), on utilise l'URL absolue directement
+    // 3. Mobile handling
     if (Capacitor.isNativePlatform()) return absolute;
 
-    // Sur le Web, on force TOUT le trafic média distant via le proxy local /apk/api/proxy
-    // pour garantir le support des headers Range et bypasser CORS.
+    // 4. Web Streaming Experience (Social Media Like)
+    // On privilégie le proxy pour assurer la lecture en ligne directe sans téléchargement préalable
+    // et pour forcer le support du streaming (Range headers)
     if (absolute.startsWith('http')) {
+      // Direct stream with proxy for maximum reliability
       return `/apk/api/proxy?url=${encodeURIComponent(absolute)}`;
     }
 

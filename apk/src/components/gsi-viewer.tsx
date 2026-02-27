@@ -227,10 +227,10 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
         )}
 
         {type === 'video' && (
-          <div className="w-full h-full flex items-center justify-center bg-black rounded-3xl overflow-hidden shadow-2xl relative" onContextMenu={(e) => e.preventDefault()}>
+          <div className="w-full h-full flex items-center justify-center bg-black rounded-3xl overflow-hidden shadow-2xl relative group" onContextMenu={(e) => e.preventDefault()}>
+            {/* Direct Play Experience with standard HTML5 */}
             <video
               key={url}
-              src={url}
               className="w-full h-full object-contain"
               controls
               autoPlay
@@ -238,53 +238,55 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
               crossOrigin="anonymous"
               preload="auto"
               controlsList="nodownload"
-              disablePictureInPicture
               onLoadedData={() => setLoading(false)}
               onError={(e) => {
                 const v = e.currentTarget;
-                const err = v.error;
-                console.error("GSI Video Error:", {
-                  code: err?.code,
-                  message: err?.message,
-                  src: v.src,
-                  readyState: v.readyState,
-                  networkState: v.networkState
-                });
-
-                let msg = "Échec de lecture vidéo.";
-                if (err?.code === 1) msg = "Chargement interrompu.";
-                if (err?.code === 2) msg = "Erreur réseau.";
-                if (err?.code === 3) msg = "Vidéo corrompue.";
-                if (err?.code === 4) msg = "Format non supporté ou accès refusé.";
-
-                onError?.(`${msg} (Code: ${err?.code || '?'}). Vérifiez votre connexion.`);
+                console.error("GSI Stream Error:", v.error?.code, v.src);
+                // Fallback to direct raw URL if proxy fails or just try to reload
+                if (v.src.includes('proxy')) {
+                   const rawUrl = new URL(v.src).searchParams.get('url');
+                   if (rawUrl) {
+                      console.log("Retrying with raw URL...");
+                      v.src = rawUrl;
+                   }
+                }
               }}
             >
-              Votre navigateur ne supporte pas la lecture de vidéos.
+              <source src={url} type="video/mp4" />
+              <source src={url} type="video/webm" />
+              <source src={url} type="video/quicktime" />
+              Votre navigateur ne supporte pas le streaming direct.
             </video>
+
+            {/* Streaming status overlay */}
+            <div className="absolute top-4 right-4 bg-green-500/20 backdrop-blur-md px-3 py-1 rounded-full border border-green-500/30 opacity-0 group-hover:opacity-100 transition-opacity">
+               <p className="text-[8px] font-black text-green-400 uppercase tracking-[0.2em]">Live Stream Active</p>
+            </div>
           </div>
         )}
 
         {type === 'image' && (
-          <div className="flex flex-col items-center gap-4" onContextMenu={(e) => e.preventDefault()}>
-            <div className="overflow-auto max-w-full rounded-2xl shadow-xl">
+          <div className="flex flex-col items-center gap-4 group" onContextMenu={(e) => e.preventDefault()}>
+            <div className="overflow-auto max-w-full rounded-2xl shadow-2xl bg-white p-2">
                <img
                  key={url}
                  src={url}
                  draggable={false}
                  crossOrigin="anonymous"
                  style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }}
-                 className="h-auto transition-transform duration-200"
-                 alt="Document"
+                 className="h-auto transition-all duration-300 rounded-xl"
+                 alt="Content View"
                  onLoad={() => {
-                   console.log("Image loaded successfully");
                    setLoading(false);
                    onLoadComplete?.();
                  }}
                  onError={(e) => {
-                   console.error("Image load error:", e);
+                   const img = e.currentTarget;
+                   if (img.src.includes('proxy')) {
+                      const rawUrl = new URL(img.src).searchParams.get('url');
+                      if (rawUrl) img.src = rawUrl;
+                   }
                    setLoading(false);
-                   onError?.("Échec du chargement de l'image. Vérifiez votre connexion.");
                  }}
                />
             </div>
