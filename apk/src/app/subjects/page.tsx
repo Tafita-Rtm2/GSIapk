@@ -155,14 +155,17 @@ export default function SubjectsPage() {
                            )}
                         </div>
                         <div className="flex gap-2">
+                           {/* Only show download for PDF/Docs, not for media as requested */}
+                           {l.files?.[0] && !l.files[0].match(/\.(mp4|mov|webm|jpg|jpeg|png|gif|webp)$/i) && (
+                             <button
+                               onClick={() => GSIStore.downloadPackFile(l.files[0], l.title, l.id)}
+                               className={cn("p-3 rounded-xl transition-all", GSIStore.isDownloaded(l.id) ? "bg-emerald-100 text-emerald-600" : "bg-gray-50 text-gray-400")}
+                             >
+                                <Download size={16} />
+                             </button>
+                           )}
                            <button
-                             onClick={() => l.files?.[0] && GSIStore.downloadPackFile(l.files[0], l.title, l.id)}
-                             className={cn("p-3 rounded-xl transition-all", GSIStore.isDownloaded(l.id) ? "bg-emerald-100 text-emerald-600" : "bg-gray-50 text-gray-400")}
-                           >
-                              <Download size={16} />
-                           </button>
-                           <button
-                             onClick={() => l.files?.[0] && GSIStore.openPackFile(l.id, l.files[0])}
+                             onClick={() => l.files && l.files.length > 0 && GSIStore.openPackFile(l.id, l.files)}
                              className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100"
                            >
                               <Play size={16} />
@@ -186,9 +189,9 @@ export default function SubjectsPage() {
                         </div>
                         <h4 className="font-black text-xs uppercase tracking-tight mb-4">{a.title}</h4>
                         <div className="flex gap-2">
-                           {a.files?.[0] && (
+                           {a.files && a.files.length > 0 && (
                              <button
-                               onClick={() => GSIStore.openPackFile(a.id, a.files![0])}
+                               onClick={() => GSIStore.openPackFile(a.id, a.files!)}
                                className="flex-1 py-3 bg-gray-50 text-gray-600 rounded-xl text-[9px] font-black uppercase tracking-widest"
                              >
                                Consulter

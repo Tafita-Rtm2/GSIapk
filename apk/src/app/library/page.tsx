@@ -187,7 +187,10 @@ export default function LibraryPage() {
               onClick={() => {
                 if(book.url) {
                   GSIStore.saveProgress(book.id, { lastOpened: Date.now() });
-                  GSIStore.openPackFile(book.id, book.url);
+                  const allFiles = (GSIStore.getCache<Lesson[]>("lessons") || []).find(l => l.id === book.id)?.files
+                                 || (GSIStore.getCache<Assignment[]>("assignments") || []).find(a => a.id === book.id)?.files
+                                 || [book.url];
+                  GSIStore.openPackFile(book.id, allFiles);
                 }
               }}
               className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 hover:border-primary/20 transition-all group cursor-pointer"
@@ -214,14 +217,16 @@ export default function LibraryPage() {
                   )}>
                   <Star size={16} fill={book.favorite ? "currentColor" : "none"} />
                 </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDownload(book.url, book.id, book.title); }}
-                  className={cn(
-                    "p-2 rounded-xl transition-colors",
-                    book.downloaded ? "bg-green-100 text-green-600" : "bg-gray-50 text-primary hover:bg-primary/10"
-                  )}>
-                  <Download size={16} />
-                </button>
+                {book.url && !book.url.match(/\.(mp4|mov|webm|jpg|jpeg|png|gif|webp)$/i) && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDownload(book.url, book.id, book.title); }}
+                    className={cn(
+                      "p-2 rounded-xl transition-colors",
+                      book.downloaded ? "bg-green-100 text-green-600" : "bg-gray-50 text-primary hover:bg-primary/10"
+                    )}>
+                    <Download size={16} />
+                  </button>
+                )}
               </div>
             </div>
           ))}

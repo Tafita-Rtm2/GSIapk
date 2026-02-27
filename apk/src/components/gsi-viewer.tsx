@@ -17,14 +17,17 @@ if (typeof window !== 'undefined') {
 interface GSIViewerProps {
   id: string;
   url: string;
+  urls?: string[];
   type: 'pdf' | 'video' | 'docx' | 'image' | 'text';
   onLoadComplete?: () => void;
   onError?: (err: string) => void;
 }
 
-export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerProps) {
+export function GSIViewer({ id, url, urls = [], type, onLoadComplete, onError }: GSIViewerProps) {
   const [loading, setLoading] = useState(true);
   const [displayUrl, setDisplayUrl] = useState(url);
+  const [multiUrls, setMultiUrls] = useState<string[]>(urls.length > 0 ? urls : [url]);
+  const [currentIdx, setCurrentIdx] = useState(0);
   const [pdfData, setPdfData] = useState<{ numPages: number; currentPage: number } | null>(null);
   const [scale, setScale] = useState(1.5);
   const [docxHtml, setDocxHtml] = useState<string | null>(null);
@@ -32,14 +35,18 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (!url) {
+    if (!url && urls.length === 0) {
        setLoading(false);
        onError?.("Aucun contenu à afficher.");
        return;
     }
 
-    setDisplayUrl(url);
-    console.log(`GSIViewer: Direct play for ${type} from ${url.substring(0, 50)}...`);
+    const activeUrls = urls.length > 0 ? urls : [url];
+    setMultiUrls(activeUrls);
+    setDisplayUrl(activeUrls[0]);
+    setCurrentIdx(0);
+
+    console.log(`GSIViewer: Direct play for ${type} from ${activeUrls[0].substring(0, 50)}...`);
 
     // For images and videos, we rely on the Smart Proxy to handle any JSON wrapping
     // This allows us to use pure HTML5 elements for maximum reliability.
@@ -254,21 +261,25 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
         )}
 
         {type === 'image' && (
-          <div className="flex flex-col items-center p-2" onContextMenu={(e) => e.preventDefault()}>
-            <div className="overflow-auto max-w-full bg-white shadow-lg border border-gray-100">
-               <img
-                 key={displayUrl}
-                 src={displayUrl}
-                 draggable={false}
-                 style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }}
-                 className="h-auto block mx-auto"
-                 alt="Content"
-                 onLoad={() => {
-                   setLoading(false);
-                   onLoadComplete?.();
-                 }}
-                 onError={() => setLoading(false)}
-               />
+          <div className="flex flex-col items-center p-2 w-full" onContextMenu={(e) => e.preventDefault()}>
+            <div className="overflow-auto max-w-full bg-white shadow-lg border border-gray-100 w-full flex flex-col items-center space-y-4 py-8">
+               {multiUrls.map((imgUrl, idx) => (
+                 <img
+                   key={`${imgUrl}-${idx}`}
+                   src={imgUrl}
+                   draggable={false}
+                   style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }}
+                   className="max-w-full h-auto block mx-auto rounded-lg shadow-sm"
+                   alt={`Page ${idx + 1}`}
+                   onLoad={() => {
+                     if (idx === multiUrls.length - 1) {
+                       setLoading(false);
+                       onLoadComplete?.();
+                     }
+                   }}
+                   onError={() => setLoading(false)}
+                 />
+               ))}
             </div>
             {/* Zoom Controls for Image */}
             <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md p-1.5 rounded-2xl flex gap-1 shadow-xl border border-gray-100 z-30">
@@ -282,6 +293,11 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
                    <ZoomIn size={20} />
                 </button>
             </div>
+            {multiUrls.length > 1 && (
+               <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest z-30">
+                  {multiUrls.length} Images chargées
+               </div>
+            )}
           </div>
         )}
 

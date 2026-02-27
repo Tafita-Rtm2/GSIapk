@@ -1048,7 +1048,9 @@ class GSIStoreClass {
     }
   }
 
-  async openPackFile(lessonId: string, url: string): Promise<void> {
+  async openPackFile(lessonId: string, urlOrUrls: string | string[]): Promise<void> {
+    const urls = Array.isArray(urlOrUrls) ? urlOrUrls : [urlOrUrls];
+    const url = urls[0];
     const lowUrl = (url || "").toLowerCase();
 
     let type: 'pdf' | 'docx' | 'video' | 'image' | 'text' = 'pdf';
@@ -1057,12 +1059,14 @@ class GSIStoreClass {
     else if (lowUrl.endsWith('.docx') || lowUrl.includes('word')) type = 'docx';
     else if (lowUrl.match(/\.(mp4|mov|webm|avi|mkv|3gp|flv|wmv)$/)) type = 'video';
     else if (lowUrl.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)$/) || lowUrl.includes('photo') || lowUrl.includes('image')) type = 'image';
-    else if (url.includes('files/') || url.includes('api/') || (url.length > 8 && !url.includes(' ') && !url.includes('.'))) {
+    else if (url && (url.includes('files/') || url.includes('api/') || (url.length > 8 && !url.includes(' ') && !url.includes('.')))) {
        type = 'image';
     }
-    else if (!url.startsWith('http') && !url.startsWith('/') && !url.startsWith('files/') && !url.startsWith('api/')) type = 'text';
+    else if (url && !url.startsWith('http') && !url.startsWith('/') && !url.startsWith('files/') && !url.startsWith('api/')) type = 'text';
 
-    const absoluteUrl = type === 'text' ? url : this.getMediaUrl(url);
+    // If multiple images, we keep it as 'image' type but pass the array
+    const absoluteUrls = type === 'text' ? urls : urls.map(u => this.getMediaUrl(u));
+    const absoluteUrl = absoluteUrls[0];
     const progress = this.getProgress(lessonId);
     const mime = (progress?.mimeType || "").toLowerCase();
 
@@ -1071,16 +1075,29 @@ class GSIStoreClass {
     else if (mime.includes('video')) type = 'video';
     else if (mime.includes('image')) type = 'image';
 
-    const dispatchViewer = (targetUrl: string) => {
+    const dispatchViewer = (targetUrl: string | string[]) => {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('gsi-open-viewer', {
-          detail: { id: lessonId, url: targetUrl, type, originalUrl: absoluteUrl }
+          detail: {
+            id: lessonId,
+            url: Array.isArray(targetUrl) ? targetUrl[0] : targetUrl,
+            urls: Array.isArray(targetUrl) ? targetUrl : [targetUrl],
+            type,
+            originalUrl: absoluteUrl
+          }
         }));
       }
     };
 
     if (type === 'text') {
        dispatchViewer(url);
+       return;
+    }
+
+    // For images and videos, we prioritize online playback via proxy as requested by user
+    // because "offline download" for these formats on web can be problematic.
+    if (!Capacitor.isNativePlatform() && (type === 'video' || type === 'image')) {
+       dispatchViewer(absoluteUrls);
        return;
     }
 

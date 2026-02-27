@@ -28,7 +28,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
 
-  const [viewerData, setViewerData] = useState<{ id: string, url: string, type: string, originalUrl?: string } | null>(null);
+  const [viewerData, setViewerData] = useState<{ id: string, url: string, urls?: string[], type: string, originalUrl?: string } | null>(null);
   const [viewerLoading, setViewerLoading] = useState(true);
 
   useEffect(() => {
@@ -195,6 +195,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <GSIViewer
                 id={viewerData.id}
                 url={viewerData.url}
+                urls={viewerData.urls}
                 type={viewerData.type as any}
                 onLoadComplete={() => setViewerLoading(false)}
                 onError={(err) => {
