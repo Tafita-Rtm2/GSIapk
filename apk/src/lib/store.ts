@@ -1108,7 +1108,8 @@ class GSIStoreClass {
 
     // For images and videos, we prioritize online playback via proxy as requested by user
     // because "offline download" for these formats on web can be problematic.
-    if (!Capacitor.isNativePlatform() && (type === 'video' || type === 'image')) {
+    // HOWEVER, if the file is ALREADY downloaded (offline mode), we should try to use it.
+    if (!Capacitor.isNativePlatform() && (type === 'video' || type === 'image') && !progress?.localPath) {
        dispatchViewer(absoluteUrls);
        return;
     }
@@ -1124,12 +1125,18 @@ class GSIStoreClass {
           }
           const file = await Filesystem.readFile({ path, directory: Directory.Data });
           const dataStr = typeof file.data === 'string' ? file.data : '';
+
           let actualMime = progress.mimeType || mime;
-          if (!actualMime) {
-             actualMime = type === 'pdf' ? 'application/pdf' :
-                          type === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' :
-                          type === 'video' ? 'video/mp4' : 'image/jpeg';
+          if (!actualMime || actualMime === "undefined") {
+             const ext = path.split('.').pop()?.toLowerCase();
+             actualMime = ext === 'pdf' ? 'application/pdf' :
+                          ext === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' :
+                          ext === 'mp4' ? 'video/mp4' :
+                          ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' :
+                          ext === 'png' ? 'image/png' :
+                          type === 'pdf' ? 'application/pdf' : 'image/jpeg';
           }
+
           const blob = this.b64toBlob(dataStr, actualMime);
           const blobUrl = URL.createObjectURL(blob);
           dispatchViewer(blobUrl);

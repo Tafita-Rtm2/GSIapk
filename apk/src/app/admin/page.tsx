@@ -757,21 +757,30 @@ function ScheduleEditor({ campuses, onSave }: { campuses: string[], onSave: (s: 
               normalizedRow[key.toLowerCase().replace(/\s/g, '')] = row[key];
            });
 
-           let start = normalizedRow.debut || normalizedRow.start || "08:00";
-           let end = normalizedRow.fin || normalizedRow.end || "10:00";
+           const formatTime = (t: any) => {
+              if (!t) return null;
+              let s = String(t).toLowerCase().trim();
+              if (s.includes('h')) s = s.replace('h', ':');
+              if (!s.includes(':')) s += ':00';
+              const [h, m] = s.split(':');
+              const hh = h.padStart(2, '0');
+              const mm = (m || '00').padEnd(2, '0').substring(0, 2);
+              return `${hh}:${mm}`;
+           };
+
+           let start = formatTime(normalizedRow.debut || normalizedRow.start) || "08:00";
+           let end = formatTime(normalizedRow.fin || normalizedRow.end) || "10:00";
 
            // Handle "8h-10h" or "08:00-10:00" in a single "heure" or "time" column
            const timeRange = normalizedRow.heure || normalizedRow.time || normalizedRow.creneau;
-           if (timeRange && typeof timeRange === 'string') {
-              const parts = timeRange.split(/[-–—/]/);
+           if (timeRange) {
+              const sRange = String(timeRange);
+              const parts = sRange.split(/[-–—/]/);
               if (parts.length === 2) {
-                 start = parts[0].trim().replace('h', ':').replace(/[^0-9:]/g, '');
-                 end = parts[1].trim().replace('h', ':').replace(/[^0-9:]/g, '');
-                 if (!start.includes(':')) start += ':00';
-                 if (!end.includes(':')) end += ':00';
-                 // Pad single digit hours
-                 if (start.length === 4 && start.indexOf(':') === 1) start = '0' + start;
-                 if (end.length === 4 && end.indexOf(':') === 1) end = '0' + end;
+                 const s = formatTime(parts[0]);
+                 const e = formatTime(parts[1]);
+                 if (s) start = s;
+                 if (e) end = e;
               }
            }
 
