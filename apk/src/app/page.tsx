@@ -116,10 +116,16 @@ export default function Home() {
   const convocations = (announcements || []).filter(a => a && a.type === 'convocation');
 
   const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
-  const currentDay = days[new Date().getDay()];
-  const currentTime = new Date().getHours() * 60 + new Date().getMinutes();
+  const [currentDay, setCurrentDay] = useState("");
+  const [currentTime, setCurrentTime] = useState(0);
 
-  const nextClass = schedule && schedule.slots && Array.isArray(schedule.slots)
+  useEffect(() => {
+    const now = new Date();
+    setCurrentDay(days[now.getDay()]);
+    setCurrentTime(now.getHours() * 60 + now.getMinutes());
+  }, []);
+
+  const nextClass = schedule && schedule.slots && Array.isArray(schedule.slots) && currentDay
     ? schedule.slots
         .filter(s => s && s.day === currentDay && typeof s.startTime === 'string' && s.startTime.includes(':'))
         .map(s => {
@@ -137,7 +143,9 @@ export default function Home() {
         .sort((a, b) => a.totalMinutes - b.totalMinutes)[0]
     : null;
 
-  const subjects = Array.from(new Set((lessons || []).map(l => l && l.subject).filter(Boolean)));
+  const subjects = Array.from(new Set((lessons || []).filter(l => l && l.subject && typeof l.subject === 'string').map(l => l.subject)));
+
+  if (!currentDay) return null; // Avoid hydration mismatch
 
   return (
     <AppLayout>
@@ -174,18 +182,18 @@ export default function Home() {
           <div className="flex items-center gap-4">
              <Link href="/profile/" className="w-14 h-14 rounded-[22px] bg-white p-0.5 shadow-xl shadow-indigo-100/50 border border-indigo-50 rotate-[-3deg] hover:rotate-0 transition-all duration-500 overflow-hidden">
                 <img
-                  src={user.photo ? GSIStore.getMediaUrl(user.photo) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`}
+                  src={user.photo ? GSIStore.getMediaUrl(user.photo) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.fullName || "GSI")}`}
                   alt="Avatar"
                   className="w-full h-full object-cover rounded-[20px]"
                   onError={(e) => {
-                    e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`;
+                    e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.fullName || "GSI")}`;
                   }}
                 />
              </Link>
              <div>
                <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mb-0.5">Bonjour {firstName}</p>
                <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">
-                  GSI <span className="text-primary">Internationale</span>
+                  GSI <span className="text-primary">Insight</span>
                </h1>
              </div>
           </div>
@@ -255,8 +263,8 @@ export default function Home() {
                  </div>
                  <div className="space-y-4">
                     {subjects.slice(0, 4).map((sub, i) => {
-                       const subLessons = lessons.filter(l => l.subject === sub);
-                       const totalPercent = subLessons.reduce((acc, l) => acc + (progressData[l.id]?.percent || 0), 0);
+                       const subLessons = (lessons || []).filter(l => l && l.subject === sub);
+                       const totalPercent = subLessons.reduce((acc, l) => acc + (l && l.id && progressData[l.id]?.percent || 0), 0);
                        const prog = subLessons.length > 0 ? Math.round(totalPercent / subLessons.length) : 0;
                        const colors = ["bg-indigo-500", "bg-emerald-500", "bg-orange-500", "bg-rose-500"];
                        return (
@@ -282,8 +290,8 @@ export default function Home() {
            <div className="bg-gradient-to-br from-[#3F51B5] via-[#5C6BC0] to-[#7986CB] p-7 rounded-[44px] text-white shadow-2xl shadow-indigo-200 relative overflow-hidden">
               <div className="relative z-10">
                  <div className="flex items-center gap-2 mb-2">
-                    <Users size={18} className="text-violet-200" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-violet-200">Votre Agent Assistant GSI</span>
+                    <Sparkles size={18} className="text-violet-200" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-violet-200">Ask Insight AI</span>
                  </div>
                  <h2 className="text-xl font-black mb-1 leading-tight">Besoin d'aide ?</h2>
                  <p className="text-[11px] text-violet-200/80 font-medium mb-4">Votre conseiller dévoué est à votre écoute 24h/24.</p>
@@ -300,13 +308,14 @@ export default function Home() {
             <Link href="/library/" className="text-[10px] font-bold text-primary uppercase tracking-widest hover:underline">Voir tout</Link>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-            {lessons.map((l, i) => {
+            {(lessons || []).map((l, i) => {
+              if (!l || !l.id) return null;
               const isCompleted = progressData[l.id]?.completed;
               return (
                 <div
-                  key={i}
+                  key={l.id || i}
                   className="min-w-[200px] p-5 bg-white rounded-[32px] border border-gray-100 shadow-sm active:scale-95 transition-all cursor-pointer group relative"
-                  onClick={() => l.files?.[0] && GSIStore.openPackFile(l.id, l.files[0])}
+                  onClick={() => l.files && l.files[0] && GSIStore.openPackFile(l.id, l.files[0])}
                 >
                   <button
                     onClick={(e) => {
@@ -329,8 +338,8 @@ export default function Home() {
                   )}>
                     <BookOpen size={20} />
                   </div>
-                  <h3 className="font-black text-xs text-gray-800 mb-1 line-clamp-1 uppercase">{l.title}</h3>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{l.subject}</p>
+                  <h3 className="font-black text-xs text-gray-800 mb-1 line-clamp-1 uppercase">{l.title || "Titre inconnu"}</h3>
+                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{l.subject || "Général"}</p>
                 </div>
               );
             })}
@@ -342,8 +351,8 @@ export default function Home() {
         <div className="mb-10">
           <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter mb-5">Devoirs à rendre</h2>
           <div className="space-y-4">
-            {assignments.map((a, i) => (
-               <div key={i} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden">
+            {(assignments || []).map((a, i) => (
+               a && <div key={a.id || i} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden">
                   <div className="flex justify-between items-center mb-4">
                     <span className="bg-orange-50 text-orange-600 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">En attente</span>
                     <div className="flex items-center gap-1 text-[9px] font-black text-gray-300 uppercase">
@@ -351,8 +360,8 @@ export default function Home() {
                        {a.deadline}
                     </div>
                   </div>
-                  <h4 className="font-black text-sm uppercase tracking-tight mb-1">{a.title}</h4>
-                  <p className="text-[10px] font-bold text-gray-400 mb-4">{a.subject}</p>
+                  <h4 className="font-black text-sm uppercase tracking-tight mb-1">{a.title || "Devoir"}</h4>
+                  <p className="text-[10px] font-bold text-gray-400 mb-4">{a.subject || "Général"}</p>
 
                   {a.files && a.files.length > 0 && (
                      <button
@@ -427,11 +436,12 @@ export default function Home() {
                       </div>
                    )}
 
-                   {announcements.map((a, i) => {
-                     const isRead = readNotifications.includes(a.id);
+                   {(announcements || []).map((a, i) => {
+                     if (!a || !a.id) return null;
+                     const isRead = Array.isArray(readNotifications) && readNotifications.includes(a.id);
                      return (
                         <div
-                          key={a.id}
+                          key={a.id || i}
                           className={cn(
                             "p-5 rounded-[32px] border transition-all duration-300",
                             isRead ? "bg-white border-gray-100 opacity-60" : "bg-white border-indigo-100 shadow-lg shadow-indigo-500/5 ring-1 ring-indigo-500/10"
@@ -445,22 +455,24 @@ export default function Home() {
                               )}>
                                  {a.type === 'convocation' ? 'OFFICIEL' : 'INFO'}
                               </span>
-                              <span className="text-[8px] font-bold text-gray-300">{new Date(a.date).toLocaleDateString()}</span>
+                              <span className="text-[8px] font-bold text-gray-300">
+                                 {a.date ? new Date(a.date).toLocaleDateString() : ""}
+                              </span>
                            </div>
-                           <h4 className="text-[11px] font-black uppercase mb-1 text-gray-800">{a.title}</h4>
-                           <p className="text-[11px] text-gray-500 font-medium leading-relaxed">{a.message}</p>
+                           <h4 className="text-[11px] font-black uppercase mb-1 text-gray-800">{a.title || "Notification"}</h4>
+                           <p className="text-[11px] text-gray-500 font-medium leading-relaxed">{a.message || "Aucun contenu"}</p>
                         </div>
                      );
                    })}
 
-                   {assignments.map((a) => (
-                      <div key={a.id} className="p-5 bg-orange-50/50 border border-orange-100 rounded-[32px]">
+                   {(assignments || []).map((a, i) => (
+                      a && <div key={a.id || i} className="p-5 bg-orange-50/50 border border-orange-100 rounded-[32px]">
                          <div className="flex justify-between items-center mb-2">
                             <span className="bg-orange-500 text-white px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest">DEVOIR</span>
                             <span className="text-[8px] font-black text-orange-600 uppercase tracking-widest">À RENDRE</span>
                          </div>
-                         <h4 className="text-[11px] font-black uppercase mb-1 text-gray-800">{a.title}</h4>
-                         <p className="text-[10px] text-orange-600 font-bold">Date limite : {a.deadline}</p>
+                         <h4 className="text-[11px] font-black uppercase mb-1 text-gray-800">{a.title || "Devoir"}</h4>
+                         <p className="text-[10px] text-orange-600 font-bold">Date limite : {a.deadline || "N/A"}</p>
                       </div>
                    ))}
                 </div>

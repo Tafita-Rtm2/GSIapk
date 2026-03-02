@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, BookOpen, Library, User, MessageCircle, Users, X, Maximize2, Wifi, WifiOff } from "lucide-react";
+import { Home, Calendar, BookOpen, Library, User, MessageCircle, Users, X, Maximize2, Wifi, WifiOff, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n";
 import { useState, useEffect } from "react";
@@ -174,9 +174,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Link
             href="/chat/"
             className="fixed bottom-28 right-4 lg:right-auto lg:left-[calc(50%+10rem)] bg-accent text-white p-4 rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all z-50 shadow-accent/30"
-            title="Agent Assistant"
+            title="Ask Insight"
           >
-            <Users size={24} />
+            <Sparkles size={24} />
           </Link>
         )}
       </div>
