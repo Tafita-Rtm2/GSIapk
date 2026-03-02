@@ -27,12 +27,15 @@ export default function LibraryPage() {
     }
 
     const updateLibrary = (lessons: Lesson[], assignments: Assignment[]) => {
+      if (!lessons || !Array.isArray(lessons)) lessons = [];
+      if (!assignments || !Array.isArray(assignments)) assignments = [];
+
       const lessonItems = lessons.filter(l =>
-        !user || user.role === 'admin' || (
+        l && (!user || user.role === 'admin' || (
           l.niveau === user.niveau &&
-          (l.filiere.includes(user.filiere) || l.filiere.length === 0) &&
-          (l.campus.includes(user.campus) || l.campus.length === 0)
-        )
+          (Array.isArray(l.filiere) && (l.filiere.includes(user.filiere) || l.filiere.length === 0)) &&
+          (Array.isArray(l.campus) && (l.campus.includes(user.campus) || l.campus.length === 0))
+        ))
       ).map(l => ({
         id: l.id,
         title: l.title,
@@ -44,11 +47,11 @@ export default function LibraryPage() {
       }));
 
       const assignmentItems = assignments.filter(a =>
-        !user || user.role === 'admin' || (
+        a && (!user || user.role === 'admin' || (
           a.niveau === user.niveau &&
-          (a.filiere.includes(user.filiere) || a.filiere.length === 0) &&
-          (a.campus.includes(user.campus) || a.campus.length === 0)
-        )
+          (Array.isArray(a.filiere) && (a.filiere.includes(user.filiere) || a.filiere.length === 0)) &&
+          (Array.isArray(a.campus) && (a.campus.includes(user.campus) || a.campus.length === 0))
+        ))
       ).map(a => ({
         id: a.id,
         title: a.title,

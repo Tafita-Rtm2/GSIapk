@@ -52,7 +52,7 @@ export function GSIViewer({ id, url, urls = [], type, onLoadComplete, onError }:
     // For images and videos, we rely on the Smart Proxy to handle any JSON wrapping
     // This allows us to use pure HTML5 elements for maximum reliability.
     if (type === 'image' || type === 'video' || type === 'text') {
-       setLoading(false); // No internal loader for media to avoid "black screen" issues
+       setLoading(type === 'image' || type === 'video');
        onLoadComplete?.();
     } else {
        setLoading(true);
@@ -244,6 +244,7 @@ export function GSIViewer({ id, url, urls = [], type, onLoadComplete, onError }:
               playsInline
               preload="auto"
               controlsList="nodownload"
+              onCanPlay={() => setLoading(false)}
               onLoadedData={() => setLoading(false)}
               onError={(e) => {
                 const v = e.currentTarget;

@@ -23,7 +23,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const currentUser = GSIStore.getCurrentUser();
     if (!currentUser) {
-      router.push("/login/");
+      window.location.href = "/apk/login/";
     } else {
       setUser(currentUser);
     }
@@ -32,7 +32,7 @@ export default function ProfilePage() {
   const handleLogout = () => {
     GSIStore.logout();
     toast.success("Déconnexion réussie");
-    router.push("/login/");
+    window.location.href = "/apk/login/";
   };
 
   if (!user) return null;

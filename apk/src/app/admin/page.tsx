@@ -60,7 +60,7 @@ export default function AdminPage() {
   useEffect(() => {
     const user = GSIStore.getCurrentUser();
     if (!user || user.role !== 'admin') {
-      router.push("/login/");
+      window.location.href = "/apk/login/";
       return;
     }
 
@@ -171,7 +171,7 @@ export default function AdminPage() {
             onClick={() => {
               GSIStore.logout();
               toast.success("Déconnexion");
-              router.push("/login/");
+              window.location.href = "/apk/login/";
             }}
             className="p-3 bg-gray-50 rounded-xl text-gray-400 hover:text-red-500 transition-colors active:scale-90"
           >
@@ -632,7 +632,7 @@ export default function AdminPage() {
 
       {/* FAB */}
       <button
-        onClick={() => router.push("/register")}
+        onClick={() => router.push("/admincreat/")}
         className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-all z-50"
       >
         <Plus size={28} />

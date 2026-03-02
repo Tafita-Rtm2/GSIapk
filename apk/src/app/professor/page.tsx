@@ -56,7 +56,7 @@ export default function ProfessorPage() {
   useEffect(() => {
     const user = GSIStore.getCurrentUser();
     if (!user || user.role !== 'professor') {
-      router.replace("/login/");
+      window.location.href = "/apk/login/";
       return;
     }
 
@@ -230,7 +230,7 @@ export default function ProfessorPage() {
             onClick={() => {
               GSIStore.logout();
               toast.success("Déconnexion");
-              router.replace("/login/");
+              window.location.href = "/apk/login/";
             }}
             className="p-3 bg-gray-50 rounded-xl text-gray-400 active:scale-90"
           >

@@ -34,12 +34,14 @@ export default function ChatPage() {
   useEffect(() => {
     if (!user) return;
     const unsub = GSIStore.subscribeAiMessages((msgs) => {
-      if (msgs.length === 0) {
+      if (!msgs || msgs.length === 0) {
+        const name = (user.fullName || "Étudiant").split(' ')[0];
         const welcome: ChatMessage = {
           role: "assistant",
-          content: `Bonjour ${user.fullName.split(' ')[0]} ! Je suis votre Agent Assistant GSI pour le campus de ${user.campus} (${user.filiere}). Je suis là pour vous accompagner personnellement dans votre réussite académique et répondre à toutes vos questions comme un véritable conseiller dévoué. Comment puis-je vous assister aujourd'hui ?`
+          content: `Bonjour ${name} ! Je suis votre Agent Assistant GSI pour le campus de ${user.campus || "GSI"} (${user.filiere || "Études"}). Je suis là pour vous accompagner personnellement dans votre réussite académique et répondre à toutes vos questions comme un véritable conseiller dévoué. Comment puis-je vous assister aujourd'hui ?`
         };
-        GSIStore.setAiMessages([welcome]);
+        // Set welcome message locally first, don't persist automatically to avoid loops
+        setMessages([welcome]);
       } else {
         setMessages(msgs);
       }
@@ -89,13 +91,13 @@ export default function ChatPage() {
         Tu n'es pas une simple IA, tu es un conseiller humain et chaleureux.
 
         CONTEXTE DE L'ÉTUDIANT À QUI TU PARLES:
-        Nom: ${user?.fullName}
+        Nom: ${user?.fullName || "Anonyme"}
         Campus: ${campus}
         Filière: ${subject}
-        Niveau: ${user?.niveau}
-        Moyenne actuelle: ${grades.length > 0 ? (grades.reduce((a,b)=>a+b.score,0)/grades.length).toFixed(2)+"/20" : "N/A"}
-        Cours récents: ${lessons.map(l => l.title).join(', ')}
-        Devoirs à faire: ${assignments.map(a => a.title + " (DL: " + a.deadline + ")").join(', ')}
+        Niveau: ${user?.niveau || "N/A"}
+        Moyenne actuelle: ${Array.isArray(grades) && grades.length > 0 ? (grades.reduce((a,b)=>a+(b.score||0),0)/grades.length).toFixed(2)+"/20" : "N/A"}
+        Cours récents: ${Array.isArray(lessons) ? lessons.map(l => l?.title).filter(Boolean).join(', ') : "Aucun"}
+        Devoirs à faire: ${Array.isArray(assignments) ? assignments.map(a => (a?.title || "Devoir") + " (DL: " + (a?.deadline || "N/A") + ")").join(', ') : "Aucun"}
       `;
 
       const apiMessages: any[] = [

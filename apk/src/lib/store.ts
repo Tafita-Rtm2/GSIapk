@@ -902,7 +902,7 @@ class GSIStoreClass {
   // --- FILES ENGINE ---
 
   getAbsoluteUrl(url: string | undefined): string {
-    if (!url || url === "undefined" || url === "null") return "";
+    if (typeof url !== 'string' || !url || url === "undefined" || url === "null") return "";
 
     if (url.startsWith('data:') || url.startsWith('blob:')) return url;
 
@@ -934,7 +934,7 @@ class GSIStoreClass {
   }
 
   getMediaUrl(url: string | undefined): string {
-    if (!url) return "";
+    if (typeof url !== 'string' || !url) return "";
 
     if (url.startsWith('blob:') || url.startsWith('data:')) return url;
 

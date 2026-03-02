@@ -22,10 +22,11 @@ export default function SubjectsPage() {
     if (!user) return;
 
     const unsubLessons = GSIStore.subscribeLessons({ niveau: user.niveau }, (all) => {
-      const filtered = all.filter(l => (l.filiere.includes(user.filiere) || l.filiere.length === 0));
+      if (!all || !Array.isArray(all)) return;
+      const filtered = all.filter(l => l && (Array.isArray(l.filiere) && (l.filiere.includes(user.filiere) || l.filiere.length === 0)));
       setLessons(filtered);
 
-      const subjectNames = Array.from(new Set(filtered.map(l => l.subject)));
+      const subjectNames = Array.from(new Set(filtered.map(l => l && l.subject).filter(Boolean)));
       const mapped = subjectNames.map((name, i) => {
         const subjectLessons = filtered.filter(l => l.subject === name);
         const count = subjectLessons.length;
@@ -47,7 +48,8 @@ export default function SubjectsPage() {
     });
 
     const unsubAssignments = GSIStore.subscribeAssignments({ niveau: user.niveau }, (all) => {
-      const filtered = all.filter(a => (a.filiere.includes(user.filiere) || a.filiere.length === 0));
+      if (!all || !Array.isArray(all)) return;
+      const filtered = all.filter(a => a && (Array.isArray(a.filiere) && (a.filiere.includes(user.filiere) || a.filiere.length === 0)));
       setAssignments(filtered);
     });
 

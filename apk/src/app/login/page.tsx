@@ -28,9 +28,9 @@ export default function LoginPage() {
       const userData = await GSIStore.login(email, password);
       if (userData) {
         toast.success("Ravi de vous revoir !", { id: toastId });
-        if (userData.role === 'admin') router.push("/admin/");
-        else if (userData.role === 'professor') router.push("/professor/");
-        else router.push("/");
+        if (userData.role === 'admin') window.location.href = "/apk/admin/";
+        else if (userData.role === 'professor') window.location.href = "/apk/professor/";
+        else window.location.href = "/apk/";
       } else {
         toast.error("Identifiants incorrects ou profil introuvable.", { id: toastId });
       }
@@ -47,7 +47,7 @@ export default function LoginPage() {
       const adminUser = await GSIStore.login("admin@gsi.mg", "password");
       if (adminUser) {
         toast.success("Accès Administrateur accordé");
-        router.push("/admin/");
+        window.location.href = "/apk/admin/";
       } else {
          GSIStore.setCurrentUser({
             id: 'admin-id',
@@ -59,7 +59,7 @@ export default function LoginPage() {
             niveau: 'N/A'
           });
           toast.success("Accès Administrateur (Local)");
-          router.push("/admin/");
+          window.location.href = "/apk/admin/";
       }
     } else {
       toast.error("Code administrateur incorrect");
@@ -72,7 +72,7 @@ export default function LoginPage() {
       const profUser = await GSIStore.login("prof@gsi.mg", "password");
       if (profUser) {
         toast.success("Accès Professeur accordé");
-        router.push("/professor/");
+        window.location.href = "/apk/professor/";
       } else {
         GSIStore.setCurrentUser({
             id: 'prof-id',
@@ -84,7 +84,7 @@ export default function LoginPage() {
             niveau: 'Multiple'
           });
           toast.success("Accès Professeur (Local)");
-          router.push("/professor/");
+          window.location.href = "/apk/professor/";
       }
     } else {
       toast.error("Mot de passe professeur incorrect");
@@ -120,10 +120,10 @@ export default function LoginPage() {
       <div className="flex-1 flex flex-col justify-center">
         <div className="flex flex-col items-center mb-12">
           <div className="w-20 h-20 bg-primary rounded-[30%] flex items-center justify-center text-white mb-6 shadow-xl rotate-12">
-            <Sparkles size={40} />
+             <div className="font-black text-4xl">G</div>
           </div>
-          <h1 className="text-4xl font-black text-primary mb-2">GSI</h1>
-          <p className="text-gray-500 font-medium text-center italic">“Your future starts here.”</p>
+          <h1 className="text-4xl font-black text-primary mb-2 tracking-tighter">GROUPE GSI</h1>
+          <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest text-center italic">“Votre réussite commence ici.”</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">

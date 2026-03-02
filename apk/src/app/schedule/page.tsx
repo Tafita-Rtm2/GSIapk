@@ -22,14 +22,18 @@ export default function SchedulePage() {
     const user = GSIStore.getCurrentUser();
     if (!user) return;
 
+    let unsubSchedules: (() => void) | undefined;
+    let unsubReminders: (() => void) | undefined;
+
     if (user.role === 'professor') {
        // Fetch all schedules and filter slots by instructor name
-       const unsub = GSIStore.subscribeLatestSchedule("", "", (allSchedules: any) => {
+       unsubSchedules = GSIStore.subscribeLatestSchedule("", "", (allSchedules: any) => {
+          if (!allSchedules) return;
           const professorSlots: ScheduleSlot[] = [];
           Object.values(allSchedules).forEach((s: any) => {
-             if (s.slots) {
+             if (s && s.slots && Array.isArray(s.slots)) {
                 s.slots.forEach((slot: any) => {
-                   if (slot.instructor && (slot.instructor.toLowerCase().includes(user.fullName.toLowerCase()) || user.fullName.toLowerCase().includes(slot.instructor.toLowerCase()))) {
+                   if (slot && slot.instructor && (slot.instructor.toLowerCase().includes(user.fullName.toLowerCase()) || user.fullName.toLowerCase().includes(slot.instructor.toLowerCase()))) {
                       professorSlots.push({ ...slot, campusInfo: `${s.campus} ${s.niveau}` });
                    }
                 });
@@ -37,20 +41,22 @@ export default function SchedulePage() {
           });
           setSchedule({ id: 'prof', campus: 'Tous', niveau: 'Tous', lastUpdated: new Date().toISOString(), slots: professorSlots });
        });
-       return () => unsub();
     } else {
-       const unsubs = [
-         GSIStore.subscribeLatestSchedule(user.campus, user.niveau, (s) => {
-            if (schedule && JSON.stringify(s) !== JSON.stringify(schedule)) {
-               toast.info("L'emploi du temps a été mis à jour par l'administration.");
-            }
-            setSchedule(s);
-         }),
-         GSIStore.subscribeReminders((rs) => setReminders(rs.filter(r => r.isAlarm)))
-       ];
-       return () => unsubs.forEach(u => u());
+       unsubSchedules = GSIStore.subscribeLatestSchedule(user.campus, user.niveau, (s) => {
+          setSchedule(s);
+       });
+       unsubReminders = GSIStore.subscribeReminders((rs) => {
+          if (Array.isArray(rs)) {
+            setReminders(rs.filter(r => r && r.isAlarm));
+          }
+       });
     }
-  }, [schedule]);
+
+    return () => {
+      if (unsubSchedules) unsubSchedules();
+      if (unsubReminders) unsubReminders();
+    };
+  }, []);
 
   const dailySlots = schedule?.slots?.filter(s => s.day === selectedDay) || [];
 

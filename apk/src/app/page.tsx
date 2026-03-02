@@ -44,25 +44,28 @@ export default function Home() {
     const unsubs = [
       GSIStore.subscribeAuth((u) => setUser(u)),
       GSIStore.subscribeLessons({ niveau: initialUser.niveau }, (all) => {
+        if (!all || !Array.isArray(all)) return;
         const filtered = all.filter(l =>
-          (l.campus.includes(initialUser.campus) || l.campus.length === 0) &&
-          (l.filiere.includes(initialUser.filiere) || l.filiere.length === 0)
+          l && (Array.isArray(l.campus) && (l.campus.includes(initialUser.campus) || l.campus.length === 0)) &&
+          (Array.isArray(l.filiere) && (l.filiere.includes(initialUser.filiere) || l.filiere.length === 0))
         );
         setLessons(filtered);
         setSyncStatus('ready');
       }),
       GSIStore.subscribeAssignments({ niveau: initialUser.niveau }, (all) => {
+        if (!all || !Array.isArray(all)) return;
         const filtered = all.filter(a =>
-          (a.campus.includes(initialUser.campus) || a.campus.length === 0) &&
-          (a.filiere.includes(initialUser.filiere) || a.filiere.length === 0)
+          a && (Array.isArray(a.campus) && (a.campus.includes(initialUser.campus) || a.campus.length === 0)) &&
+          (Array.isArray(a.filiere) && (a.filiere.includes(initialUser.filiere) || a.filiere.length === 0))
         );
         setAssignments(filtered);
       }),
       GSIStore.subscribeAnnouncements((anns) => {
+        if (!anns || !Array.isArray(anns)) return;
         const filtered = anns.filter(a =>
-          (!a.targetUserId || a.targetUserId === initialUser.id) &&
-          (!a.campus || a.campus.includes(initialUser.campus) || a.campus.length === 0) &&
-          (!a.filiere || a.filiere.includes(initialUser.filiere) || a.filiere.length === 0) &&
+          a && (!a.targetUserId || a.targetUserId === initialUser.id) &&
+          (!a.campus || (Array.isArray(a.campus) && (a.campus.includes(initialUser.campus) || a.campus.length === 0))) &&
+          (!a.filiere || (Array.isArray(a.filiere) && (a.filiere.includes(initialUser.filiere) || a.filiere.length === 0))) &&
           (!a.niveau || a.niveau === initialUser.niveau)
         );
         setAnnouncements(filtered);
@@ -109,27 +112,32 @@ export default function Home() {
 
   if (!user) return null;
 
-  const firstName = user.fullName.split(' ')[0];
-  const convocations = announcements.filter(a => a.type === 'convocation');
+  const firstName = (user.fullName || "Étudiant").split(' ')[0];
+  const convocations = (announcements || []).filter(a => a && a.type === 'convocation');
 
   const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
   const currentDay = days[new Date().getDay()];
   const currentTime = new Date().getHours() * 60 + new Date().getMinutes();
 
-  const nextClass = schedule?.slots
-    ?.filter(s => s.day === currentDay && s.startTime && s.startTime.includes(':'))
-    ?.map(s => {
-       try {
-         const [h, m] = s.startTime.split(':').map(Number);
-         return { ...s, totalMinutes: (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m) };
-       } catch (e) {
-         return { ...s, totalMinutes: 0 };
-       }
-    })
-    ?.filter(s => s.totalMinutes > currentTime)
-    ?.sort((a, b) => a.totalMinutes - b.totalMinutes)[0];
+  const nextClass = schedule && schedule.slots && Array.isArray(schedule.slots)
+    ? schedule.slots
+        .filter(s => s && s.day === currentDay && typeof s.startTime === 'string' && s.startTime.includes(':'))
+        .map(s => {
+           try {
+             const parts = s.startTime.split(':');
+             const h = parseInt(parts[0], 10);
+             const m = parseInt(parts[1], 10);
+             const totalMinutes = (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
+             return { ...s, totalMinutes };
+           } catch (e) {
+             return { ...s, totalMinutes: 0 };
+           }
+        })
+        .filter(s => s && s.totalMinutes > currentTime)
+        .sort((a, b) => a.totalMinutes - b.totalMinutes)[0]
+    : null;
 
-  const subjects = Array.from(new Set(lessons.map(l => l.subject)));
+  const subjects = Array.from(new Set((lessons || []).map(l => l && l.subject).filter(Boolean)));
 
   return (
     <AppLayout>
