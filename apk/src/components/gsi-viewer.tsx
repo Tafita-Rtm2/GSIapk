@@ -35,13 +35,14 @@ export function GSIViewer({ id, url, urls = [], type, onLoadComplete, onError }:
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (!url && urls.length === 0) {
+    const safeUrls = Array.isArray(urls) ? urls : [];
+    if (!url && safeUrls.length === 0) {
        setLoading(false);
        onError?.("Aucun contenu à afficher.");
        return;
     }
 
-    const activeUrls = urls.length > 0 ? urls : [url];
+    const activeUrls = safeUrls.length > 0 ? safeUrls : [url];
     setMultiUrls(activeUrls);
     setDisplayUrl(activeUrls[0]);
     setCurrentIdx(0);
@@ -51,7 +52,7 @@ export function GSIViewer({ id, url, urls = [], type, onLoadComplete, onError }:
     // For images and videos, we rely on the Smart Proxy to handle any JSON wrapping
     // This allows us to use pure HTML5 elements for maximum reliability.
     if (type === 'image' || type === 'video' || type === 'text') {
-       setLoading(type === 'image'); // Video has its own loading event
+       setLoading(false); // No internal loader for media to avoid "black screen" issues
        onLoadComplete?.();
     } else {
        setLoading(true);
@@ -60,7 +61,7 @@ export function GSIViewer({ id, url, urls = [], type, onLoadComplete, onError }:
        if (type === 'pdf') renderPdf(startPage);
        else if (type === 'docx') renderDocx();
     }
-  }, [url, type]);
+  }, [url, urls, type]);
 
   const renderPdf = async (pageNum = 1, currentScale = scale, targetUrl = displayUrl) => {
     try {

@@ -1108,8 +1108,7 @@ class GSIStoreClass {
 
     // For images and videos, we prioritize online playback via proxy as requested by user
     // because "offline download" for these formats on web can be problematic.
-    // HOWEVER, if the file is ALREADY downloaded (offline mode), we should try to use it.
-    if (!Capacitor.isNativePlatform() && (type === 'video' || type === 'image') && !progress?.localPath) {
+    if (!Capacitor.isNativePlatform() && (type === 'video' || type === 'image')) {
        dispatchViewer(absoluteUrls);
        return;
     }

@@ -381,16 +381,59 @@ export default function ProfessorPage() {
                                 const targetNiveau = prompt("Pour quel niveau (ex: L1) ?", "L1");
 
                                 if (targetNiveau) {
+                                   const formatTime = (t: any) => {
+                                      if (t === undefined || t === null || t === "") return null;
+                                      if (typeof t === 'number') {
+                                         const totalSeconds = Math.round(t * 86400);
+                                         const h = Math.floor(totalSeconds / 3600);
+                                         const m = Math.floor((totalSeconds % 3600) / 60);
+                                         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                                      }
+                                      let s = String(t).toLowerCase().trim();
+                                      if (s.includes('h')) s = s.replace('h', ':');
+                                      if (!s.includes(':')) {
+                                         if (s.length > 0 && s.length <= 2) s += ':00';
+                                         else if (s.length === 4 && !isNaN(Number(s))) s = s.substring(0, 2) + ':' + s.substring(2);
+                                      }
+                                      const parts = s.split(':');
+                                      const hh = parts[0].padStart(2, '0');
+                                      const mm = (parts[1] || '00').padEnd(2, '0').substring(0, 2);
+                                      return `${hh}:${mm}`;
+                                   };
+
                                    const slots = data.map((row: any) => {
                                       const normalizedRow: any = {};
                                       Object.keys(row).forEach(key => {
                                          normalizedRow[key.toLowerCase().replace(/\s/g, '')] = row[key];
                                       });
 
+                                      let start = formatTime(normalizedRow.debut || normalizedRow.start) || "08:00";
+                                      let end = formatTime(normalizedRow.fin || normalizedRow.end) || "10:00";
+
+                                      const timeRange = normalizedRow.heure || normalizedRow.time || normalizedRow.creneau;
+                                      if (timeRange) {
+                                         const parts = String(timeRange).split(/[-–—/]/);
+                                         if (parts.length === 2) {
+                                            const s = formatTime(parts[0]);
+                                            const e = formatTime(parts[1]);
+                                            if (s) start = s;
+                                            if (e) end = e;
+                                         }
+                                      }
+
+                                      let day = normalizedRow.jour || normalizedRow.day || "Lundi";
+                                      const dayLower = day.toLowerCase();
+                                      if (dayLower.includes('lun')) day = "Lundi";
+                                      else if (dayLower.includes('mar')) day = "Mardi";
+                                      else if (dayLower.includes('mer')) day = "Mercredi";
+                                      else if (dayLower.includes('jeu')) day = "Jeudi";
+                                      else if (dayLower.includes('ven')) day = "Vendredi";
+                                      else if (dayLower.includes('sam')) day = "Samedi";
+
                                       return {
-                                         day: normalizedRow.jour || normalizedRow.day || "Lundi",
-                                         startTime: normalizedRow.debut || normalizedRow.start || "08:00",
-                                         endTime: normalizedRow.fin || normalizedRow.end || "10:00",
+                                         day,
+                                         startTime: start,
+                                         endTime: end,
                                          subject: normalizedRow.matiere || normalizedRow.subject || "Cours",
                                          room: normalizedRow.salle || normalizedRow.room || "-",
                                          instructor: GSIStore.getCurrentUser()?.fullName || "-"

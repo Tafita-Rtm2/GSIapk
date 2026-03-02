@@ -758,13 +758,25 @@ function ScheduleEditor({ campuses, onSave }: { campuses: string[], onSave: (s: 
            });
 
            const formatTime = (t: any) => {
-              if (!t) return null;
+              if (t === undefined || t === null || t === "") return null;
+
+              if (typeof t === 'number') {
+                 const totalSeconds = Math.round(t * 86400);
+                 const h = Math.floor(totalSeconds / 3600);
+                 const m = Math.floor((totalSeconds % 3600) / 60);
+                 return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+              }
+
               let s = String(t).toLowerCase().trim();
               if (s.includes('h')) s = s.replace('h', ':');
-              if (!s.includes(':')) s += ':00';
-              const [h, m] = s.split(':');
-              const hh = h.padStart(2, '0');
-              const mm = (m || '00').padEnd(2, '0').substring(0, 2);
+              if (!s.includes(':')) {
+                 if (s.length > 0 && s.length <= 2) s += ':00';
+                 else if (s.length === 4 && !isNaN(Number(s))) s = s.substring(0, 2) + ':' + s.substring(2);
+              }
+
+              const parts = s.split(':');
+              const hh = parts[0].padStart(2, '0');
+              const mm = (parts[1] || '00').padEnd(2, '0').substring(0, 2);
               return `${hh}:${mm}`;
            };
 
