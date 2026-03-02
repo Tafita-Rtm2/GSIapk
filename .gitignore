@@ -15,8 +15,10 @@
 
 # next.js
 /.next/
-# /out/ is allowed for the web folder as requested by the user
-!web/out/
+/out/
+web/out/
+# apk/out/ is explicitly included for deployment
+!apk/out/
 
 # production
 /build
@@ -52,3 +54,5 @@ android/app/src/main/assets/capacitor.config.json
 
 web/node_modules/
 web/.next/
+apk/node_modules/
+apk/.next/
