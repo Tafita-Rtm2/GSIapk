@@ -161,9 +161,9 @@ export default function PerformancePage() {
               <AlertCircle size={20} />
            </div>
            <div>
-              <h4 className="text-orange-900 font-bold text-sm">Conseil GSI Insight</h4>
+              <h4 className="text-orange-900 font-bold text-sm">Conseil de votre Agent Assistant</h4>
               <p className="text-orange-700 text-xs mt-1 leading-relaxed">
-                 Votre performance en <b>{user.filiere}</b> est excellente ! Pensez à consulter les supports complémentaires en bibliothèque pour maintenir ce niveau.
+                 Votre performance en <b>{user.filiere}</b> est exemplaire ! Je vous recommande de consulter les supports complémentaires en bibliothèque pour approfondir vos connaissances.
               </p>
            </div>
         </div>

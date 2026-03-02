@@ -91,7 +91,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <BookOpen size={18} className="text-white" />
            </div>
-           <span className="font-black text-sm uppercase tracking-tighter">GSI Insight</span>
+           <span className="font-black text-sm uppercase tracking-tighter">GSI</span>
         </div>
         <nav className="flex-1 p-4 space-y-1">
            {navItems.map((item) => {
@@ -174,8 +174,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Link
             href="/chat/"
             className="fixed bottom-28 right-4 lg:right-auto lg:left-[calc(50%+10rem)] bg-accent text-white p-4 rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all z-50 shadow-accent/30"
+            title="Agent Assistant"
           >
-            <MessageCircle size={24} />
+            <Users size={24} />
           </Link>
         )}
       </div>

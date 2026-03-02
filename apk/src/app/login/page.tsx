@@ -122,8 +122,8 @@ export default function LoginPage() {
           <div className="w-20 h-20 bg-primary rounded-[30%] flex items-center justify-center text-white mb-6 shadow-xl rotate-12">
             <Sparkles size={40} />
           </div>
-          <h1 className="text-4xl font-black text-primary mb-2">GSI Insight</h1>
-          <p className="text-gray-500 font-medium text-center italic">“Where data meets your future.”</p>
+          <h1 className="text-4xl font-black text-primary mb-2">GSI</h1>
+          <p className="text-gray-500 font-medium text-center italic">“Your future starts here.”</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">

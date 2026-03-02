@@ -1,7 +1,7 @@
 {
-  "name": "GSI Insight",
+  "name": "GSI Internationale",
   "short_name": "GSI",
-  "description": "Where data meets your future.",
+  "description": "Your future starts here.",
   "start_url": "/apk/",
   "display": "standalone",
   "background_color": "#ffffff",

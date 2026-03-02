@@ -37,7 +37,7 @@ export default function ChatPage() {
       if (msgs.length === 0) {
         const welcome: ChatMessage = {
           role: "assistant",
-          content: `Bonjour ${user.fullName.split(' ')[0]} ! Je suis Insight, votre assistant académique GSI. Comment puis-je vous aider aujourd'hui ?`
+          content: `Bonjour ${user.fullName.split(' ')[0]} ! Je suis votre Agent Assistant GSI pour le campus de ${user.campus} (${user.filiere}). Je suis là pour vous accompagner personnellement dans votre réussite académique et répondre à toutes vos questions comme un véritable conseiller dévoué. Comment puis-je vous assister aujourd'hui ?`
         };
         GSIStore.setAiMessages([welcome]);
       } else {
@@ -76,7 +76,7 @@ export default function ChatPage() {
       const campus = user?.campus || "Antananarivo";
       const subject = user?.filiere || "Général";
       const promptKey = `${campus}_${subject}`;
-      const systemPrompt = config.prompts[promptKey] || config.prompts[`${campus}_Général`] || "Tu es Insight, l'assistant IA du Groupe GSI. Tu aides les étudiants avec leurs cours, exercices et vie de campus. Réponds toujours avec professionnalisme et utilise le Markdown pour structurer tes réponses (tableaux, code, titres).";
+      const systemPrompt = config.prompts[promptKey] || config.prompts[`${campus}_Général`] || "Tu es l'Agent Assistant, le conseiller IA personnel du Groupe GSI. Tu aides les étudiants avec leurs cours, exercices et vie de campus. Réponds toujours avec professionnalisme, empathie et utilise le Markdown pour structurer tes réponses (tableaux, code, titres).";
 
       // Fetch relevant academic context
       const lessons = (await GSIStore.getLessons()).filter(l => l.niveau === user?.niveau).slice(0, 3);
@@ -84,14 +84,18 @@ export default function ChatPage() {
       const grades = (await GSIStore.getGrades()).filter(g => g.studentId === user?.id);
 
       const contextText = `
-        CONTEXTE ÉTUDIANT:
+        TON IDENTITÉ ET RÔLE:
+        Tu es l'Agent Assistant Officiel du Groupe GSI.
+        Tu n'es pas une simple IA, tu es un conseiller humain et chaleureux.
+
+        CONTEXTE DE L'ÉTUDIANT À QUI TU PARLES:
         Nom: ${user?.fullName}
         Campus: ${campus}
         Filière: ${subject}
         Niveau: ${user?.niveau}
-        Moyenne: ${grades.length > 0 ? (grades.reduce((a,b)=>a+b.score,0)/grades.length).toFixed(2)+"/20" : "N/A"}
-        Dernières leçons: ${lessons.map(l => l.title).join(', ')}
-        Devoirs en attente: ${assignments.map(a => a.title + " (DL: " + a.deadline + ")").join(', ')}
+        Moyenne actuelle: ${grades.length > 0 ? (grades.reduce((a,b)=>a+b.score,0)/grades.length).toFixed(2)+"/20" : "N/A"}
+        Cours récents: ${lessons.map(l => l.title).join(', ')}
+        Devoirs à faire: ${assignments.map(a => a.title + " (DL: " + a.deadline + ")").join(', ')}
       `;
 
       const apiMessages: any[] = [
@@ -99,7 +103,7 @@ export default function ChatPage() {
       ];
 
       // Add last few messages for conversation history
-      messages.slice(-5).forEach(m => {
+      messages.slice(-10).forEach(m => {
         apiMessages.push({ role: m.role, content: m.content });
       });
 
@@ -147,8 +151,8 @@ export default function ChatPage() {
     <div className="flex flex-col h-screen max-w-md mx-auto bg-white shadow-xl overflow-hidden relative">
       {/* Header */}
       <PageHeader
-        title="Ask Insight"
-        subtitle="Assistant IA GSI"
+        title="Agent Assistant"
+        subtitle="GSI Agent Assistant"
         className="p-6 bg-primary text-white mb-0"
         rightElement={
           <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md">
@@ -216,14 +220,14 @@ export default function ChatPage() {
               ) : m.content}
             </div>
             <span className="text-[8px] text-gray-300 mt-1 px-2 uppercase font-black">
-              {m.role === 'user' ? 'Vous' : 'Insight'}
+              {m.role === 'user' ? 'Étudiant' : 'Agent Assistant GSI'}
             </span>
           </div>
         ))}
         {isTyping && (
           <div className="flex flex-col items-start animate-pulse">
             <div className="bg-white text-gray-400 p-4 rounded-[24px] rounded-tl-none border border-gray-100 text-xs font-bold italic">
-               Insight réfléchit...
+               L'agent assistant réfléchit...
             </div>
           </div>
         )}

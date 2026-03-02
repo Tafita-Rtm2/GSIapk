@@ -136,7 +136,7 @@ export default function AdminPage() {
     { id: "academic", icon: GraduationCap, label: t("gestion_academique"), color: "bg-purple-600" },
     { id: "schedule", icon: RefreshCcw, label: "Emploi du temps", color: "bg-violet-600" },
     { id: "media", icon: BookOpen, label: "Médiathèque", color: "bg-sky-600" },
-    { id: "ai_config", icon: Cpu, label: "IA Config", color: "bg-black" },
+    { id: "ai_config", icon: Users, label: "Agent Assistant", color: "bg-black" },
     { id: "stats", icon: BarChart3, label: t("stats_rapports"), color: "bg-pink-600" },
   ];
 
@@ -661,12 +661,12 @@ function AIConfigEditor({ onBack }: { onBack: () => void }) {
 
    const handleSave = async () => {
       await GSIStore.updateAIConfig(config);
-      toast.success("Configuration IA enregistrée !");
+      toast.success("Configuration de l'agent enregistrée !");
    };
 
    return (
       <div className="space-y-6">
-         <PageHeader title="Configuration IA" onBack={onBack} />
+         <PageHeader title="Agent Configuration" onBack={onBack} />
 
          <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-6">
             <div className="space-y-2">

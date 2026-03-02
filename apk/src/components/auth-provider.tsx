@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         <div className="w-16 h-16 bg-primary rounded-[30%] flex items-center justify-center text-white mb-4 animate-pulse rotate-12">
           <Sparkles size={32} />
         </div>
-        <h1 className="text-xl font-black text-primary">GSI Insight</h1>
+        <h1 className="text-xl font-black text-primary">GSI</h1>
         <p className="text-xs text-gray-400 mt-2 animate-bounce">Initialisation du Pack GSI...</p>
       </div>
     );

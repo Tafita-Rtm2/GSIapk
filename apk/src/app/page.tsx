@@ -177,7 +177,7 @@ export default function Home() {
              <div>
                <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mb-0.5">Bonjour {firstName}</p>
                <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">
-                  GSI Insight <span className="text-primary">Plus</span>
+                  GSI <span className="text-primary">Internationale</span>
                </h1>
              </div>
           </div>
@@ -274,12 +274,12 @@ export default function Home() {
            <div className="bg-gradient-to-br from-[#3F51B5] via-[#5C6BC0] to-[#7986CB] p-7 rounded-[44px] text-white shadow-2xl shadow-indigo-200 relative overflow-hidden">
               <div className="relative z-10">
                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles size={18} className="text-violet-200" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-violet-200">Ask Insight AI</span>
+                    <Users size={18} className="text-violet-200" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-violet-200">Votre Agent Assistant GSI</span>
                  </div>
-                 <h2 className="text-xl font-black mb-1 leading-tight">Des questions ?</h2>
-                 <p className="text-[11px] text-violet-200/80 font-medium mb-4">Emplois du temps, devoirs, notes...</p>
-                 <div className="inline-flex bg-white/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/10">Lancer Assistant</div>
+                 <h2 className="text-xl font-black mb-1 leading-tight">Besoin d'aide ?</h2>
+                 <p className="text-[11px] text-violet-200/80 font-medium mb-4">Votre conseiller dévoué est à votre écoute 24h/24.</p>
+                 <div className="inline-flex bg-white/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/10">Ouvrir l'assistant</div>
               </div>
               <div className="absolute right-[-20px] bottom-[-20px] w-32 h-32 bg-white/5 rounded-full blur-3xl"></div>
            </div>

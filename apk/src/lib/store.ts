@@ -174,7 +174,7 @@ class GSIStoreClass {
 
     if (this.state.lessons.length === 0) {
       this.state.lessons = [
-        { id: 'l1', title: 'Guide GSI Insight', description: 'Bienvenue.', subject: 'Général', niveau: 'L1', filiere: [], campus: [], date: new Date().toISOString(), files: [] }
+        { id: 'l1', title: 'Guide GSI Agent Assistant', description: 'Bienvenue dans votre espace personnel.', subject: 'Général', niveau: 'L1', filiere: [], campus: [], date: new Date().toISOString(), files: [] }
       ];
     }
     this.saveImmediate();
