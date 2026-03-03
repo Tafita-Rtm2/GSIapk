@@ -15,18 +15,21 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
     }
 
     const checkAlarms = () => {
-      const saved = localStorage.getItem('gsi_study_program');
-      if (saved) {
+      try {
+        const saved = localStorage.getItem('gsi_study_program');
+        if (!saved) return;
+
         let items: any[] = [];
         try {
            items = JSON.parse(saved);
            if (!Array.isArray(items)) items = [];
         } catch (e) { items = []; }
+
         const now = new Date();
         const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
         items.forEach((item: any) => {
-          if (item.time === currentTime) {
+          if (item && item.time === currentTime) {
             const alarmKey = `alarm_${item.id}_${now.toDateString()}_${currentTime}`;
             if (!window.sessionStorage.getItem(alarmKey)) {
               // 1. Toast (In-app)
@@ -54,6 +57,8 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
             }
           }
         });
+      } catch (err) {
+        console.error("Alarm check error:", err);
       }
     };
 

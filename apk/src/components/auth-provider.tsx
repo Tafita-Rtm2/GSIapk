@@ -48,7 +48,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Utilisation de slashes de fin pour éviter les redirections inutiles avec basePath et trailingSlash: true
     const publicPaths = ["/login/", "/admincreat/"];
     // On normalise le pathname pour la comparaison (Next.js peut ajouter le slash automatiquement)
-    const normalizedPath = pathname.endsWith('/') ? pathname : `${pathname}/`;
+    const safePath = pathname || "/";
+    const normalizedPath = safePath.endsWith('/') ? safePath : `${safePath}/`;
     const isPublicPath = publicPaths.includes(normalizedPath);
 
     if (user && isPublicPath) {

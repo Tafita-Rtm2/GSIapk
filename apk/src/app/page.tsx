@@ -133,17 +133,20 @@ export default function Home() {
   const { nextClass, subjects, convocations, firstName } = useMemo(() => {
     try {
       if (!user) return { firstName: "Étudiant", convocations: [], subjects: [], nextClass: null };
-      const fn = (user.fullName || "Étudiant").split(' ')[0];
-      const convs = (announcements || []).filter(a => a && a.type === 'convocation');
-      const subs = Array.from(new Set((lessons || []).filter(l => l && l.subject && typeof l.subject === 'string').map(l => l.subject)));
+
+      const fn = (user?.fullName || "Étudiant").split(' ')[0];
+      const convs = Array.isArray(announcements) ? announcements.filter(a => a && a.type === 'convocation') : [];
+
+      const safeLessons = Array.isArray(lessons) ? lessons : [];
+      const subs = Array.from(new Set(safeLessons.filter(l => l && l.subject && typeof l.subject === 'string').map(l => l.subject)));
 
       let nc = null;
-      if (schedule && schedule.slots && Array.isArray(schedule.slots) && currentDay) {
+      if (schedule && Array.isArray(schedule.slots) && currentDay) {
         nc = schedule.slots
           .filter(s => s && s.day === currentDay && typeof s.startTime === 'string' && s.startTime.includes(':'))
           .map(s => {
              try {
-                const parts = s.startTime.split(':');
+                const parts = (s.startTime || "00:00").split(':');
                 const h = parseInt(parts[0], 10);
                 const m = parseInt(parts[1], 10);
                 const totalMinutes = (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
@@ -152,7 +155,7 @@ export default function Home() {
                 return { ...s, totalMinutes: 0 };
              }
           })
-          .filter(s => s && s.totalMinutes > currentTime)
+          .filter(s => s && typeof s.totalMinutes === 'number' && s.totalMinutes > currentTime)
           .sort((a, b) => (a.totalMinutes || 0) - (b.totalMinutes || 0))[0] || null;
       }
       return { firstName: fn, convocations: convs, subjects: subs, nextClass: nc };
