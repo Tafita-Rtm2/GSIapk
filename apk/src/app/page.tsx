@@ -5,7 +5,7 @@ import { Bell, Sparkles, BookOpen, FileText, Clock, X, CheckCircle2, RefreshCcw,
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { GSIStore, User, Lesson, Assignment, Announcement, StructuredSchedule } from "@/lib/store";
 import { toast } from "sonner";
@@ -23,8 +23,10 @@ export default function Home() {
   const [syncStatus, setSyncStatus] = useState<'syncing' | 'offline' | 'ready'>('syncing');
   const [schedule, setSchedule] = useState<StructuredSchedule | null>(null);
   const [progressData, setProgressData] = useState<Record<string, any>>({});
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const initialUser = GSIStore.getCurrentUser();
     if (!initialUser) {
       router.replace("/login/");
@@ -91,11 +93,19 @@ export default function Home() {
   }, [user]);
 
   useEffect(() => {
-     const saved = localStorage.getItem('gsi_progress');
-     if (saved) setProgressData(JSON.parse(saved));
+     try {
+       const saved = localStorage.getItem('gsi_progress');
+       if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object') setProgressData(parsed);
+       }
 
-     const read = localStorage.getItem('gsi_read_notifications');
-     if (read) setReadNotifications(JSON.parse(read));
+       const read = localStorage.getItem('gsi_read_notifications');
+       if (read) {
+          const parsed = JSON.parse(read);
+          if (Array.isArray(parsed)) setReadNotifications(parsed);
+       }
+     } catch (e) {}
 
      const handleProgressUpdate = (e: any) => {
         setProgressData(e.detail);
@@ -110,11 +120,6 @@ export default function Home() {
     localStorage.setItem('gsi_read_notifications', JSON.stringify(updated));
   };
 
-  if (!user) return null;
-
-  const firstName = (user.fullName || "Étudiant").split(' ')[0];
-  const convocations = (announcements || []).filter(a => a && a.type === 'convocation');
-
   const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
   const [currentDay, setCurrentDay] = useState("");
   const [currentTime, setCurrentTime] = useState(0);
@@ -125,27 +130,39 @@ export default function Home() {
     setCurrentTime(now.getHours() * 60 + now.getMinutes());
   }, []);
 
-  const nextClass = schedule && schedule.slots && Array.isArray(schedule.slots) && currentDay
-    ? schedule.slots
-        .filter(s => s && s.day === currentDay && typeof s.startTime === 'string' && s.startTime.includes(':'))
-        .map(s => {
-           try {
-             const parts = s.startTime.split(':');
-             const h = parseInt(parts[0], 10);
-             const m = parseInt(parts[1], 10);
-             const totalMinutes = (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
-             return { ...s, totalMinutes };
-           } catch (e) {
-             return { ...s, totalMinutes: 0 };
-           }
-        })
-        .filter(s => s && s.totalMinutes > currentTime)
-        .sort((a, b) => a.totalMinutes - b.totalMinutes)[0]
-    : null;
+  const { nextClass, subjects, convocations, firstName } = useMemo(() => {
+    try {
+      if (!user) return { firstName: "Étudiant", convocations: [], subjects: [], nextClass: null };
+      const fn = (user.fullName || "Étudiant").split(' ')[0];
+      const convs = (announcements || []).filter(a => a && a.type === 'convocation');
+      const subs = Array.from(new Set((lessons || []).filter(l => l && l.subject && typeof l.subject === 'string').map(l => l.subject)));
 
-  const subjects = Array.from(new Set((lessons || []).filter(l => l && l.subject && typeof l.subject === 'string').map(l => l.subject)));
+      let nc = null;
+      if (schedule && schedule.slots && Array.isArray(schedule.slots) && currentDay) {
+        nc = schedule.slots
+          .filter(s => s && s.day === currentDay && typeof s.startTime === 'string' && s.startTime.includes(':'))
+          .map(s => {
+             try {
+                const parts = s.startTime.split(':');
+                const h = parseInt(parts[0], 10);
+                const m = parseInt(parts[1], 10);
+                const totalMinutes = (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
+                return { ...s, totalMinutes };
+             } catch (e) {
+                return { ...s, totalMinutes: 0 };
+             }
+          })
+          .filter(s => s && s.totalMinutes > currentTime)
+          .sort((a, b) => (a.totalMinutes || 0) - (b.totalMinutes || 0))[0] || null;
+      }
+      return { firstName: fn, convocations: convs, subjects: subs, nextClass: nc };
+    } catch (e) {
+      console.error("Home Data Processing Error:", e);
+      return { firstName: "Étudiant", convocations: [], subjects: [], nextClass: null };
+    }
+  }, [user, announcements, lessons, schedule, currentDay, currentTime]);
 
-  if (!currentDay) return null; // Avoid hydration mismatch
+  if (!mounted || !currentDay || !user) return null;
 
   return (
     <AppLayout>
@@ -223,9 +240,9 @@ export default function Home() {
                        <p className="text-[10px] font-bold text-gray-500 mb-2">{nextClass.startTime} — Salle {nextClass.room}</p>
                        <div className="flex items-center gap-2">
                           <div className="w-5 h-5 rounded-full bg-gray-100 overflow-hidden">
-                             <img src={`https://api.dicebear.com/7.x/initials/svg?seed=${nextClass.instructor}`} />
+                             <img src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(nextClass.instructor || "GSI")}`} />
                           </div>
-                          <span className="text-[9px] font-black text-gray-400 uppercase">{nextClass.instructor}</span>
+                          <span className="text-[9px] font-black text-gray-400 uppercase">{nextClass.instructor || "Professeur"}</span>
                        </div>
                     </>
                  ) : (
@@ -264,7 +281,7 @@ export default function Home() {
                  <div className="space-y-4">
                     {subjects.slice(0, 4).map((sub, i) => {
                        const subLessons = (lessons || []).filter(l => l && l.subject === sub);
-                       const totalPercent = subLessons.reduce((acc, l) => acc + (l && l.id && progressData[l.id]?.percent || 0), 0);
+                       const totalPercent = subLessons.reduce((acc, l) => acc + (l && l.id && progressData && typeof progressData === 'object' && progressData[l.id]?.percent || 0), 0);
                        const prog = subLessons.length > 0 ? Math.round(totalPercent / subLessons.length) : 0;
                        const colors = ["bg-indigo-500", "bg-emerald-500", "bg-orange-500", "bg-rose-500"];
                        return (
@@ -321,8 +338,13 @@ export default function Home() {
                     onClick={(e) => {
                       e.stopPropagation();
                       GSIStore.toggleLessonCompleted(l.id);
-                      const saved = localStorage.getItem('gsi_progress');
-                      if (saved) setProgressData(JSON.parse(saved));
+                      try {
+                        const saved = localStorage.getItem('gsi_progress');
+                        if (saved) {
+                          const parsed = JSON.parse(saved);
+                          if (parsed && typeof parsed === 'object') setProgressData(parsed);
+                        }
+                      } catch (err) {}
                       toast.success(isCompleted ? "Marqué comme non lu" : "Félicitations ! Cours terminé.");
                     }}
                     className={cn(
@@ -480,7 +502,7 @@ export default function Home() {
                 <div className="p-6 bg-white border-t border-gray-100">
                    <button
                      onClick={() => {
-                        const allIds = announcements.map(a => a.id);
+                        const allIds = announcements.filter(a => a && a.id).map(a => a.id);
                         setReadNotifications(allIds);
                         localStorage.setItem('gsi_read_notifications', JSON.stringify(allIds));
                         toast.success("Tout est marqué comme lu");

@@ -17,7 +17,11 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
     const checkAlarms = () => {
       const saved = localStorage.getItem('gsi_study_program');
       if (saved) {
-        const items = JSON.parse(saved);
+        let items: any[] = [];
+        try {
+           items = JSON.parse(saved);
+           if (!Array.isArray(items)) items = [];
+        } catch (e) { items = []; }
         const now = new Date();
         const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 

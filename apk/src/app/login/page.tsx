@@ -122,7 +122,7 @@ export default function LoginPage() {
           <div className="w-20 h-20 bg-primary rounded-[30%] flex items-center justify-center text-white mb-6 shadow-xl rotate-12 relative">
             <Sparkles size={40} className="relative z-10" />
             <div className="absolute inset-0 flex items-center justify-center">
-               <img src="/apk/logo.png" className="w-12 h-12 object-contain" onError={(e) => e.currentTarget.style.display='none'} />
+               <img src="/logo.png" className="w-12 h-12 object-contain" onError={(e) => e.currentTarget.style.display='none'} />
             </div>
           </div>
           <h1 className="text-4xl font-black text-primary mb-2">GSI Insight</h1>

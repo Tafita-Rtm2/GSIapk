@@ -154,10 +154,25 @@ class GSIStoreClass {
       const saved = localStorage.getItem('gsi_v8_master');
       if (saved) {
         const parsed = JSON.parse(saved);
-        this.state = { ...initialState, ...parsed };
+        if (parsed && typeof parsed === 'object') {
+          this.state = {
+            ...initialState,
+            ...parsed,
+            users: Array.isArray(parsed.users) ? parsed.users : [],
+            lessons: Array.isArray(parsed.lessons) ? parsed.lessons : [],
+            assignments: Array.isArray(parsed.assignments) ? parsed.assignments : [],
+            announcements: Array.isArray(parsed.announcements) ? parsed.announcements : [],
+            schedules: (parsed.schedules && typeof parsed.schedules === 'object') ? parsed.schedules : {}
+          };
+        }
       }
-      if (this.state.users.length === 0) this.generateMockData();
-    } catch (e) {}
+      if (!Array.isArray(this.state.users) || this.state.users.length === 0) {
+        this.state.users = [];
+        this.generateMockData();
+      }
+    } catch (e) {
+      this.state = { ...initialState };
+    }
   }
 
   private generateMockData() {
@@ -257,10 +272,14 @@ class GSIStoreClass {
   }
 
   private async cleanOfflineFiles() {
-     const progress = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
-     const downloaded = JSON.parse(localStorage.getItem('gsi_downloaded') || '{}');
+     let progress: any = {};
+     let downloaded: any = {};
+     try {
+        progress = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
+        downloaded = JSON.parse(localStorage.getItem('gsi_downloaded') || '{}');
+     } catch (e) {}
 
-     const cloudLessonIds = new Set(this.state.lessons.map(l => l.id));
+     const cloudLessonIds = new Set((this.state.lessons || []).map(l => l && l.id).filter(Boolean));
      const cloudAssignmentIds = new Set(this.state.assignments.map(a => a.id));
 
      for (const id in downloaded) {
@@ -388,22 +407,22 @@ class GSIStoreClass {
       // We overwrite with cloud data to propagate deletions.
       const isConsumable = ['lessons', 'assignments', 'announcements', 'grades'].includes(key as string);
 
-      if (Array.isArray(currentLocal)) {
-         if (isConsumable) {
-            merged = cloudData;
-         } else {
-            const cloudIds = new Set(cloudData.map((d: any) => d.id));
-            const localOnly = (currentLocal as any[]).filter(item => !cloudIds.has(item.id));
-            merged = [...cloudData, ...localOnly];
-         }
+      if (isConsumable) {
+         merged = cloudData;
+      } else if (Array.isArray(currentLocal)) {
+         const cloudIds = new Set(cloudData.map((d: any) => d.id));
+         const localOnly = (currentLocal as any[]).filter(item => item && item.id && !cloudIds.has(item.id));
+         merged = [...cloudData, ...localOnly];
       } else {
-         merged = isConsumable ? {} : { ...currentLocal };
+         merged = { ...(currentLocal || {}) };
          cloudData.forEach((d: any) => {
-            if (key === 'schedules') {
-               const schedKey = `${d.campus}_${d.niveau}`;
-               (merged as any)[schedKey] = d;
-            } else {
-               (merged as any)[d.id] = d;
+            if (d) {
+               if (key === 'schedules' && d.campus && d.niveau) {
+                  const schedKey = `${d.campus}_${d.niveau}`;
+                  (merged as any)[schedKey] = d;
+               } else if (d.id) {
+                  (merged as any)[d.id] = d;
+               }
             }
          });
       }
@@ -1204,7 +1223,10 @@ class GSIStoreClass {
   setCache(key: string, data: any) { (this.state as any)[key] = data; this.save(); }
 
   saveProgress(id: string, p: any) {
-    const all = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
+    let all: any = {};
+    try {
+       all = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
+    } catch (e) {}
     all[id] = { ...(all[id] || {}), ...p, ts: Date.now() };
     localStorage.setItem('gsi_progress', JSON.stringify(all));
     this.notify('progress', all);
@@ -1215,13 +1237,24 @@ class GSIStoreClass {
      const p = this.getProgress(id) || {};
      this.saveProgress(id, { completed: !p.completed });
   }
-  getProgress(id: string) { return JSON.parse(localStorage.getItem('gsi_progress') || '{}')[id] || null; }
+  getProgress(id: string) {
+    try {
+      return JSON.parse(localStorage.getItem('gsi_progress') || '{}')[id] || null;
+    } catch (e) { return null; }
+  }
   setDownloaded(id: string, s = true) {
-    const all = JSON.parse(localStorage.getItem('gsi_downloaded') || '{}');
+    let all: any = {};
+    try {
+      all = JSON.parse(localStorage.getItem('gsi_downloaded') || '{}');
+    } catch (e) {}
     all[id] = s;
     localStorage.setItem('gsi_downloaded', JSON.stringify(all));
   }
-  isDownloaded(id: string) { return !!JSON.parse(localStorage.getItem('gsi_downloaded') || '{}')[id]; }
+  isDownloaded(id: string) {
+    try {
+      return !!JSON.parse(localStorage.getItem('gsi_downloaded') || '{}')[id];
+    } catch (e) { return false; }
+  }
 }
 
 export const GSIStore = new GSIStoreClass();
