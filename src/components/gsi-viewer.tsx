@@ -1,9 +1,16 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, ZoomIn, ZoomOut, X } from 'lucide-react';
+import { Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, ZoomIn, ZoomOut, X, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { GSIStore } from '@/lib/store';
+import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
+import * as mammoth from 'mammoth';
+
+// Configure PDF.js worker
+if (typeof window !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+}
 
 interface GSIViewerProps {
   id: string;
@@ -23,7 +30,6 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderTaskRef = useRef<any>(null);
   const pdfDocRef = useRef<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   // Helper for cleanup
   const cleanup = async () => {
@@ -38,7 +44,19 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   };
 
   useEffect(() => {
-    return () => { cleanup(); };
+    const handleGlobalError = (event: ErrorEvent | PromiseRejectionEvent) => {
+      if (event instanceof ErrorEvent && event.message.includes('Loading chunk')) {
+        handleInternalError("Problème de connexion aux ressources. Veuillez réessayer.");
+      }
+    };
+    window.addEventListener('error', handleGlobalError);
+    window.addEventListener('unhandledrejection', handleGlobalError);
+
+    return () => {
+      cleanup();
+      window.removeEventListener('error', handleGlobalError);
+      window.removeEventListener('unhandledrejection', handleGlobalError);
+    };
   }, []);
 
   useEffect(() => {
@@ -65,7 +83,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
                 handleInternalError("Type de fichier non reconnu.");
             }
         } catch (err: any) {
-            handleInternalError(`Erreur de chargement: ${err.message || 'Inconnue'}`);
+            handleInternalError(`Erreur: ${err.message || 'Problème de chargement'}`);
         }
     };
 
@@ -83,10 +101,6 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
     if (typeof window === 'undefined') return;
 
     try {
-      // Dynamic import to avoid issues during build/init
-      const pdfjsLib = await import('pdfjs-dist/build/pdf.mjs');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-
       if (!pdfDocRef.current) {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Status ${response.status}`);
@@ -134,7 +148,6 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
 
   const renderDocx = async () => {
     try {
-      const mammoth = await import('mammoth');
       const response = await fetch(url);
       if (!response.ok) throw new Error(`Status ${response.status}`);
       const arrayBuffer = await response.arrayBuffer();
@@ -167,7 +180,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
       {loading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-20">
           <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
-          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Chargement...</p>
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest text-center px-4">Préparation du document GSI...</p>
         </div>
       )}
 
@@ -176,14 +189,30 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
           <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mb-4">
             <AlertCircle size={32} />
           </div>
-          <h3 className="text-sm font-black text-gray-900 uppercase mb-2">Oups ! Une petite erreur</h3>
-          <p className="text-xs text-gray-500 mb-6 max-w-xs">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest"
-          >
-            Actualiser
-          </button>
+          <h3 className="text-sm font-black text-gray-900 uppercase mb-2">Erreur de chargement</h3>
+          <p className="text-[10px] text-gray-500 mb-6 max-w-xs">{error}</p>
+          <div className="flex flex-col gap-2 w-full max-w-[200px]">
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full px-6 py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
+              >
+                <RefreshCcw size={14} />
+                Réessayer
+              </button>
+              <button
+                onClick={() => {
+                    const lowUrl = url.toLowerCase();
+                    if (lowUrl.endsWith('.pdf') || lowUrl.endsWith('.docx') || lowUrl.endsWith('.jpg') || lowUrl.endsWith('.png') || lowUrl.endsWith('.mp4')) {
+                        window.open(url, '_blank');
+                    } else {
+                        toast.error("Impossible d'ouvrir ce lien directement.");
+                    }
+                }}
+                className="w-full px-6 py-3 bg-gray-100 text-gray-900 rounded-xl text-[10px] font-black uppercase tracking-widest"
+              >
+                Ouvrir directement
+              </button>
+          </div>
         </div>
       )}
 
@@ -201,7 +230,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
                 <div className="bg-gray-900/90 text-white px-6 py-3 rounded-full flex items-center gap-6 backdrop-blur-md shadow-2xl">
                   <button onClick={() => changePage(-1)} disabled={pdfData.currentPage <= 1} className="disabled:opacity-20"><ChevronLeft size={20} /></button>
                   <span className="text-[10px] font-black uppercase tracking-widest">Page {pdfData.currentPage} / {pdfData.numPages}</span>
-                  <button onClick={() => changePage(1)} disabled={pdfData.currentPage >= pdfData.numPages} className="disabled:opacity-20"><ChevronRight size={20} /></button>
+                  <button onClick={() => changePage(1)} disabled={pdfData.currentPage >= pdfDocRef.current?.numPages} className="disabled:opacity-20"><ChevronRight size={20} /></button>
                 </div>
               )}
             </div>
