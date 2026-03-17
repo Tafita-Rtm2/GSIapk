@@ -58,14 +58,18 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   const renderPdf = async (pageNum = 1, currentScale = scale) => {
     try {
       const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) throw new Error(`Impossible de récupérer le fichier (Status ${response.status})`);
       const arrayBuffer = await response.arrayBuffer();
+
+      if (!arrayBuffer || arrayBuffer.byteLength < 5) {
+        throw new Error("Le fichier est vide ou corrompu.");
+      }
 
       // Basic PDF magic number check (%PDF-)
       const header = new Uint8Array(arrayBuffer.slice(0, 5));
       const headerString = String.fromCharCode(...header);
       if (!headerString.includes('%PDF-')) {
-         throw new Error("Le fichier n'est pas un document PDF valide.");
+         throw new Error("Le format du document n'est pas un PDF valide.");
       }
 
       const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
@@ -127,9 +131,12 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
       }
 
       const result = await converter({ arrayBuffer }, options);
+      if (!result || typeof result.value !== 'string') {
+        throw new Error("Échec de la conversion du document.");
+      }
       setDocxHtml(result.value);
 
-      if (result.messages.length > 0) {
+      if (result.messages && result.messages.length > 0) {
         console.warn("Mammoth messages:", result.messages);
       }
 

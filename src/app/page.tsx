@@ -275,7 +275,7 @@ export default function Home() {
               <div className="relative z-10">
                  <div className="flex items-center gap-2 mb-2">
                     <Sparkles size={18} className="text-violet-200" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-violet-200">Ask Insight AI</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-violet-200">Agent Assistant</span>
                  </div>
                  <h2 className="text-xl font-black mb-1 leading-tight">Des questions ?</h2>
                  <p className="text-[11px] text-violet-200/80 font-medium mb-4">Emplois du temps, devoirs, notes...</p>

@@ -118,7 +118,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         })}
       </nav>
 
-      {/* Floating Action Button for Ask Insight */}
+      {/* Floating Action Button for Agent Assistant */}
       {!pathname.includes('chat') && !pathname.includes('community') && (
         <Link
           href="/chat"

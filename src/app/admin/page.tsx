@@ -17,6 +17,7 @@ import {
   BookOpen,
   FileText,
   Cpu,
+  Sparkles,
   Mail,
   X,
   Wifi,
@@ -136,7 +137,7 @@ export default function AdminPage() {
     { id: "academic", icon: GraduationCap, label: t("gestion_academique"), color: "bg-purple-600" },
     { id: "schedule", icon: RefreshCcw, label: "Emploi du temps", color: "bg-violet-600" },
     { id: "media", icon: BookOpen, label: "Médiathèque", color: "bg-sky-600" },
-    { id: "ai_config", icon: Cpu, label: "IA Config", color: "bg-black" },
+    { id: "ai_config", icon: Sparkles, label: "Agent Assistant", color: "bg-black" },
     { id: "stats", icon: BarChart3, label: t("stats_rapports"), color: "bg-pink-600" },
   ];
 
@@ -661,27 +662,27 @@ function AIConfigEditor({ onBack }: { onBack: () => void }) {
 
    const handleSave = async () => {
       await GSIStore.updateAIConfig(config);
-      toast.success("Configuration IA enregistrée !");
+      toast.success("Configuration mise à jour !");
    };
 
    return (
       <div className="space-y-6">
-         <PageHeader title="Configuration IA" onBack={onBack} />
+         <PageHeader title="Agent Assistant" onBack={onBack} />
 
          <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-6">
             <div className="space-y-2">
-               <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Clé API OpenAI</label>
+               <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Clé d'accès Service</label>
                <input
                   type="password"
                   value={config.apiKey}
                   onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
-                  placeholder="sk-..."
+                  placeholder="Clé de service..."
                   className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-bold outline-none border-2 border-transparent focus:border-black transition-all"
                />
             </div>
 
             <div className="pt-4 border-t border-gray-100 space-y-4">
-               <h3 className="text-xs font-black uppercase tracking-widest text-indigo-600">Prompts Personnalisés</h3>
+               <h3 className="text-xs font-black uppercase tracking-widest text-indigo-600">Instructions de l'Assistant</h3>
 
                <div className="grid grid-cols-2 gap-2">
                   <select
@@ -702,14 +703,14 @@ function AIConfigEditor({ onBack }: { onBack: () => void }) {
                </div>
 
                <div className="space-y-2">
-                  <label className="text-[9px] font-black uppercase text-gray-400 ml-1">Instruction Système ({selectedCampus} - {selectedSubject})</label>
+                  <label className="text-[9px] font-black uppercase text-gray-400 ml-1">Comportement Personnalisé ({selectedCampus} - {selectedSubject})</label>
                   <textarea
                      value={currentPrompt}
                      onChange={(e) => {
                         const newPrompts = { ...config.prompts, [currentPromptKey]: e.target.value };
                         setConfig({ ...config, prompts: newPrompts });
                      }}
-                     placeholder="Tu es Insight, un assistant spécialisé pour le campus..."
+                     placeholder="Définissez comment l'assistant doit interagir avec les élèves..."
                      className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-medium outline-none min-h-[200px] border-2 border-transparent focus:border-indigo-500 transition-all"
                   />
                </div>
@@ -719,7 +720,7 @@ function AIConfigEditor({ onBack }: { onBack: () => void }) {
                onClick={handleSave}
                className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all"
             >
-               Sauvegarder Configuration
+               Enregistrer les modifications
             </button>
          </div>
       </div>
