@@ -151,8 +151,7 @@ class GSIStoreClass {
   private generateMockData() {
     const mockUsers: User[] = [
       { id: 'admin-id', fullName: 'Nina GSI', email: 'admin@gsi.mg', password: 'password', role: 'admin', campus: 'Antananarivo', filiere: 'Directeur', niveau: 'N/A' },
-      { id: 'prof-id', fullName: 'Professeur GSI', email: 'prof@gsi.mg', password: 'password', role: 'professor', campus: 'Antananarivo', filiere: 'Informatique', niveau: 'L1' },
-      { id: 'student-id', fullName: 'Tafita Student', email: 'student@gsi.mg', password: 'password', role: 'student', campus: 'Antananarivo', filiere: 'Informatique', niveau: 'L1' }
+      { id: 'prof-id', fullName: 'Professeur GSI', email: 'prof@gsi.mg', password: 'password', role: 'professor', campus: 'Antananarivo', filiere: 'Informatique', niveau: 'L1' }
     ];
 
     mockUsers.forEach(mu => {
@@ -163,10 +162,7 @@ class GSIStoreClass {
 
     if (this.state.lessons.length === 0) {
       this.state.lessons = [
-        { id: 'l1', title: 'Guide PDF Test', description: 'Test PDF.', subject: 'Général', niveau: 'L1', filiere: [], campus: [], date: new Date().toISOString(), files: ["https://raw.githubusercontent.com/mozilla/pdf.js/master/test/pdfs/tracemonkey.pdf"] },
-        { id: 'l2', title: 'Test Image', description: 'Test Image.', subject: 'Informatique', niveau: 'L1', filiere: [], campus: [], date: new Date().toISOString(), files: ["https://picsum.photos/800/600"] },
-        { id: 'l3', title: 'Test Video', description: 'Test Video.', subject: 'Physique', niveau: 'L1', filiere: [], campus: [], date: new Date().toISOString(), files: ["https://www.w3schools.com/html/mov_bbb.mp4"] },
-        { id: 'l4', title: 'Test DOCX', description: 'Test DOCX.', subject: 'Anglais', niveau: 'L1', filiere: [], campus: [], date: new Date().toISOString(), files: ["https://raw.githubusercontent.com/evidenceprime/mammoth.js/master/test/test-data/single-paragraph.docx"] }
+        { id: 'l1', title: 'Guide GSI Insight', description: 'Bienvenue.', subject: 'Général', niveau: 'L1', filiere: [], campus: [], date: new Date().toISOString(), files: [] }
       ];
     }
     this.saveImmediate();

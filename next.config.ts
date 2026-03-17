@@ -3,7 +3,7 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   /* config options here */
   output: 'export', // AJOUTÉ : Indispensable pour l'APK
-  transpilePackages: ['@genkit-ai/next', 'pdfjs-dist', 'mammoth'],
+  transpilePackages: ['@genkit-ai/next'],
   typescript: {
     ignoreBuildErrors: false,
   },

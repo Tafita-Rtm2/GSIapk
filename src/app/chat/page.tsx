@@ -18,7 +18,9 @@ interface ChatMessage {
 
 export default function ChatPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: "assistant", content: "Bonjour ! Je suis Insight, votre assistant académique GSI. Comment puis-je vous aider aujourd'hui ?" },
+  ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
@@ -28,31 +30,11 @@ export default function ChatPage() {
     const currentUser = GSIStore.getCurrentUser();
     if (currentUser) {
       setUser(currentUser);
-
-      // Load history from local storage
-      const saved = localStorage.getItem(`gsi_chat_history_${currentUser.id}`);
-      if (saved) {
-        try {
-          setMessages(JSON.parse(saved));
-        } catch (e) {
-          console.error("Failed to load chat history", e);
-        }
-      } else {
-        setMessages([
-          {
-            role: "assistant",
-            content: `Bonjour ${currentUser.fullName.split(' ')[0]} ! Je suis votre Agent Assistant GSI pour le campus de ${currentUser.campus} (${currentUser.filiere}). Je suis là pour vous accompagner personnellement dans votre réussite académique et répondre à toutes vos questions comme un véritable conseiller dévoué. Comment puis-je vous assister aujourd'hui ?`
-          },
-        ]);
-      }
+      setMessages([
+        { role: "assistant", content: `Bonjour ${currentUser.fullName.split(' ')[0]} ! Je suis Insight, votre assistant académique GSI. Comment puis-je vous aider aujourd'hui ?` },
+      ]);
     }
   }, []);
-
-  useEffect(() => {
-    if (user && messages.length > 0) {
-      localStorage.setItem(`gsi_chat_history_${user.id}`, JSON.stringify(messages));
-    }
-  }, [messages, user]);
 
   const handleSend = async () => {
     if ((!input.trim() && !attachedImage) || isTyping) return;
@@ -83,7 +65,7 @@ export default function ChatPage() {
       const campus = user?.campus || "Antananarivo";
       const subject = user?.filiere || "Général";
       const promptKey = `${campus}_${subject}`;
-      const systemPrompt = config.prompts[promptKey] || config.prompts[`${campus}_Général`] || `Tu es l'Agent Assistant GSI, un conseiller dévoué pour les étudiants du campus de ${campus}. Ton rôle est d'accompagner personnellement chaque étudiant dans sa réussite académique. Réponds avec chaleur, professionnalisme et expertise. Utilise le Markdown pour structurer tes réponses (tableaux, code, titres). Ne mentionne jamais que tu es une intelligence artificielle ou un modèle de langage, agis comme un conseiller humain.`;
+      const systemPrompt = config.prompts[promptKey] || config.prompts[`${campus}_Général`] || "Tu es Insight, l'assistant IA du Groupe GSI. Tu aides les étudiants avec leurs cours, exercices et vie de campus. Réponds toujours avec professionnalisme et utilise le Markdown pour structurer tes réponses (tableaux, code, titres).";
 
       // Fetch relevant academic context
       const lessons = (await GSIStore.getLessons()).filter(l => l.niveau === user?.niveau).slice(0, 3);
@@ -132,8 +114,8 @@ export default function ChatPage() {
       setMessages([...newMessages, { role: "assistant", content: responseText }]);
 
     } catch (err: any) {
-      console.error("Assistant Error:", err);
-      setMessages([...newMessages, { role: "assistant", content: "Je rencontre une petite difficulté technique pour vous répondre. Pourriez-vous réessayer dans un instant ? Je reste à votre entière disposition." }]);
+      toast.error(err.message);
+      setMessages([...newMessages, { role: "assistant", content: "Désolée, j'ai une difficulté technique (OpenAI). Vérifiez la clé API ou votre connexion." }]);
     } finally {
       setIsTyping(false);
     }
@@ -154,8 +136,8 @@ export default function ChatPage() {
     <div className="flex flex-col h-screen max-w-md mx-auto bg-white shadow-xl overflow-hidden relative">
       {/* Header */}
       <PageHeader
-        title="Agent Assistant"
-        subtitle="Conseiller Académique"
+        title="Ask Insight"
+        subtitle="Assistant IA GSI"
         className="p-6 bg-primary text-white mb-0"
         rightElement={
           <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md">
@@ -223,14 +205,14 @@ export default function ChatPage() {
               ) : m.content}
             </div>
             <span className="text-[8px] text-gray-300 mt-1 px-2 uppercase font-black">
-              {m.role === 'user' ? 'Vous' : 'Agent Assistant'}
+              {m.role === 'user' ? 'Vous' : 'Insight'}
             </span>
           </div>
         ))}
         {isTyping && (
           <div className="flex flex-col items-start animate-pulse">
             <div className="bg-white text-gray-400 p-4 rounded-[24px] rounded-tl-none border border-gray-100 text-xs font-bold italic">
-               Votre conseiller prépare sa réponse...
+               Insight réfléchit...
             </div>
           </div>
         )}
