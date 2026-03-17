@@ -15,7 +15,8 @@
 
 # next.js
 /.next/
-/out/
+# /out/ is explicitly included for deployment as requested by user
+# /out/
 web/out/
 # apk/out/ is explicitly included for deployment
 !apk/out/
