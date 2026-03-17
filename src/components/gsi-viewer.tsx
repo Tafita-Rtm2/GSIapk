@@ -1,14 +1,13 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
 import * as mammoth from 'mammoth';
 import { Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, ZoomIn, ZoomOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { GSIStore } from '@/lib/store';
 
 // Configure PDF.js worker
-// Use a check to ensure we are in a browser environment
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
@@ -28,6 +27,8 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   const [docxHtml, setDocxHtml] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const renderTaskRef = useRef<any>(null);
+  const pdfDocRef = useRef<any>(null);
 
   useEffect(() => {
     if (!url) {
@@ -56,24 +57,36 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   }, [url, type]);
 
   const renderPdf = async (pageNum = 1, currentScale = scale) => {
+    if (typeof window === 'undefined') return;
+
+    // Cancel existing render task
+    if (renderTaskRef.current) {
+      try {
+        await renderTaskRef.current.cancel();
+      } catch (e) {}
+    }
+
     try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`Impossible de récupérer le fichier (Status ${response.status})`);
-      const arrayBuffer = await response.arrayBuffer();
+      if (!pdfDocRef.current) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Impossible de récupérer le fichier (Status ${response.status})`);
+        const arrayBuffer = await response.arrayBuffer();
 
-      if (!arrayBuffer || arrayBuffer.byteLength < 5) {
-        throw new Error("Le fichier est vide ou corrompu.");
+        if (!arrayBuffer || arrayBuffer.byteLength < 5) {
+          throw new Error("Le fichier est vide ou corrompu.");
+        }
+
+        const header = new Uint8Array(arrayBuffer.slice(0, 5));
+        const headerString = String.fromCharCode(...header);
+        if (!headerString.includes('%PDF-')) {
+           throw new Error("Le format du document n'est pas un PDF valide.");
+        }
+
+        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+        pdfDocRef.current = await loadingTask.promise;
       }
 
-      // Basic PDF magic number check (%PDF-)
-      const header = new Uint8Array(arrayBuffer.slice(0, 5));
-      const headerString = String.fromCharCode(...header);
-      if (!headerString.includes('%PDF-')) {
-         throw new Error("Le format du document n'est pas un PDF valide.");
-      }
-
-      const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-      const pdf = await loadingTask.promise;
+      const pdf = pdfDocRef.current;
       setPdfData({ numPages: pdf.numPages, currentPage: pageNum });
 
       const page = await pdf.getPage(pageNum);
@@ -82,7 +95,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
       const canvas = canvasRef.current;
       if (!canvas) return;
 
-      const context = canvas.getContext('2d');
+      const context = canvas.getContext('2d', { alpha: false });
       if (!context) return;
 
       canvas.height = viewport.height;
@@ -93,10 +106,16 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
         viewport: viewport
       };
 
-      await page.render(renderContext).promise;
+      const renderTask = page.render(renderContext);
+      renderTaskRef.current = renderTask;
+
+      await renderTask.promise;
+      renderTaskRef.current = null;
+
       setLoading(false);
       onLoadComplete?.();
     } catch (err: any) {
+      if (err.name === 'RenderingCancelledException') return;
       console.error("PDF Render Error:", err);
       setLoading(false);
       onError?.(`Erreur de rendu PDF: ${err.message || 'Fichier invalide'}`);
@@ -134,7 +153,10 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
       if (!result || typeof result.value !== 'string') {
         throw new Error("Échec de la conversion du document.");
       }
-      setDocxHtml(result.value);
+
+      // Sanitization/Safety check for HTML content
+      const safeHtml = result.value || "<p>Le document est vide.</p>";
+      setDocxHtml(safeHtml);
 
       if (result.messages && result.messages.length > 0) {
         console.warn("Mammoth messages:", result.messages);
