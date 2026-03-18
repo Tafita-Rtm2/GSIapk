@@ -7,33 +7,6 @@ import { GSIStore } from '@/lib/store';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as mammoth from 'mammoth';
 
-// --- CRITICAL ENVIRONMENT FIXES ---
-if (typeof window !== 'undefined') {
-  // 1. Polyfill structuredClone
-  if (typeof window.structuredClone !== 'function') {
-    (window as any).structuredClone = (obj: any) => {
-      try { return JSON.parse(JSON.stringify(obj)); } catch (e) { return obj; }
-    };
-  }
-
-  // 2. Fix Array.prototype pollution (common in older WebViews/Capacitor plugins)
-  // PDF.js strictly checks that Array properties are non-enumerable
-  try {
-    const pollutedProps = ['at'];
-    pollutedProps.forEach(prop => {
-      if (Object.prototype.hasOwnProperty.call(Array.prototype, prop)) {
-        const descriptor = Object.getOwnPropertyDescriptor(Array.prototype, prop);
-        if (descriptor && descriptor.enumerable) {
-          Object.defineProperty(Array.prototype, prop, { ...descriptor, enumerable: false });
-          console.log(`GSI Sanitizer: fixed enumerable Array.prototype.${prop}`);
-        }
-      }
-    });
-  } catch (e) {
-    console.warn("GSI Sanitizer: failed to patch Array.prototype", e);
-  }
-}
-
 // Configure PDF.js worker
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
@@ -58,7 +31,6 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   const renderTaskRef = useRef<any>(null);
   const pdfDocRef = useRef<any>(null);
 
-  // Helper for cleanup
   const cleanup = async () => {
     if (renderTaskRef.current) {
       try { await renderTaskRef.current.cancel(); } catch (e) {}
@@ -79,7 +51,6 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
     };
     window.addEventListener('error', handleGlobalError);
     window.addEventListener('unhandledrejection', handleGlobalError);
-
     return () => {
       cleanup();
       window.removeEventListener('error', handleGlobalError);
@@ -134,11 +105,11 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
         if (!response.ok) throw new Error(`Status ${response.status}`);
         const arrayBuffer = await response.arrayBuffer();
 
-        if (arrayBuffer.byteLength < 10) throw new Error("Document vide ou corrompu");
+        if (arrayBuffer.byteLength < 10) throw new Error("Le fichier est vide (0 octets).");
 
         const loadingTask = pdfjsLib.getDocument({
           data: new Uint8Array(arrayBuffer),
-          disableFontFace: true, // Compatibility for older systems
+          disableFontFace: true,
           verbosity: 0
         });
         pdfDocRef.current = await loadingTask.promise;
@@ -183,6 +154,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
       const response = await fetch(url);
       if (!response.ok) throw new Error(`Status ${response.status}`);
       const arrayBuffer = await response.arrayBuffer();
+      if (arrayBuffer.byteLength < 10) throw new Error("Fichier corrompu.");
 
       const result = await mammoth.convertToHtml({ arrayBuffer });
       setDocxHtml(result.value || "<p>Document vide.</p>");

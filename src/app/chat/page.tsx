@@ -30,12 +30,12 @@ export default function ChatPage() {
       setUser(currentUser);
 
       // Load history from local storage
-      const saved = localStorage.getItem(`gsi_assistant_history_${currentUser.id}`);
+      const saved = localStorage.getItem(`gsi_assistant_memory_${currentUser.id}`);
       if (saved) {
         try {
           setMessages(JSON.parse(saved));
         } catch (e) {
-          console.error("Failed to load chat history", e);
+          console.error("Failed to load Agent history", e);
         }
       } else {
         setMessages([
@@ -50,7 +50,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (user && messages.length > 0) {
-      localStorage.setItem(`gsi_assistant_history_${user.id}`, JSON.stringify(messages));
+      localStorage.setItem(`gsi_assistant_memory_${user.id}`, JSON.stringify(messages));
     }
   }, [messages, user]);
 
@@ -74,7 +74,7 @@ export default function ChatPage() {
     try {
       const config = GSIStore.getAIConfig();
       if (!config.apiKey) {
-         throw new Error("Configuration IA manquante. Contactez un administrateur.");
+         throw new Error("Configuration indisponible.");
       }
 
       const openai = new OpenAI({ apiKey: config.apiKey, dangerouslyAllowBrowser: true });
@@ -83,7 +83,7 @@ export default function ChatPage() {
       const campus = user?.campus || "Antananarivo";
       const subject = user?.filiere || "Général";
       const promptKey = `${campus}_${subject}`;
-      const systemPrompt = config.prompts[promptKey] || config.prompts[`${campus}_Général`] || `Tu es l'Agent Assistant GSI, un conseiller dévoué pour les étudiants du campus de ${campus}. Ton rôle est d'accompagner personnellement chaque étudiant dans sa réussite académique. Réponds avec chaleur, professionnalisme et expertise. Utilise le Markdown pour structurer tes réponses (tableaux, code, titres). Ne mentionne jamais que tu es une intelligence artificielle ou un modèle de langage, agis comme un conseiller humain.`;
+      const systemPrompt = config.prompts[promptKey] || config.prompts[`${campus}_Général`] || `Tu es l'Agent Assistant GSI, un conseiller dévoué pour les étudiants du campus de ${campus}. Ton rôle est d'accompagner personnellement chaque étudiant dans sa réussite académique. Réponds avec chaleur, professionnalisme et expertise. Utilise le Markdown pour structurer tes réponses. Ne mentionne jamais que tu es une intelligence artificielle ou un modèle de langage, agis comme un conseiller humain. Si on te demande qui tu es, réponds simplement que tu es un conseiller GSI.`;
 
       // Fetch relevant academic context
       const lessons = (await GSIStore.getLessons()).filter(l => l.niveau === user?.niveau).slice(0, 3);
@@ -106,7 +106,7 @@ export default function ChatPage() {
       ];
 
       // Add last few messages for conversation history
-      messages.slice(-5).forEach(m => {
+      messages.slice(-6).forEach(m => {
         apiMessages.push({ role: m.role, content: m.content });
       });
 
@@ -115,7 +115,7 @@ export default function ChatPage() {
         apiMessages.push({
           role: "user",
           content: [
-            { type: "text", text: userMessage || "Analyse cette image pour m'aider dans mes études." },
+            { type: "text", text: userMessage || "Veuillez analyser ce document." },
             { type: "image_url", image_url: { url: currentImage } }
           ]
         });
@@ -128,12 +128,12 @@ export default function ChatPage() {
         messages: apiMessages,
       });
 
-      const responseText = completion.choices[0].message.content || "Je n'ai pas pu générer de réponse.";
+      const responseText = completion.choices[0].message.content || "Je n'ai pas pu formuler de réponse pour le moment.";
       setMessages([...newMessages, { role: "assistant", content: responseText }]);
 
     } catch (err: any) {
-      console.error("Assistant Error:", err);
-      setMessages([...newMessages, { role: "assistant", content: "Je rencontre une petite difficulté technique pour vous répondre. Pourriez-vous réessayer dans un instant ? Je reste à votre entière disposition." }]);
+      console.error("Agent Error:", err);
+      setMessages([...newMessages, { role: "assistant", content: "Je suis navré, mais je rencontre une petite difficulté pour vous répondre immédiatement. Mes collègues conseillers et moi-même faisons le maximum pour rester disponibles. Pourriez-vous me relancer dans quelques instants ?" }]);
     } finally {
       setIsTyping(false);
     }
@@ -152,10 +152,9 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen max-w-md mx-auto bg-white shadow-xl overflow-hidden relative">
-      {/* Header */}
       <PageHeader
         title="Agent Assistant"
-        subtitle="Conseiller Académique"
+        subtitle="Conseiller GSI Personnel"
         className="p-6 bg-primary text-white mb-0"
         rightElement={
           <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md">
@@ -164,7 +163,6 @@ export default function ChatPage() {
         }
       />
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/50">
         {messages.map((m, i) => (
           <div key={i} className={cn(
@@ -173,7 +171,7 @@ export default function ChatPage() {
           )}>
             {m.image && (
               <div className="mb-2 max-w-[70%] rounded-2xl overflow-hidden shadow-md border-4 border-white">
-                <img src={m.image} alt="User upload" className="w-full h-auto" />
+                <img src={m.image} alt="Upload" className="w-full h-auto" />
               </div>
             )}
             <div className={cn(
@@ -187,7 +185,6 @@ export default function ChatPage() {
                     <ReactMarkdown
                        components={{
                           code({ node, className, children, ...props }) {
-                             const match = /language-(\w+)/.exec(className || '');
                              const codeContent = String(children).replace(/\n$/, '');
                              return (
                                 <div className="relative my-4 group/code">
@@ -197,7 +194,7 @@ export default function ChatPage() {
                                    <button
                                       onClick={() => {
                                          navigator.clipboard.writeText(codeContent);
-                                         toast.success("Code copié !");
+                                         toast.success("Copié !");
                                       }}
                                       className="absolute top-2 right-2 p-2 bg-white/10 hover:bg-white/20 rounded-lg text-white opacity-0 group-hover/code:opacity-100 transition-opacity"
                                    >
@@ -236,14 +233,13 @@ export default function ChatPage() {
         )}
       </div>
 
-      {/* Input */}
       <div className="p-4 bg-white border-t border-gray-100 space-y-3">
         {attachedImage && (
            <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-2xl animate-in zoom-in">
               <div className="w-12 h-12 rounded-xl overflow-hidden border border-gray-200">
                  <img src={attachedImage} className="w-full h-full object-cover" />
               </div>
-              <p className="text-[10px] font-bold text-gray-400 flex-1">Image prête pour analyse</p>
+              <p className="text-[10px] font-bold text-gray-400 flex-1">Fichier prêt</p>
               <button onClick={() => setAttachedImage(null)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-full">
                  <X size={16} />
               </button>
