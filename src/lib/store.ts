@@ -947,8 +947,10 @@ class GSIStoreClass {
       const path = `gsi_packs/${lessonId}_${safeFileName}`;
 
       try {
-        await Filesystem.stat({ path, directory: Directory.Data });
-        return path;
+        const stats = await Filesystem.stat({ path, directory: Directory.Data });
+        if (stats.size > 0) return path;
+        // If size is 0, delete it and re-download
+        await Filesystem.deleteFile({ path, directory: Directory.Data });
       } catch (e) {}
 
       if (typeof window === 'undefined' || !window.navigator.onLine) {
@@ -986,6 +988,10 @@ class GSIStoreClass {
           };
           reader.readAsDataURL(blob);
         });
+      }
+
+      if (!base64Data || base64Data.length < 5) {
+         throw new Error("Le fichier récupéré est vide ou invalide.");
       }
 
       await Filesystem.writeFile({
@@ -1059,6 +1065,10 @@ class GSIStoreClass {
           // FOR DOCUMENTS: Use Blob (better for Render Engines like PDF.js/Mammoth)
           const file = await Filesystem.readFile({ path, directory: Directory.Data });
           const dataStr = typeof file.data === 'string' ? file.data : '';
+
+          if (!dataStr || dataStr.length < 5) {
+             throw new Error("Fichier local corrompu ou vide.");
+          }
 
           let actualMime = progress.mimeType || mime;
           if (!actualMime) {

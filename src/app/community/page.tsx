@@ -27,8 +27,13 @@ export default function CommunityPage() {
       const sorted = [...ms].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
       setMessages(sorted);
       setTimeout(() => {
-        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-      }, 100);
+        if (scrollRef.current) {
+          scrollRef.current.scrollTo({
+            top: scrollRef.current.scrollHeight,
+            behavior: 'smooth'
+          });
+        }
+      }, 200);
     });
 
     const unsubUsers = GSIStore.subscribeUsers((us) => setUsers(us));

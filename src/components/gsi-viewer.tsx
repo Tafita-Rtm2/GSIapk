@@ -7,21 +7,14 @@ import { GSIStore } from '@/lib/store';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as mammoth from 'mammoth';
 
-// --- ROBUST ENVIRONMENT SANITIZER ---
+// --- CRITICAL ENVIRONMENT SANITIZER ---
 if (typeof window !== 'undefined') {
-  // Hard-patch structuredClone with a recursion-safe version
   if (typeof window.structuredClone !== 'function') {
-    (window as any).structuredClone = function(obj: any) {
-      if (obj === undefined) return undefined;
-      try {
-        return JSON.parse(JSON.stringify(obj));
-      } catch (e) {
-        return Object.assign({}, obj); // Surface copy as last resort
-      }
+    (window as any).structuredClone = (obj: any) => {
+      try { return JSON.parse(JSON.stringify(obj)); } catch (e) { return obj; }
     };
   }
 
-  // Fix enumerable Array properties that crash PDF.js
   try {
     const polluted = ['at', 'findLast', 'findLastIndex'];
     polluted.forEach(prop => {
@@ -54,6 +47,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   const [pdfData, setPdfData] = useState<{ numPages: number; currentPage: number } | null>(null);
   const [scale, setScale] = useState(1.5);
   const [docxHtml, setDocxHtml] = useState<string | null>(null);
+  const [renderMode, setRenderMode] = useState<'canvas' | 'iframe'>('canvas');
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderTaskRef = useRef<any>(null);
@@ -74,7 +68,8 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
     const handleGlobalError = (event: ErrorEvent | PromiseRejectionEvent) => {
       const msg = event instanceof ErrorEvent ? event.message : (event as any).reason?.message;
       if (msg && (msg.includes('Loading chunk') || msg.includes('structuredClone') || msg.includes('enumerable'))) {
-        handleInternalError("Optimisation de lecture requise. Veuillez actualiser.");
+        handleInternalError("Optimisation de lecture requise.");
+        setRenderMode('iframe'); // Fallback to iframe browser-like view
       }
     };
     window.addEventListener('error', handleGlobalError);
@@ -100,7 +95,11 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
 
         try {
             if (type === 'pdf') {
-                await renderPdf();
+                if (renderMode === 'canvas') {
+                  await renderPdf();
+                } else {
+                  setLoading(false);
+                }
             } else if (type === 'docx') {
                 await renderDocx();
             } else if (type === 'video' || type === 'image' || type === 'text') {
@@ -110,12 +109,17 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
                 handleInternalError("Ce type de fichier n'est pas encore pris en charge.");
             }
         } catch (err: any) {
-            handleInternalError(`Détail technique: ${err.message || 'Problème de lecture'}`);
+            console.warn("Primary render failed, trying fallback mode...", err);
+            if (type === 'pdf' && renderMode === 'canvas') {
+               setRenderMode('iframe');
+            } else {
+               handleInternalError(`Détail technique: ${err.message || 'Problème de lecture'}`);
+            }
         }
     };
 
     loadContent();
-  }, [url, type]);
+  }, [url, type, renderMode]);
 
   const handleInternalError = (msg: string) => {
     console.error("GSIViewer Error:", msg);
@@ -133,7 +137,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
         if (!response.ok) throw new Error(`Status ${response.status}`);
         const arrayBuffer = await response.arrayBuffer();
 
-        if (arrayBuffer.byteLength < 10) throw new Error("Document vide ou corrompu.");
+        if (arrayBuffer.byteLength < 10) throw new Error("Le fichier est vide.");
 
         const loadingTask = pdfjsLib.getDocument({
           data: new Uint8Array(arrayBuffer),
@@ -204,7 +208,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   const handleZoom = (delta: number) => {
      const newScale = Math.min(Math.max(scale + delta, 0.5), 4);
      setScale(newScale);
-     if (type === 'pdf') renderPdf(pdfData?.currentPage || 1, newScale);
+     if (type === 'pdf' && renderMode === 'canvas') renderPdf(pdfData?.currentPage || 1, newScale);
   };
 
   return (
@@ -236,7 +240,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
       )}
 
       <div className="flex-1 overflow-auto flex flex-col items-center p-4">
-        {type === 'pdf' && !error && (
+        {type === 'pdf' && !error && renderMode === 'canvas' && (
           <div className="flex flex-col items-center">
             <canvas ref={canvasRef} className="shadow-2xl rounded-sm bg-white" />
             <div className="fixed bottom-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-30">
@@ -254,6 +258,17 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
               )}
             </div>
           </div>
+        )}
+
+        {type === 'pdf' && !error && renderMode === 'iframe' && (
+           <div className="w-full h-full bg-white rounded-xl overflow-hidden shadow-inner">
+              <iframe
+                src={url}
+                className="w-full h-full border-none"
+                onLoad={() => { setLoading(false); onLoadComplete?.(); }}
+                title="Lecteur Haute Compatibilité"
+              />
+           </div>
         )}
 
         {type === 'docx' && docxHtml && !error && (
