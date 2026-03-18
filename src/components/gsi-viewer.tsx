@@ -7,6 +7,34 @@ import { GSIStore } from '@/lib/store';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as mammoth from 'mammoth';
 
+// --- ROBUST ENVIRONMENT SANITIZER ---
+if (typeof window !== 'undefined') {
+  // Hard-patch structuredClone with a recursion-safe version
+  if (typeof window.structuredClone !== 'function') {
+    (window as any).structuredClone = function(obj: any) {
+      if (obj === undefined) return undefined;
+      try {
+        return JSON.parse(JSON.stringify(obj));
+      } catch (e) {
+        return Object.assign({}, obj); // Surface copy as last resort
+      }
+    };
+  }
+
+  // Fix enumerable Array properties that crash PDF.js
+  try {
+    const polluted = ['at', 'findLast', 'findLastIndex'];
+    polluted.forEach(prop => {
+      if (Array.prototype.hasOwnProperty(prop)) {
+        const desc = Object.getOwnPropertyDescriptor(Array.prototype, prop);
+        if (desc && desc.enumerable) {
+          Object.defineProperty(Array.prototype, prop, { ...desc, enumerable: false });
+        }
+      }
+    });
+  } catch (e) {}
+}
+
 // Configure PDF.js worker
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
@@ -45,8 +73,8 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   useEffect(() => {
     const handleGlobalError = (event: ErrorEvent | PromiseRejectionEvent) => {
       const msg = event instanceof ErrorEvent ? event.message : (event as any).reason?.message;
-      if (msg && (msg.includes('Loading chunk') || msg.includes('structuredClone') || msg.includes('withResolvers') || msg.includes('enumerable'))) {
-        handleInternalError("Une mise à jour du système est requise ou la connexion est instable. Veuillez réessayer.");
+      if (msg && (msg.includes('Loading chunk') || msg.includes('structuredClone') || msg.includes('enumerable'))) {
+        handleInternalError("Optimisation de lecture requise. Veuillez actualiser.");
       }
     };
     window.addEventListener('error', handleGlobalError);
@@ -105,7 +133,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
         if (!response.ok) throw new Error(`Status ${response.status}`);
         const arrayBuffer = await response.arrayBuffer();
 
-        if (arrayBuffer.byteLength < 10) throw new Error("Le fichier est vide (0 octets).");
+        if (arrayBuffer.byteLength < 10) throw new Error("Document vide ou corrompu.");
 
         const loadingTask = pdfjsLib.getDocument({
           data: new Uint8Array(arrayBuffer),
