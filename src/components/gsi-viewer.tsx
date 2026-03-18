@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, ZoomIn, ZoomOut, X, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { GSIStore } from '@/lib/store';
-import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as mammoth from 'mammoth';
 
 // Configure PDF.js worker
@@ -198,19 +198,6 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
               >
                 <RefreshCcw size={14} />
                 Réessayer
-              </button>
-              <button
-                onClick={() => {
-                    const lowUrl = url.toLowerCase();
-                    if (lowUrl.endsWith('.pdf') || lowUrl.endsWith('.docx') || lowUrl.endsWith('.jpg') || lowUrl.endsWith('.png') || lowUrl.endsWith('.mp4')) {
-                        window.open(url, '_blank');
-                    } else {
-                        toast.error("Impossible d'ouvrir ce lien directement.");
-                    }
-                }}
-                className="w-full px-6 py-3 bg-gray-100 text-gray-900 rounded-xl text-[10px] font-black uppercase tracking-widest"
-              >
-                Ouvrir directement
               </button>
           </div>
         </div>
