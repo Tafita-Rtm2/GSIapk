@@ -7,15 +7,31 @@ import { GSIStore } from '@/lib/store';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as mammoth from 'mammoth';
 
-// Polyfill structuredClone for older environments (Capacitor/WebView)
-if (typeof window !== 'undefined' && typeof window.structuredClone !== 'function') {
-  (window as any).structuredClone = (obj: any) => {
-    try {
-      return JSON.parse(JSON.stringify(obj));
-    } catch (e) {
-      return obj; // Fallback for non-serializable
-    }
-  };
+// --- CRITICAL ENVIRONMENT FIXES ---
+if (typeof window !== 'undefined') {
+  // 1. Polyfill structuredClone
+  if (typeof window.structuredClone !== 'function') {
+    (window as any).structuredClone = (obj: any) => {
+      try { return JSON.parse(JSON.stringify(obj)); } catch (e) { return obj; }
+    };
+  }
+
+  // 2. Fix Array.prototype pollution (common in older WebViews/Capacitor plugins)
+  // PDF.js strictly checks that Array properties are non-enumerable
+  try {
+    const pollutedProps = ['at'];
+    pollutedProps.forEach(prop => {
+      if (Object.prototype.hasOwnProperty.call(Array.prototype, prop)) {
+        const descriptor = Object.getOwnPropertyDescriptor(Array.prototype, prop);
+        if (descriptor && descriptor.enumerable) {
+          Object.defineProperty(Array.prototype, prop, { ...descriptor, enumerable: false });
+          console.log(`GSI Sanitizer: fixed enumerable Array.prototype.${prop}`);
+        }
+      }
+    });
+  } catch (e) {
+    console.warn("GSI Sanitizer: failed to patch Array.prototype", e);
+  }
 }
 
 // Configure PDF.js worker
@@ -57,7 +73,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   useEffect(() => {
     const handleGlobalError = (event: ErrorEvent | PromiseRejectionEvent) => {
       const msg = event instanceof ErrorEvent ? event.message : (event as any).reason?.message;
-      if (msg && (msg.includes('Loading chunk') || msg.includes('structuredClone') || msg.includes('withResolvers'))) {
+      if (msg && (msg.includes('Loading chunk') || msg.includes('structuredClone') || msg.includes('withResolvers') || msg.includes('enumerable'))) {
         handleInternalError("Une mise à jour du système est requise ou la connexion est instable. Veuillez réessayer.");
       }
     };
@@ -120,7 +136,11 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
 
         if (arrayBuffer.byteLength < 10) throw new Error("Document vide ou corrompu");
 
-        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+        const loadingTask = pdfjsLib.getDocument({
+          data: new Uint8Array(arrayBuffer),
+          disableFontFace: true, // Compatibility for older systems
+          verbosity: 0
+        });
         pdfDocRef.current = await loadingTask.promise;
       }
 
