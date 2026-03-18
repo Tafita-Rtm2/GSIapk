@@ -7,6 +7,17 @@ import { GSIStore } from '@/lib/store';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as mammoth from 'mammoth';
 
+// Polyfill structuredClone for older environments (Capacitor/WebView)
+if (typeof window !== 'undefined' && typeof window.structuredClone !== 'function') {
+  (window as any).structuredClone = (obj: any) => {
+    try {
+      return JSON.parse(JSON.stringify(obj));
+    } catch (e) {
+      return obj; // Fallback for non-serializable
+    }
+  };
+}
+
 // Configure PDF.js worker
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
@@ -45,8 +56,9 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
 
   useEffect(() => {
     const handleGlobalError = (event: ErrorEvent | PromiseRejectionEvent) => {
-      if (event instanceof ErrorEvent && event.message.includes('Loading chunk')) {
-        handleInternalError("Problème de connexion aux ressources. Veuillez réessayer.");
+      const msg = event instanceof ErrorEvent ? event.message : (event as any).reason?.message;
+      if (msg && (msg.includes('Loading chunk') || msg.includes('structuredClone') || msg.includes('withResolvers'))) {
+        handleInternalError("Une mise à jour du système est requise ou la connexion est instable. Veuillez réessayer.");
       }
     };
     window.addEventListener('error', handleGlobalError);
@@ -80,10 +92,10 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
                 setLoading(false);
                 onLoadComplete?.();
             } else {
-                handleInternalError("Type de fichier non reconnu.");
+                handleInternalError("Ce type de fichier n'est pas encore pris en charge.");
             }
         } catch (err: any) {
-            handleInternalError(`Erreur: ${err.message || 'Problème de chargement'}`);
+            handleInternalError(`Détail technique: ${err.message || 'Problème de lecture'}`);
         }
     };
 
@@ -106,7 +118,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
         if (!response.ok) throw new Error(`Status ${response.status}`);
         const arrayBuffer = await response.arrayBuffer();
 
-        if (arrayBuffer.byteLength < 10) throw new Error("Fichier vide");
+        if (arrayBuffer.byteLength < 10) throw new Error("Document vide ou corrompu");
 
         const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
         pdfDocRef.current = await loadingTask.promise;
@@ -180,7 +192,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
       {loading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-20">
           <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
-          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest text-center px-4">Préparation du document GSI...</p>
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest text-center px-4">Ouverture du document GSI...</p>
         </div>
       )}
 
@@ -189,7 +201,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
           <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mb-4">
             <AlertCircle size={32} />
           </div>
-          <h3 className="text-sm font-black text-gray-900 uppercase mb-2">Erreur de chargement</h3>
+          <h3 className="text-sm font-black text-gray-900 uppercase mb-2">Lecture impossible</h3>
           <p className="text-[10px] text-gray-500 mb-6 max-w-xs">{error}</p>
           <div className="flex flex-col gap-2 w-full max-w-[200px]">
               <button
@@ -197,7 +209,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
                 className="w-full px-6 py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
               >
                 <RefreshCcw size={14} />
-                Réessayer
+                Réessayer la lecture
               </button>
           </div>
         </div>
@@ -232,13 +244,13 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
 
         {type === 'video' && !error && (
           <div className="w-full h-full flex items-center justify-center bg-black rounded-3xl overflow-hidden shadow-2xl">
-            <video src={url} className="w-full max-h-full" controls autoPlay playsInline onError={() => handleInternalError("Vidéo illisible")} />
+            <video src={url} className="w-full max-h-full" controls autoPlay playsInline onError={() => handleInternalError("Le format vidéo n'est pas supporté par votre terminal")} />
           </div>
         )}
 
         {type === 'image' && !error && (
           <div className="flex flex-col items-center gap-4">
-             <img src={url} style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }} className="rounded-2xl shadow-xl transition-transform h-auto" onError={() => handleInternalError("Image illisible")} />
+             <img src={url} style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }} className="rounded-2xl shadow-xl transition-transform h-auto" onError={() => handleInternalError("L'image ne peut pas être affichée")} />
           </div>
         )}
 
