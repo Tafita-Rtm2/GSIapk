@@ -4,6 +4,19 @@ import "./globals.css";
 
 // --- CRITICAL TERMINAL COMPATIBILITY ---
 if (typeof window !== 'undefined') {
+  // 0. Polyfill Promise.withResolvers (for older engines)
+  if (typeof Promise.withResolvers !== 'function') {
+    (Promise as any).withResolvers = function<T>() {
+      let resolve!: (value: T | PromiseLike<T>) => void;
+      let reject!: (reason?: any) => void;
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+  }
+
   // 1. Polyfill structuredClone
   if (typeof window.structuredClone !== 'function') {
     (window as any).structuredClone = (obj: any) => {
@@ -32,7 +45,7 @@ import { Toaster } from "sonner";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "GSI Insight",
+  title: "GROUPE GSI",
   description: "Where data meets your future.",
   manifest: "/manifest.json",
 };

@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, ZoomIn, ZoomOut, X, RefreshCcw } from 'lucide-react';
+import { Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, ZoomIn, ZoomOut, X, RefreshCcw, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { GSIStore } from '@/lib/store';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as mammoth from 'mammoth';
 
-// --- CRITICAL ENVIRONMENT SANITIZER ---
+// --- ROBUST ENVIRONMENT SANITIZER ---
 if (typeof window !== 'undefined') {
   if (typeof window.structuredClone !== 'function') {
     (window as any).structuredClone = (obj: any) => {
@@ -28,11 +28,6 @@ if (typeof window !== 'undefined') {
   } catch (e) {}
 }
 
-// Configure PDF.js worker
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-}
-
 interface GSIViewerProps {
   id: string;
   url: string;
@@ -47,7 +42,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   const [pdfData, setPdfData] = useState<{ numPages: number; currentPage: number } | null>(null);
   const [scale, setScale] = useState(1.5);
   const [docxHtml, setDocxHtml] = useState<string | null>(null);
-  const [renderMode, setRenderMode] = useState<'canvas' | 'iframe'>('canvas');
+  const [renderMode, setRenderMode] = useState<'canvas' | 'iframe' | 'external'>('canvas');
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderTaskRef = useRef<any>(null);
@@ -65,11 +60,17 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   };
 
   useEffect(() => {
+    // Configure PDF.js worker dynamically to handle subdirectories
+    if (typeof window !== 'undefined') {
+       const workerPath = window.location.pathname.startsWith('/apk/') ? '/apk/pdf.worker.min.mjs' : '/pdf.worker.min.mjs';
+       pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
+    }
+
     const handleGlobalError = (event: ErrorEvent | PromiseRejectionEvent) => {
       const msg = event instanceof ErrorEvent ? event.message : (event as any).reason?.message;
       if (msg && (msg.includes('Loading chunk') || msg.includes('structuredClone') || msg.includes('enumerable'))) {
         handleInternalError("Optimisation de lecture requise.");
-        setRenderMode('iframe'); // Fallback to iframe browser-like view
+        setRenderMode('iframe');
       }
     };
     window.addEventListener('error', handleGlobalError);
@@ -216,7 +217,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
       {loading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-20">
           <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
-          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest text-center px-4">Ouverture du document GSI...</p>
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest text-center px-4">Ouverture sécurisée GSI...</p>
         </div>
       )}
 
@@ -233,8 +234,16 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
                 className="w-full px-6 py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
               >
                 <RefreshCcw size={14} />
-                Réessayer la lecture
+                Réessayer
               </button>
+              {type === 'pdf' && (
+                <button
+                   onClick={() => setRenderMode('iframe')}
+                   className="w-full px-6 py-3 bg-gray-100 text-gray-900 rounded-xl text-[10px] font-black uppercase tracking-widest"
+                >
+                   Mode Compatibilité
+                </button>
+              )}
           </div>
         </div>
       )}
@@ -261,12 +270,13 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
         )}
 
         {type === 'pdf' && !error && renderMode === 'iframe' && (
-           <div className="w-full h-full bg-white rounded-xl overflow-hidden shadow-inner">
+           <div className="w-full h-full bg-white rounded-xl overflow-hidden shadow-inner flex flex-col">
+              <div className="p-2 bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-widest text-center">Affichage via le moteur de navigation</div>
               <iframe
                 src={url}
-                className="w-full h-full border-none"
+                className="flex-1 w-full border-none"
                 onLoad={() => { setLoading(false); onLoadComplete?.(); }}
-                title="Lecteur Haute Compatibilité"
+                title="Lecteur Intégré"
               />
            </div>
         )}
@@ -279,7 +289,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
 
         {type === 'video' && !error && (
           <div className="w-full h-full flex items-center justify-center bg-black rounded-3xl overflow-hidden shadow-2xl">
-            <video src={url} className="w-full max-h-full" controls autoPlay playsInline onError={() => handleInternalError("Le format vidéo n'est pas supporté par votre terminal")} />
+            <video src={url} className="w-full max-h-full" controls autoPlay playsInline onError={() => handleInternalError("Le format vidéo n'est pas supporté")} />
           </div>
         )}
 

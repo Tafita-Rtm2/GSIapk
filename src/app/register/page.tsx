@@ -54,7 +54,7 @@ export default function RegisterPage() {
 
       const result = await GSIStore.register(newUser);
       if (result) {
-        toast.success("Bienvenue chez GSI Insight !", { id: toastId });
+        toast.success("Bienvenue chez GROUPE GSI !", { id: toastId });
         router.push("/");
       } else {
         toast.error("Erreur lors de la création du compte.", { id: toastId });

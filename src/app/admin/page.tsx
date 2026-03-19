@@ -709,7 +709,7 @@ function AIConfigEditor({ onBack }: { onBack: () => void }) {
                         const newPrompts = { ...config.prompts, [currentPromptKey]: e.target.value };
                         setConfig({ ...config, prompts: newPrompts });
                      }}
-                     placeholder="Tu es Insight, un assistant spécialisé pour le campus..."
+                     placeholder="Tu es l'Agent Assistant GSI, un conseiller spécialisé pour le campus..."
                      className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-medium outline-none min-h-[200px] border-2 border-transparent focus:border-indigo-500 transition-all"
                   />
                </div>

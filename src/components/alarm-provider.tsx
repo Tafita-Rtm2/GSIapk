@@ -29,12 +29,12 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
               toast.info(`C'est l'heure de votre session : ${item.title}`, {
                 icon: <BellRing className="text-primary animate-bounce" size={20} />,
                 duration: 20000,
-                description: "GSI Insight — Assistant Académique",
+                description: "GROUPE GSI — Votre Conseiller Personnel",
               });
 
               // 2. Native/Browser Notification (Background)
               if ("Notification" in window && Notification.permission === "granted") {
-                new Notification("GSI Insight - Rappel d'étude", {
+                new Notification("GROUPE GSI - Rappel d'étude", {
                   body: `C'est l'heure de votre session : ${item.title}`,
                   icon: "/favicon.ico"
                 });

@@ -29,19 +29,21 @@ export default function ChatPage() {
     if (currentUser) {
       setUser(currentUser);
 
-      // Load history from local storage
+      // Load memory from local storage
       const saved = localStorage.getItem(`gsi_assistant_memory_${currentUser.id}`);
       if (saved) {
         try {
           setMessages(JSON.parse(saved));
         } catch (e) {
-          console.error("Failed to load Agent history", e);
+          console.error("Failed to load Agent Assistant memory", e);
         }
       } else {
+        const campus = currentUser.campus || "Antananarivo";
+        const filiere = currentUser.filiere || "Général";
         setMessages([
           {
             role: "assistant",
-            content: `Bonjour ${currentUser.fullName.split(' ')[0]} ! Je suis votre Agent Assistant GSI pour le campus de ${currentUser.campus} (${currentUser.filiere}). Je suis là pour vous accompagner personnellement dans votre réussite académique et répondre à toutes vos questions comme un véritable conseiller dévoué. Comment puis-je vous assister aujourd'hui ?`
+            content: `Bonjour ${currentUser.fullName.split(' ')[0]} ! Je suis votre Agent Assistant GSI pour le campus de ${campus} (${filiere}). Je suis là pour vous accompagner personnellement dans votre réussite académique et répondre à toutes vos questions comme un véritable conseiller dévoué. Comment puis-je vous assister aujourd'hui ?`
           },
         ]);
       }
@@ -74,48 +76,42 @@ export default function ChatPage() {
     try {
       const config = GSIStore.getAIConfig();
       if (!config.apiKey) {
-         throw new Error("Configuration indisponible.");
+         throw new Error("Bureau indisponible.");
       }
 
       const openai = new OpenAI({ apiKey: config.apiKey, dangerouslyAllowBrowser: true });
 
-      // Build context-aware system prompt
       const campus = user?.campus || "Antananarivo";
       const subject = user?.filiere || "Général";
       const promptKey = `${campus}_${subject}`;
-      const systemPrompt = config.prompts[promptKey] || config.prompts[`${campus}_Général`] || `Tu es l'Agent Assistant GSI, un conseiller dévoué pour les étudiants du campus de ${campus}. Ton rôle est d'accompagner personnellement chaque étudiant dans sa réussite académique. Réponds avec chaleur, professionnalisme et expertise. Utilise le Markdown pour structurer tes réponses. Ne mentionne jamais que tu es une intelligence artificielle ou un modèle de langage, agis comme un conseiller humain. Si on te demande qui tu es, réponds simplement que tu es un conseiller GSI.`;
+      const systemPrompt = config.prompts[promptKey] || config.prompts[`${campus}_Général`] || `Tu es l'Agent Assistant GSI, un conseiller académique personnel pour le campus de ${campus}. Agis comme un humain dévoué. Ne mentionne jamais que tu es une IA. Utilise le Markdown pour la clarté. Ton objectif est la réussite de l'étudiant.`;
 
-      // Fetch relevant academic context
       const lessons = (await GSIStore.getLessons()).filter(l => l.niveau === user?.niveau).slice(0, 3);
       const assignments = (await GSIStore.getAssignments()).filter(a => a.niveau === user?.niveau).slice(0, 3);
       const grades = (await GSIStore.getGrades()).filter(g => g.studentId === user?.id);
 
       const contextText = `
-        CONTEXTE ÉTUDIANT:
+        PROFIL ÉTUDIANT:
         Nom: ${user?.fullName}
         Campus: ${campus}
         Filière: ${subject}
         Niveau: ${user?.niveau}
         Moyenne: ${grades.length > 0 ? (grades.reduce((a,b)=>a+b.score,0)/grades.length).toFixed(2)+"/20" : "N/A"}
-        Dernières leçons: ${lessons.map(l => l.title).join(', ')}
-        Devoirs en attente: ${assignments.map(a => a.title + " (DL: " + a.deadline + ")").join(', ')}
       `;
 
       const apiMessages: any[] = [
         { role: "system", content: systemPrompt + "\n\n" + contextText }
       ];
 
-      // Add last few messages for conversation history
       messages.slice(-6).forEach(m => {
         apiMessages.push({ role: m.role, content: m.content });
       });
 
-      // Add current user message
       if (currentImage) {
         apiMessages.push({
           role: "user",
           content: [
-            { type: "text", text: userMessage || "Veuillez analyser ce document." },
+            { type: "text", text: userMessage || "Analyse ce document pour moi s'il vous plaît." },
             { type: "image_url", image_url: { url: currentImage } }
           ]
         });
@@ -128,12 +124,12 @@ export default function ChatPage() {
         messages: apiMessages,
       });
 
-      const responseText = completion.choices[0].message.content || "Je n'ai pas pu formuler de réponse pour le moment.";
+      const responseText = completion.choices[0].message.content || "Je n'ai pas de réponse immédiate, pourriez-vous reformuler ?";
       setMessages([...newMessages, { role: "assistant", content: responseText }]);
 
     } catch (err: any) {
-      console.error("Agent Error:", err);
-      setMessages([...newMessages, { role: "assistant", content: "Je suis navré, mais je rencontre une petite difficulté pour vous répondre immédiatement. Mes collègues conseillers et moi-même faisons le maximum pour rester disponibles. Pourriez-vous me relancer dans quelques instants ?" }]);
+      console.error("Assistant indisponible:", err);
+      setMessages([...newMessages, { role: "assistant", content: "Je suis sincèrement désolé, mais mon bureau de conseil rencontre une difficulté technique pour vous répondre à l'instant. Mes collègues et moi faisons le maximum pour rétablir le service. N'hésitez pas à me relancer dans quelques minutes, je reste à votre entière disposition." }]);
     } finally {
       setIsTyping(false);
     }
@@ -154,7 +150,7 @@ export default function ChatPage() {
     <div className="flex flex-col h-screen max-w-md mx-auto bg-white shadow-xl overflow-hidden relative">
       <PageHeader
         title="Agent Assistant"
-        subtitle="Conseiller GSI Personnel"
+        subtitle="Votre Conseiller GSI"
         className="p-6 bg-primary text-white mb-0"
         rightElement={
           <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md">
@@ -227,7 +223,7 @@ export default function ChatPage() {
         {isTyping && (
           <div className="flex flex-col items-start animate-pulse">
             <div className="bg-white text-gray-400 p-4 rounded-[24px] rounded-tl-none border border-gray-100 text-xs font-bold italic">
-               Votre conseiller prépare sa réponse...
+               Le conseiller prépare sa réponse...
             </div>
           </div>
         )}
@@ -239,7 +235,7 @@ export default function ChatPage() {
               <div className="w-12 h-12 rounded-xl overflow-hidden border border-gray-200">
                  <img src={attachedImage} className="w-full h-full object-cover" />
               </div>
-              <p className="text-[10px] font-bold text-gray-400 flex-1">Fichier prêt</p>
+              <p className="text-[10px] font-bold text-gray-400 flex-1">Document prêt</p>
               <button onClick={() => setAttachedImage(null)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-full">
                  <X size={16} />
               </button>
@@ -267,7 +263,7 @@ export default function ChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder="Posez votre question..."
+            placeholder="Posez votre question au conseiller..."
             className="w-full bg-gray-100 rounded-2xl px-5 py-4 outline-none text-sm font-medium focus:ring-2 ring-primary/20 transition-all"
           />
           {input && (
