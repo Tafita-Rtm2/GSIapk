@@ -661,7 +661,7 @@ function AIConfigEditor({ onBack }: { onBack: () => void }) {
 
    const handleSave = async () => {
       await GSIStore.updateAIConfig(config);
-      toast.success("Configuration de l'Agent enregistrée !");
+      toast.success("Configuration de l'Agent Assistant enregistrée !");
    };
 
    return (

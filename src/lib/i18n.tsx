@@ -26,7 +26,7 @@ export const translations: Translations = {
   votre_progression: { fr: "Votre progression", en: "Your progress" },
   cours_en_cours: { fr: "Cours en cours", en: "Current courses" },
   votre_emploi_du_temps: { fr: "Votre emploi du temps", en: "Your schedule" },
-  ask_insight: { fr: "Demander à Insight", en: "Ask Insight" },
+  ask_insight: { fr: "Agent Assistant", en: "Agent Assistant" },
   se_connecter: { fr: "Se connecter", en: "Login" },
   email: { fr: "Adresse Email", en: "Email Address" },
   password: { fr: "Mot de passe", en: "Password" },

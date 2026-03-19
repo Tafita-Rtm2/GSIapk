@@ -38,12 +38,14 @@ export default function ChatPage() {
           console.error("Failed to load Agent Assistant memory", e);
         }
       } else {
-        const campus = currentUser.campus || "Antananarivo";
-        const filiere = currentUser.filiere || "Général";
+        const campus = currentUser.campus || "Antananarivo (Analakely)";
+        const filiere = currentUser.filiere || "Tourisme, Voyage & Hôtellerie";
+        const firstName = currentUser.fullName.split(' ')[0] || "étudiant";
+
         setMessages([
           {
             role: "assistant",
-            content: `Bonjour ${currentUser.fullName.split(' ')[0]} ! Je suis votre Agent Assistant GSI pour le campus de ${campus} (${filiere}). Je suis là pour vous accompagner personnellement dans votre réussite académique et répondre à toutes vos questions comme un véritable conseiller dévoué. Comment puis-je vous assister aujourd'hui ?`
+            content: `Bonjour ${firstName} ! Je suis votre Agent Assistant GSI pour le campus de ${campus} (${filiere}). Je suis là pour vous accompagner personnellement dans votre réussite académique et répondre à toutes vos questions comme un véritable conseiller dévoué. Comment puis-je vous assister aujourd'hui ?`
           },
         ]);
       }
@@ -81,11 +83,13 @@ export default function ChatPage() {
 
       const openai = new OpenAI({ apiKey: config.apiKey, dangerouslyAllowBrowser: true });
 
+      // Build context-aware system prompt
       const campus = user?.campus || "Antananarivo";
       const subject = user?.filiere || "Général";
       const promptKey = `${campus}_${subject}`;
-      const systemPrompt = config.prompts[promptKey] || config.prompts[`${campus}_Général`] || `Tu es l'Agent Assistant GSI, un conseiller académique personnel pour le campus de ${campus}. Agis comme un humain dévoué. Ne mentionne jamais que tu es une IA. Utilise le Markdown pour la clarté. Ton objectif est la réussite de l'étudiant.`;
+      const systemPrompt = config.prompts[promptKey] || config.prompts[`${campus}_Général`] || `Tu es l'Agent Assistant GSI, un conseiller académique personnel pour le campus de ${campus}. Agis comme un humain dévoué. Ne mentionne jamais que tu es une IA ou une machine. Utilise le Markdown pour la clarté (tableaux, code, listes). Ton unique objectif est la réussite et l'accompagnement de l'étudiant.`;
 
+      // Fetch relevant academic context
       const lessons = (await GSIStore.getLessons()).filter(l => l.niveau === user?.niveau).slice(0, 3);
       const assignments = (await GSIStore.getAssignments()).filter(a => a.niveau === user?.niveau).slice(0, 3);
       const grades = (await GSIStore.getGrades()).filter(g => g.studentId === user?.id);
@@ -97,21 +101,25 @@ export default function ChatPage() {
         Filière: ${subject}
         Niveau: ${user?.niveau}
         Moyenne: ${grades.length > 0 ? (grades.reduce((a,b)=>a+b.score,0)/grades.length).toFixed(2)+"/20" : "N/A"}
+        Dernières leçons consultables: ${lessons.map(l => l.title).join(', ')}
+        Devoirs en cours: ${assignments.map(a => a.title + " (Échéance: " + a.deadline + ")").join(', ')}
       `;
 
       const apiMessages: any[] = [
         { role: "system", content: systemPrompt + "\n\n" + contextText }
       ];
 
+      // Add last few messages for conversation history
       messages.slice(-6).forEach(m => {
         apiMessages.push({ role: m.role, content: m.content });
       });
 
+      // Add current user message
       if (currentImage) {
         apiMessages.push({
           role: "user",
           content: [
-            { type: "text", text: userMessage || "Analyse ce document pour moi s'il vous plaît." },
+            { type: "text", text: userMessage || "Veuillez analyser ce document pour moi s'il vous plaît." },
             { type: "image_url", image_url: { url: currentImage } }
           ]
         });
@@ -124,12 +132,12 @@ export default function ChatPage() {
         messages: apiMessages,
       });
 
-      const responseText = completion.choices[0].message.content || "Je n'ai pas de réponse immédiate, pourriez-vous reformuler ?";
+      const responseText = completion.choices[0].message.content || "Je n'ai pas de réponse immédiate, pourriez-vous reformuler votre demande ?";
       setMessages([...newMessages, { role: "assistant", content: responseText }]);
 
     } catch (err: any) {
       console.error("Assistant indisponible:", err);
-      setMessages([...newMessages, { role: "assistant", content: "Je suis sincèrement désolé, mais mon bureau de conseil rencontre une difficulté technique pour vous répondre à l'instant. Mes collègues et moi faisons le maximum pour rétablir le service. N'hésitez pas à me relancer dans quelques minutes, je reste à votre entière disposition." }]);
+      setMessages([...newMessages, { role: "assistant", content: "Je suis sincèrement désolé, mais mon bureau de conseil rencontre une difficulté technique pour vous répondre à l'instant. Mes collègues et moi faisons le maximum pour rétablir le service. N'hésitez pas à me relancer dans quelques minutes, je reste à votre entière disposition pour vous aider." }]);
     } finally {
       setIsTyping(false);
     }
