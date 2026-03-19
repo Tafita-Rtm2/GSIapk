@@ -1,32 +1,11 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, ZoomIn, ZoomOut, X, RefreshCcw, ExternalLink } from 'lucide-react';
+import { Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, ZoomIn, ZoomOut, X, RefreshCcw, ExternalLink, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { GSIStore } from '@/lib/store';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as mammoth from 'mammoth';
-
-// --- ROBUST ENVIRONMENT SANITIZER ---
-if (typeof window !== 'undefined') {
-  if (typeof window.structuredClone !== 'function') {
-    (window as any).structuredClone = (obj: any) => {
-      try { return JSON.parse(JSON.stringify(obj)); } catch (e) { return obj; }
-    };
-  }
-
-  try {
-    const polluted = ['at', 'findLast', 'findLastIndex'];
-    polluted.forEach(prop => {
-      if (Array.prototype.hasOwnProperty(prop)) {
-        const desc = Object.getOwnPropertyDescriptor(Array.prototype, prop);
-        if (desc && desc.enumerable) {
-          Object.defineProperty(Array.prototype, prop, { ...desc, enumerable: false });
-        }
-      }
-    });
-  } catch (e) {}
-}
 
 interface GSIViewerProps {
   id: string;
@@ -40,7 +19,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pdfData, setPdfData] = useState<{ numPages: number; currentPage: number } | null>(null);
-  const [scale, setScale] = useState(1.5);
+  const [scale, setScale] = useState(1.2);
   const [docxHtml, setDocxHtml] = useState<string | null>(null);
   const [renderMode, setRenderMode] = useState<'canvas' | 'iframe' | 'external'>('canvas');
 
@@ -60,16 +39,16 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   };
 
   useEffect(() => {
-    // Configure PDF.js worker dynamically to handle subdirectories
     if (typeof window !== 'undefined') {
-       const workerPath = window.location.pathname.startsWith('/apk/') ? '/apk/pdf.worker.min.mjs' : '/pdf.worker.min.mjs';
-       pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
+       const base = window.location.pathname.split('/')[1];
+       const prefix = (base === 'apk' || base === 'web') ? `/${base}` : '';
+       pdfjsLib.GlobalWorkerOptions.workerSrc = `${prefix}/pdf.worker.min.mjs`;
     }
 
     const handleGlobalError = (event: ErrorEvent | PromiseRejectionEvent) => {
       const msg = event instanceof ErrorEvent ? event.message : (event as any).reason?.message;
-      if (msg && (msg.includes('Loading chunk') || msg.includes('structuredClone') || msg.includes('enumerable'))) {
-        handleInternalError("Optimisation de lecture requise.");
+      if (msg && (msg.includes('Loading chunk') || msg.includes('structuredClone') || msg.includes('at is not a function'))) {
+        handleInternalError("Optimisation de lecture requise...");
         setRenderMode('iframe');
       }
     };
@@ -100,6 +79,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
                   await renderPdf();
                 } else {
                   setLoading(false);
+                  onLoadComplete?.();
                 }
             } else if (type === 'docx') {
                 await renderDocx();
@@ -207,7 +187,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
   };
 
   const handleZoom = (delta: number) => {
-     const newScale = Math.min(Math.max(scale + delta, 0.5), 4);
+     const newScale = Math.min(Math.max(scale + delta, 0.5), 3);
      setScale(newScale);
      if (type === 'pdf' && renderMode === 'canvas') renderPdf(pdfData?.currentPage || 1, newScale);
   };
@@ -236,14 +216,15 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
                 <RefreshCcw size={14} />
                 Réessayer
               </button>
-              {type === 'pdf' && (
-                <button
-                   onClick={() => setRenderMode('iframe')}
-                   className="w-full px-6 py-3 bg-gray-100 text-gray-900 rounded-xl text-[10px] font-black uppercase tracking-widest"
-                >
-                   Mode Compatibilité
-                </button>
-              )}
+              <a
+                 href={url}
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 className="w-full px-6 py-3 bg-gray-100 text-gray-900 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
+              >
+                 <ExternalLink size={14} />
+                 Navigateur Externe
+              </a>
           </div>
         </div>
       )}
@@ -254,9 +235,9 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
             <canvas ref={canvasRef} className="shadow-2xl rounded-sm bg-white" />
             <div className="fixed bottom-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-30">
               <div className="bg-white/90 backdrop-blur-md p-1.5 rounded-2xl flex gap-1 shadow-xl border border-gray-100">
-                <button onClick={() => handleZoom(-0.25)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all"><ZoomOut size={18} /></button>
+                <button onClick={() => handleZoom(-0.2)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all"><ZoomOut size={18} /></button>
                 <div className="px-3 flex items-center text-[10px] font-bold text-gray-400">{Math.round(scale * 100)}%</div>
-                <button onClick={() => handleZoom(0.25)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all"><ZoomIn size={18} /></button>
+                <button onClick={() => handleZoom(0.2)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all"><ZoomIn size={18} /></button>
               </div>
               {pdfData && (
                 <div className="bg-gray-900/90 text-white px-6 py-3 rounded-full flex items-center gap-6 backdrop-blur-md shadow-2xl">
@@ -270,13 +251,44 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
         )}
 
         {type === 'pdf' && !error && renderMode === 'iframe' && (
-           <div className="w-full h-full bg-white rounded-xl overflow-hidden shadow-inner flex flex-col">
-              <div className="p-2 bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-widest text-center">Affichage via le moteur de navigation</div>
+           <div className="w-full h-full bg-white rounded-xl overflow-hidden shadow-inner flex flex-col relative min-h-[500px]">
+              <div className="p-4 flex-1 flex flex-col items-center justify-center text-center space-y-6">
+                 <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center">
+                    <FileText size={40} />
+                 </div>
+                 <div>
+                    <h4 className="text-sm font-black uppercase text-gray-900">Lecture par le système</h4>
+                    <p className="text-[10px] text-gray-500 max-w-[200px] mt-2">Si le document ne s'affiche pas automatiquement, utilisez le bouton ci-dessous.</p>
+                 </div>
+
+                 <div className="flex flex-col gap-3 w-full max-w-[250px]">
+                    <a
+                      href={url}
+                      target="_blank"
+                      className="flex items-center justify-center gap-2 w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-[10px] shadow-lg shadow-indigo-100"
+                    >
+                       <ExternalLink size={16} />
+                       Voir le document complet
+                    </a>
+
+                    <button
+                      onClick={() => setRenderMode('canvas')}
+                      className="text-[9px] font-bold text-gray-400 uppercase hover:text-indigo-600 transition-colors"
+                    >
+                       Réessayer le lecteur intégré
+                    </button>
+                 </div>
+              </div>
+
               <iframe
                 src={url}
-                className="flex-1 w-full border-none"
-                onLoad={() => { setLoading(false); onLoadComplete?.(); }}
-                title="Lecteur Intégré"
+                className="absolute inset-0 w-full h-full border-none opacity-0 pointer-events-none"
+                onLoad={() => {
+                   // If it loads, we could try to show it, but if user sees blank, better show the buttons
+                   setLoading(false);
+                   onLoadComplete?.();
+                }}
+                title="Lecteur Invisible"
               />
            </div>
         )}
@@ -295,7 +307,7 @@ export function GSIViewer({ id, url, type, onLoadComplete, onError }: GSIViewerP
 
         {type === 'image' && !error && (
           <div className="flex flex-col items-center gap-4">
-             <img src={url} style={{ transform: `scale(${scale / 1.5})`, transformOrigin: 'top center' }} className="rounded-2xl shadow-xl transition-transform h-auto" onError={() => handleInternalError("L'image ne peut pas être affichée")} />
+             <img src={url} style={{ transform: `scale(${scale / 1.2})`, transformOrigin: 'top center' }} className="rounded-2xl shadow-xl transition-transform h-auto" onError={() => handleInternalError("L'image ne peut pas être affichée")} />
           </div>
         )}
 

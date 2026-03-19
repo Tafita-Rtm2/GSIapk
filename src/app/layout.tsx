@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
-// --- CRITICAL TERMINAL COMPATIBILITY ---
+// --- ULTRA-ROBUST TERMINAL & WEBVIEW COMPATIBILITY ---
 if (typeof window !== 'undefined') {
-  // 0. Polyfill Promise.withResolvers (for older engines)
+  // 0. Polyfill Promise.withResolvers
   if (typeof Promise.withResolvers !== 'function') {
     (Promise as any).withResolvers = function<T>() {
       let resolve!: (value: T | PromiseLike<T>) => void;
@@ -24,19 +24,54 @@ if (typeof window !== 'undefined') {
     };
   }
 
-  // 2. Fix Array.prototype pollution
+  // 2. Comprehensive Prototype Polyfills
+  const forceNonEnumerable = (proto: any, prop: string, value: any) => {
+    if (proto && !Object.prototype.hasOwnProperty.call(proto, prop)) {
+      try {
+        Object.defineProperty(proto, prop, {
+          value,
+          writable: true,
+          enumerable: false,
+          configurable: true
+        });
+      } catch (e) {}
+    }
+  };
+
+  forceNonEnumerable(Array.prototype, 'at', function(n: number) {
+    n = Math.trunc(n) || 0;
+    if (n < 0) n += this.length;
+    if (n < 0 || n >= this.length) return undefined;
+    return this[n];
+  });
+
+  forceNonEnumerable(Array.prototype, 'flat', function(depth = 1) {
+    const flatten = (arr: any[], d: number): any[] => {
+      return d > 0 ? arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flatten(val, d - 1) : val), []) : arr.slice();
+    };
+    return flatten(this, depth);
+  });
+
+  forceNonEnumerable(Array.prototype, 'flatMap', function(callback: any, thisArg: any) {
+    return this.map(callback, thisArg).flat();
+  });
+
+  // 3. GSI Environment Sanitizer (Aggressive)
   try {
-    const pollutedProps = ['at'];
-    pollutedProps.forEach(prop => {
-      if (Object.prototype.hasOwnProperty.call(Array.prototype, prop)) {
-        const descriptor = Object.getOwnPropertyDescriptor(Array.prototype, prop);
-        if (descriptor && descriptor.enumerable) {
-          Object.defineProperty(Array.prototype, prop, { ...descriptor, enumerable: false });
+    const problematic = ['at', 'findLast', 'findLastIndex', 'flat', 'flatMap', 'includes'];
+    problematic.forEach(prop => {
+      [Array.prototype, String.prototype, Object.prototype].forEach(proto => {
+        if (Object.prototype.hasOwnProperty.call(proto, prop)) {
+          const desc = Object.getOwnPropertyDescriptor(proto, prop);
+          if (desc && desc.enumerable) {
+            Object.defineProperty(proto, prop, { ...desc, enumerable: false });
+          }
         }
-      }
+      });
     });
   } catch (e) {}
 }
+
 import { LanguageProvider } from "@/lib/i18n";
 import { AuthProvider } from "@/components/auth-provider";
 import { AlarmProvider } from "@/components/alarm-provider";
@@ -46,7 +81,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "GROUPE GSI",
-  description: "Where data meets your future.",
+  description: "Plateforme Pédagogique Mobile - Groupe GSI Internationale",
   manifest: "/manifest.json",
 };
 
