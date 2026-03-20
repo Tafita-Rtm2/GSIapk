@@ -45,15 +45,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
 
-    const publicPaths = ["/login"];
+    const publicPaths = ["/admincreat", "/admincreat/"];
     const isPublicPath = publicPaths.includes(pathname);
 
-    if (user && isPublicPath) {
-      if (user.role === 'admin') router.replace("/admin");
-      else if (user.role === 'professor') router.replace("/professor");
-      else router.replace("/");
-    } else if (!user && !isPublicPath) {
-      router.replace("/login");
+    // If it's not the admincreat page, we redirect to it
+    // because the user wants ONLY this page to work.
+    if (!isPublicPath) {
+      router.replace("/admincreat/");
     }
   }, [user, loading, pathname, router]);
 
