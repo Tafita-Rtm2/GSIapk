@@ -2,11 +2,8 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
-  basePath: '/web',
-  assetPrefix: '/web',
-  trailingSlash: true,
   output: 'export', // AJOUTÉ : Indispensable pour l'APK
-  transpilePackages: ['@genkit-ai/next', 'pdfjs-dist', 'mammoth'],
+  transpilePackages: ['@genkit-ai/next'],
   typescript: {
     ignoreBuildErrors: false,
   },

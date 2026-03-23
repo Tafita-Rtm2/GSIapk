@@ -177,7 +177,7 @@ export default function Home() {
              <div>
                <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mb-0.5">Bonjour {firstName}</p>
                <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">
-                  GROUPE GSI <span className="text-primary">App</span>
+                  GSI Insight <span className="text-primary">Plus</span>
                </h1>
              </div>
           </div>
@@ -275,7 +275,7 @@ export default function Home() {
               <div className="relative z-10">
                  <div className="flex items-center gap-2 mb-2">
                     <Sparkles size={18} className="text-violet-200" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-violet-200">Agent Assistant GSI</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-violet-200">Ask Insight AI</span>
                  </div>
                  <h2 className="text-xl font-black mb-1 leading-tight">Des questions ?</h2>
                  <p className="text-[11px] text-violet-200/80 font-medium mb-4">Emplois du temps, devoirs, notes...</p>

@@ -23,9 +23,7 @@ export default function CommunityPage() {
     setUser(u);
 
     const unsubMessages = GSIStore.subscribeMessages((ms) => {
-      // Ensure messages are ordered chronologically (newest at bottom)
-      const sorted = [...ms].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-      setMessages(sorted);
+      setMessages(ms);
       setTimeout(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }, 100);

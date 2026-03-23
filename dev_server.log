@@ -7,8 +7,12 @@
    - Network:      http://192.168.0.2:9002
 
  ✓ Starting...
- ✓ Ready in 1485ms
- ○ Compiling /admincreat ...
- ✓ Compiled /admincreat in 6.8s
- GET /admincreat/ 200 in 7777ms
- GET /admincreat/ 200 in 170ms
+ ✓ Ready in 1494ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 5.1s
+ GET /login 200 in 5738ms
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 1502ms
+ GET /admin 200 in 1605ms
+ GET /admin 200 in 152ms
+ GET /admin 200 in 98ms

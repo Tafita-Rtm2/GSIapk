@@ -123,7 +123,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <Link
           href="/chat"
           className="absolute bottom-24 right-4 bg-accent text-white p-4 rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all z-20"
-          title="Agent Assistant"
         >
           <MessageCircle size={24} />
         </Link>
