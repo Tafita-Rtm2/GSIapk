@@ -1,6 +1,5 @@
 "use client";
 import { toast } from "sonner";
-import { toast } from "sonner";
 
 import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
