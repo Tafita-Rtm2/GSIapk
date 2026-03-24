@@ -130,13 +130,13 @@ export default function AdminPage() {
 
   const menuItems = [
     { id: "dashboard", icon: ShieldCheck, label: t("dashboard"), color: "bg-indigo-600" },
-    { id: "users", icon: Users, label: t("gestion_utilisateurs"), color: "bg-blue-600" },
+    { id: "users", icon: UserCircles, label: t("gestion_utilisateurs"), color: "bg-blue-600" },
     { id: "submissions", icon: FileText, label: "Devoirs Reçus", color: "bg-emerald-600" },
     { id: "communication", icon: Megaphone, label: t("communication"), color: "bg-orange-600" },
     { id: "academic", icon: GraduationCap, label: t("gestion_academique"), color: "bg-purple-600" },
     { id: "schedule", icon: RefreshCcw, label: "Emploi du temps", color: "bg-violet-600" },
     { id: "media", icon: BookOpen, label: "Médiathèque", color: "bg-sky-600" },
-    { id: "ai_config", icon: User, label: "Agent Assistant", color: "bg-black" },
+    { id: "ai_config", icon: UserCircle, label: "Agent Assistant", color: "bg-black" },
     { id: "stats", icon: BarChart3, label: t("stats_rapports"), color: "bg-pink-600" },
   ];
 
