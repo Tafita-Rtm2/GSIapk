@@ -24,7 +24,7 @@ jobs:
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init "FirebaseStudio" "com.tafita.rtm2" --web-dir out
-          npx cap add android
+          npx cap sync android || npx cap add android
           npx cap copy android
 
       - name: Set up JDK 21
