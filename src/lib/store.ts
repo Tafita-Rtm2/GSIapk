@@ -814,6 +814,37 @@ class GSIStoreClass {
     await this.apiCall('/db/messages', 'POST', msg);
   }
 
+  async deleteMessage(messageId: string, forEveryone: boolean) {
+    if (!this.state.currentUser) return;
+    
+    if (forEveryone) {
+      const msg = this.state.messages.find(m => m.id === messageId);
+      if (msg && msg.senderId === this.state.currentUser.id) {
+        // Find _id if not present
+        let targetId = msg._id;
+        if (!targetId) {
+          const q = encodeURIComponent(JSON.stringify({ id: messageId }));
+          const existing = await this.apiCall(`/db/messages?q=${q}`);
+          if (existing && Array.isArray(existing) && existing.length > 0) {
+            targetId = existing[0]._id;
+          }
+        }
+        if (targetId) {
+          await this.apiCall(`/db/messages/${targetId}`, 'DELETE');
+        }
+      }
+    }
+
+    // Local update
+    this.state.messages = this.state.messages.filter(m => m.id !== messageId);
+    this.notify('messages', this.state.messages);
+  }
+
+  clearCommunityChat() {
+    this.state.messages = [];
+    this.notify('messages', this.state.messages);
+  }
+
   // --- REMINDERS & NOTIFICATIONS ---
   async addReminder(r: Reminder) {
     this.state.reminders = [...this.state.reminders, r];

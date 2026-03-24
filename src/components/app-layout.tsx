@@ -9,6 +9,7 @@ import { useLanguage } from "@/lib/i18n";
 import { useState, useEffect } from "react";
 import { GSIStore, User as GSIUser } from "@/lib/store";
 import { toast } from "sonner";
+import { App } from "@capacitor/app";
 import dynamic from "next/dynamic";
 
 // Dynamic import for the viewer to avoid SSR issues with pdfjs and mammoth
@@ -51,6 +52,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
     const unsubSync = GSIStore.subscribeSyncStatus((s) => setIsSyncing(s));
 
+    const backListener = App.addListener('backButton', ({ canGoBack }) => {
+      if (canGoBack) {
+        window.history.back();
+      } else {
+        // We are at the root, do nothing or show a toast
+        // toast.info("Appuyez encore pour quitter");
+      }
+    });
+
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
@@ -60,6 +70,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener('gsi-open-viewer', handleOpen);
       unsubSync();
+      backListener.then(l => l.remove());
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };

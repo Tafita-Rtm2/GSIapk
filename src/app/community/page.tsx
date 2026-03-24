@@ -2,7 +2,7 @@
 
 import { AppLayout } from "@/components/app-layout";
 import { useLanguage } from "@/lib/i18n";
-import { Send, Users, Sparkles, MessageSquare, Clock, X, Paperclip, Image as ImageIcon, File } from "lucide-react";
+import { Send, Users, Sparkles, MessageSquare, Clock, X, Paperclip, Image as ImageIcon, File, Trash2, MoreVertical } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { GSIStore, ChatMessage, User } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ export default function CommunityPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState<ChatMessage | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,6 +56,21 @@ export default function CommunityPage() {
 
   if (!user) return null;
 
+  const handleDeleteMessage = async (forEveryone: boolean) => {
+    if (showDeleteModal) {
+      await GSIStore.deleteMessage(showDeleteModal.id, forEveryone);
+      setShowDeleteModal(null);
+      toast.success(forEveryone ? "Message supprimé pour tous" : "Message supprimé pour vous");
+    }
+  };
+
+  const clearChat = () => {
+    if (confirm("Voulez-vous effacer toute la conversation (localement) ?")) {
+      GSIStore.clearCommunityChat();
+      toast.success("Conversation effacée.");
+    }
+  };
+
   return (
     <AppLayout>
       <div className="flex flex-col h-full bg-[#F8FAFC]">
@@ -63,9 +79,14 @@ export default function CommunityPage() {
               <h1 className="text-xl font-black text-gray-900 uppercase tracking-tight">Communauté</h1>
               <p className="text-[9px] font-bold text-indigo-500 uppercase tracking-widest">{user.filiere} • {user.niveau}</p>
            </div>
-           <div className="bg-indigo-50 px-3 py-1 rounded-full flex items-center gap-2">
-              <Users size={12} className="text-indigo-600" />
-              <span className="text-[10px] font-black text-indigo-600">En ligne</span>
+           <div className="flex items-center gap-3">
+              <button onClick={clearChat} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                 <Trash2 size={20} />
+              </button>
+              <div className="bg-indigo-50 px-3 py-1 rounded-full flex items-center gap-2">
+                 <Users size={12} className="text-indigo-600" />
+                 <span className="text-[10px] font-black text-indigo-600">En ligne</span>
+              </div>
            </div>
         </div>
 
@@ -99,7 +120,10 @@ export default function CommunityPage() {
                        <span className="text-[7px] text-gray-300 font-bold">{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                     <div
-                      onContextMenu={(e) => { e.preventDefault(); setReplyTo(m); }}
+                      onContextMenu={(e) => { 
+                        e.preventDefault(); 
+                        setShowDeleteModal(m);
+                      }}
                       onClick={() => setReplyTo(m)}
                       className={cn(
                         "p-4 rounded-[24px] text-sm font-medium shadow-sm active:scale-[0.98] transition-transform overflow-hidden",
@@ -144,6 +168,34 @@ export default function CommunityPage() {
              </div>
            )}
         </div>
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6 animate-in fade-in duration-200">
+             <div className="bg-white w-full max-w-xs rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+                   <h3 className="font-black text-sm uppercase tracking-widest">Supprimer le message</h3>
+                   <button onClick={() => setShowDeleteModal(null)} className="text-gray-400"><X size={20} /></button>
+                </div>
+                <div className="p-4 space-y-2">
+                   <button 
+                     onClick={() => handleDeleteMessage(false)}
+                     className="w-full py-4 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors"
+                   >
+                      Supprimer pour moi
+                   </button>
+                   {showDeleteModal.senderId === user.id && (
+                      <button 
+                        onClick={() => handleDeleteMessage(true)}
+                        className="w-full py-4 bg-red-50 hover:bg-red-100 text-red-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors"
+                      >
+                         Supprimer pour tout le monde
+                      </button>
+                   )}
+                </div>
+             </div>
+          </div>
+        )}
 
         <div className="p-4 bg-white border-t border-gray-100">
            {replyTo && (
