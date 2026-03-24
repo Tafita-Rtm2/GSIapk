@@ -3,7 +3,7 @@
 import { useState, useEffect, memo } from "react";
 import {
   ShieldCheck,
-  Users,
+  Users, UserCircle,
   Megaphone,
   GraduationCap,
   BarChart3,
@@ -130,7 +130,7 @@ export default function AdminPage() {
 
   const menuItems = [
     { id: "dashboard", icon: ShieldCheck, label: t("dashboard"), color: "bg-indigo-600" },
-    { id: "users", icon: UserCircles, label: t("gestion_utilisateurs"), color: "bg-blue-600" },
+    { id: "users", icon: UserCircle, label: t("gestion_utilisateurs"), color: "bg-blue-600" },
     { id: "submissions", icon: FileText, label: "Devoirs Reçus", color: "bg-emerald-600" },
     { id: "communication", icon: Megaphone, label: t("communication"), color: "bg-orange-600" },
     { id: "academic", icon: GraduationCap, label: t("gestion_academique"), color: "bg-purple-600" },
