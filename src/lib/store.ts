@@ -6,24 +6,25 @@ import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { toast } from 'sonner';
 
+// --- CONFIGURATION SÉCURISÉE (CORRIGÉE) ---
 const _d = (s: string): string => {
   try {
     const decoded = typeof window !== 'undefined' 
       ? atob(s) 
       : Buffer.from(s, 'base64').toString('utf-8');
-    return decoded; 
+    return decoded; // ✅ Sans reverse
   } catch (e) {
     console.error('Decode error:', e);
     return '';
   }
 };
 
+// ✅ Valeurs correctement encodées (vos vraies URLs)
+const API_BASE = _d("aHR0cHM6Ly9ncm91cGVnc2kubWcvcnRtZ2dtZy9hcGk=");
+const MEDIA_BASE = _d("aHR0cHM6Ly9ncm91cGVnc2kubWcvcnRtZ2dtZw==");
 
-const API_BASE = _d("aHR0cHM6Ly9ncm91cGVpc2d0Lm1nL3J0bWdlam0vYXBp"); 
-const MEDIA_BASE = _d("aHR0cHM6Ly9ncm91cGVpc2d0Lm1nL3J0bWdlam0");
-
-let ADMIN_CODE = _d("TmluYSBJU0c="); 
-let PROF_PASS = _d("cHJvZi1pc2ctbWc="); 
+let ADMIN_CODE = _d("TmluYSBHU0k=");
+let PROF_PASS = _d("cHJvZi1nc2ktbWc=");
 let AI_CONFIG = {
   apiKey: "",
   prompts: {} as Record<string, string>
