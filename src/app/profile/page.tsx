@@ -1,7 +1,7 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
-import { Settings, ChevronRight, FileCheck, Award, LogOut, QrCode, X, Camera, ShieldCheck, MapPin, GraduationCap, TrendingUp, Clock } from "lucide-react";
+import { Settings, ChevronRight, FileCheck, Award, LogOut, QrCode, X, Camera, ShieldCheck, MapPin, GraduationCap, TrendingUp, Clock, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { QRCodeCanvas } from "qrcode.react";
@@ -162,6 +162,9 @@ export default function ProfilePage() {
           </Link>
           <Link href="/services">
             <ProfileLink icon={FileCheck} label="Documents Administratifs" color="text-orange-500" />
+          </Link>
+          <Link href="/ecolage">
+            <ProfileLink icon={Receipt} label="Mes Écolages & Reçus" color="text-rose-500" />
           </Link>
 
           <div className="bg-gradient-to-br from-indigo-600 to-violet-800 rounded-[40px] p-7 text-white mb-6 mt-6 shadow-xl relative overflow-hidden group">
