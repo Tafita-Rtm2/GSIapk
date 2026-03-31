@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Filesystem, Directory } from '@capacitor/filesystem';
@@ -8,16 +7,22 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { toast } from 'sonner';
 
 // --- CONFIGURATION ---
-// IMPORTANT: Assurez-vous que ces URLs correspondent exactement à votre config serveur.
-// Un slash manquant ou un domaine sans 'www' peut causer des erreurs 301.
-const API_BASE = "https://groupegsi.mg/rtmggmg/api";
-const MEDIA_BASE = "https://groupegsi.mg/rtmggmg";
+const _d = (s: string) => {
+  const b = typeof window !== 'undefined' ? atob(s) : Buffer.from(s, 'base64').toString();
+  return b.split('').reverse().join('');
+};
 
-let ADMIN_CODE = "Nina GSI";
-let PROF_PASS = "prof-gsi-mg";
+const API_BASE = _d("aXBhL2dtbWdn bXRyL2dtLmlzZ2VwdW9yZy8vOnNwdHRo");
+
+const MEDIA_BASE = _d("Z21tZ2dtdHIvZ20uaXNnZXB1b3JnLy86c3B0dGg=");
+
+let ADMIN_CODE = _d("SVN HIGFuaU4=");
+
+let PROF_PASS = _d("Z20taXNnLWZvcnA=");
+
 let AI_CONFIG = {
   apiKey: "",
-  prompts: {} as Record<string, string> // campus_subject -> prompt
+  prompts: {} as Record<string, string>
 };
 
 // Types
@@ -40,6 +45,7 @@ export interface Lesson { id: string; title: string; description: string; subjec
 export interface Assignment { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; deadline: string; timeLimit: string; maxScore: number; files?: string[]; _id?: string; }
 export interface Submission { id: string; assignmentId: string; studentId: string; studentName: string; date: string; file: string; score?: number; feedback?: string; _id?: string; campus?: string; filiere?: string; niveau?: string; }
 export interface Grade { id: string; studentId: string; studentName: string; subject: string; score: number; maxScore: number; date: string; niveau: string; filiere: string; _id?: string; }
+export interface Ecolage { id: string; studentId: string; studentName: string; month: string; amount: string; date: string; status: string; reference: string; campus?: string; filiere?: string; niveau?: string; _id?: string; }
 export interface Announcement { id: string; title: string; message: string; date: string; author: string; type?: 'info' | 'convocation'; targetUserId?: string; campus?: string[]; filiere?: string[]; niveau?: string; _id?: string; }
 
 export interface ChatMessage {
@@ -100,6 +106,7 @@ interface State {
   assignments: Assignment[];
   submissions: Submission[];
   grades: Grade[];
+  ecolages: Ecolage[];
   announcements: Announcement[];
   schedules: Record<string, StructuredSchedule>;
   messages: ChatMessage[];
@@ -113,6 +120,7 @@ const initialState: State = {
   assignments: [],
   submissions: [],
   grades: [],
+  ecolages: [],
   announcements: [],
   schedules: {},
   messages: [],
@@ -247,6 +255,7 @@ class GSIStoreClass {
        this.fetchCollection('assignments', 'assignments'),
        this.fetchCollection('announcements', 'announcements'),
        this.fetchCollection('grades', 'grades'),
+       this.fetchCollection('ecolages', 'ecolage'),
        this.fetchCollection('schedules', 'schedules'),
        this.fetchChatMessages()
      ]);
@@ -560,6 +569,18 @@ class GSIStoreClass {
     };
     applyFilter(this.state.grades);
     this.fetchCollection('grades', 'grades', `?q={"studentId":"${studentId}"}`);
+    return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
+  }
+
+  subscribeEcolages(studentId: string, cb: (es: Ecolage[]) => void) {
+    const subKey = `ecolages_${studentId}`;
+    if (!this.listeners[subKey]) this.listeners[subKey] = [];
+    this.listeners[subKey].push(cb);
+    const applyFilter = (data: Ecolage[]) => {
+      cb(data.filter((e: any) => e.studentId === studentId));
+    };
+    applyFilter(this.state.ecolages);
+    this.fetchCollection('ecolages', 'ecolage', `?q={"studentId":"${studentId}"}`);
     return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
   }
 
