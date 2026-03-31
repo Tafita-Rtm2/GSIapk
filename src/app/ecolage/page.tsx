@@ -5,14 +5,14 @@ import { ChevronLeft, Receipt, Calendar, CreditCard, CheckCircle2, Download, Ext
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { GSIStore, User, Ecolage } from "@/lib/store";
+import { GSIStore, User, Ecolage, Payment } from "@/lib/store";
 import Link from "next/link";
 
 export default function EcolagePage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [ecolages, setEcolages] = useState<Ecolage[]>([]);
-  const [selectedReceipt, setSelectedReceipt] = useState<Ecolage | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [selectedReceipt, setSelectedReceipt] = useState<Payment | null>(null);
 
   useEffect(() => {
     const currentUser = GSIStore.getCurrentUser();
@@ -22,9 +22,11 @@ export default function EcolagePage() {
     }
     setUser(currentUser);
 
-    return GSIStore.subscribeEcolages(currentUser.id, (data) => {
-      setEcolages(data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-    });
+    if (currentUser.matricule) {
+      return GSIStore.subscribePayments(currentUser.matricule, (data) => {
+        setPayments(data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      });
+    }
   }, [router]);
 
   if (!user) return null;
@@ -50,7 +52,7 @@ export default function EcolagePage() {
               <div className="flex justify-between items-center bg-white/10 rounded-2xl p-4 backdrop-blur-sm border border-white/10">
                  <div>
                     <p className="text-[9px] font-bold opacity-60 uppercase">Dernier paiement</p>
-                    <p className="text-sm font-black">{ecolages[0]?.month || "Aucun"} • {ecolages[0]?.amount || "0 Ar"}</p>
+                    <p className="text-sm font-black">{payments[0]?.note || "Aucun"} • {payments[0]?.montant.toLocaleString('fr-MG')} Ar</p>
                  </div>
                  <CheckCircle2 size={24} className="text-emerald-400" />
               </div>
@@ -62,10 +64,10 @@ export default function EcolagePage() {
           <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-4 px-2">Liste des reçus</h3>
           
           <div className="space-y-3">
-            {ecolages.map((eco) => (
+            {payments.map((pay) => (
               <button
-                key={eco.id}
-                onClick={() => setSelectedReceipt(eco)}
+                key={pay.id}
+                onClick={() => setSelectedReceipt(pay)}
                 className="w-full bg-white p-5 rounded-[28px] border border-gray-100 flex justify-between items-center shadow-sm active:scale-[0.97] transition-all group"
               >
                 <div className="flex items-center gap-4 text-left">
@@ -73,18 +75,18 @@ export default function EcolagePage() {
                     <Receipt size={24} />
                   </div>
                   <div>
-                    <h4 className="font-black text-sm text-gray-800 uppercase tracking-tight">{eco.month}</h4>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase">{new Date(eco.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                    <h4 className="font-black text-sm text-gray-800 uppercase tracking-tight">{pay.note || "Scolarité"}</h4>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase">{new Date(pay.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                   <p className="font-black text-sm text-gray-900">{eco.amount}</p>
+                   <p className="font-black text-sm text-gray-900">{pay.montant.toLocaleString('fr-MG')} Ar</p>
                    <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-full mt-1 inline-block">Payé</p>
                 </div>
               </button>
             ))}
 
-            {ecolages.length === 0 && (
+            {payments.length === 0 && (
               <div className="py-20 flex flex-col items-center text-center">
                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center text-gray-300 mb-4">
                     <Receipt size={24} />
@@ -127,7 +129,7 @@ export default function EcolagePage() {
                             </div>
                             <span className="text-[10px] font-black text-gray-400 uppercase">Période</span>
                          </div>
-                         <span className="font-black text-sm text-gray-800 uppercase">{selectedReceipt.month}</span>
+                         <span className="font-black text-sm text-gray-800 uppercase">{selectedReceipt.note}</span>
                       </div>
 
                       <div className="flex justify-between items-center pb-4 border-dashed border-b border-gray-100">
@@ -137,7 +139,7 @@ export default function EcolagePage() {
                             </div>
                             <span className="text-[10px] font-black text-gray-400 uppercase">Montant Versé</span>
                          </div>
-                         <span className="font-black text-lg text-indigo-600">{selectedReceipt.amount}</span>
+                         <span className="font-black text-lg text-indigo-600">{selectedReceipt.montant.toLocaleString('fr-MG')} Ar</span>
                       </div>
 
                       <div className="flex justify-between items-center pb-4 border-dashed border-b border-gray-100">
@@ -147,9 +149,22 @@ export default function EcolagePage() {
                             </div>
                             <span className="text-[10px] font-black text-gray-400 uppercase">Statut</span>
                          </div>
-                         <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
-                            Validé & Enregistré
-                         </span>
+                         <div className="text-right">
+                           <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 block mb-1">
+                              Validé & Enregistré
+                           </span>
+                           <p className="text-[8px] text-gray-400 font-bold uppercase">Par {selectedReceipt.agentNom}</p>
+                         </div>
+                      </div>
+
+                      <div className="flex justify-between items-center pb-4 border-dashed border-b border-gray-100">
+                         <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
+                               <CreditCard size={14} />
+                            </div>
+                            <span className="text-[10px] font-black text-gray-400 uppercase">Mode</span>
+                         </div>
+                         <span className="font-black text-[10px] text-gray-800 uppercase">{selectedReceipt.mode}</span>
                       </div>
 
                       <div className="bg-gray-50 rounded-2xl p-5 mt-4">

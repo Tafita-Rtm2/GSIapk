@@ -50,6 +50,7 @@ export interface Lesson { id: string; title: string; description: string; subjec
 export interface Assignment { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; deadline: string; timeLimit: string; maxScore: number; files?: string[]; _id?: string; }
 export interface Submission { id: string; assignmentId: string; studentId: string; studentName: string; date: string; file: string; score?: number; feedback?: string; _id?: string; campus?: string; filiere?: string; niveau?: string; }
 export interface Grade { id: string; studentId: string; studentName: string; subject: string; score: number; maxScore: number; date: string; niveau: string; filiere: string; _id?: string; }
+export interface Payment { id: string; reference: string; etudiantId: string; etudiantNom: string; matricule: string; campus: string; filiere: string; classe: string; montant: number; date: string; mode: string; agentNom: string; note: string; _id?: string; }
 export interface Ecolage { id: string; studentId: string; studentName: string; month: string; amount: string; date: string; status: string; reference: string; campus?: string; filiere?: string; niveau?: string; _id?: string; }
 export interface Announcement { id: string; title: string; message: string; date: string; author: string; type?: 'info' | 'convocation'; targetUserId?: string; campus?: string[]; filiere?: string[]; niveau?: string; _id?: string; }
 
@@ -111,6 +112,7 @@ interface State {
   assignments: Assignment[];
   submissions: Submission[];
   grades: Grade[];
+  payments: Payment[];
   ecolages: Ecolage[];
   announcements: Announcement[];
   schedules: Record<string, StructuredSchedule>;
@@ -125,6 +127,7 @@ const initialState: State = {
   assignments: [],
   submissions: [],
   grades: [],
+  payments: [],
   ecolages: [],
   announcements: [],
   schedules: {},
@@ -258,6 +261,7 @@ class GSIStoreClass {
        this.fetchCollection('assignments', 'assignments'),
        this.fetchCollection('announcements', 'announcements'),
        this.fetchCollection('grades', 'grades'),
+       this.fetchCollection('payments', 'paiements'),
        this.fetchCollection('ecolages', 'ecolage'),
        this.fetchCollection('schedules', 'schedules'),
        this.fetchChatMessages()
@@ -608,6 +612,18 @@ class GSIStoreClass {
     };
     applyFilter(this.state.ecolages);
     this.fetchCollection('ecolages', 'ecolage', `?q={"studentId":"${studentId}"}`);
+    return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
+  }
+
+  subscribePayments(matricule: string, cb: (ps: Payment[]) => void) {
+    const subKey = `payments_${matricule}`;
+    if (!this.listeners[subKey]) this.listeners[subKey] = [];
+    this.listeners[subKey].push(cb);
+    const applyFilter = (data: Payment[]) => {
+      cb(data.filter((p: any) => p.matricule === matricule));
+    };
+    applyFilter(this.state.payments);
+    this.fetchCollection('payments', 'paiements', `?q={"matricule":"${matricule}"}`);
     return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
   }
 
