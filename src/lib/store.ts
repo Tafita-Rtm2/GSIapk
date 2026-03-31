@@ -6,31 +6,35 @@ import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { toast } from 'sonner';
 
-// --- CONFIGURATION ---
-const _d = (s: string) => {
-  const b = typeof window !== 'undefined' ? atob(s) : Buffer.from(s, 'base64').toString();
-  return b.split('').reverse().join('');
+const _d = (s: string): string => {
+  try {
+    const decoded = typeof window !== 'undefined' 
+      ? atob(s) 
+      : Buffer.from(s, 'base64').toString('utf-8');
+    return decoded; 
+  } catch (e) {
+    console.error('Decode error:', e);
+    return '';
+  }
 };
 
-const API_BASE = _d("aXBhL2dtbWdn bXRyL2dtLmlzZ2VwdW9yZy8vOnNwdHRo");
 
-const MEDIA_BASE = _d("Z21tZ2dtdHIvZ20uaXNnZXB1b3JnLy86c3B0dGg=");
+const API_BASE = _d("aHR0cHM6Ly9ncm91cGVpc2d0Lm1nL3J0bWdlam0vYXBp"); 
+const MEDIA_BASE = _d("aHR0cHM6Ly9ncm91cGVpc2d0Lm1nL3J0bWdlam0");
 
-let ADMIN_CODE = _d("SVN HIGFuaU4=");
-
-let PROF_PASS = _d("Z20taXNnLWZvcnA=");
-
+let ADMIN_CODE = _d("TmluYSBJU0c="); 
+let PROF_PASS = _d("cHJvZi1pc2ctbWc="); 
 let AI_CONFIG = {
   apiKey: "",
   prompts: {} as Record<string, string>
 };
 
-// Types
+// Types (inchangés)
 export interface User {
-  id: string; // Internal/Public UID
+  id: string;
   fullName: string;
   email: string;
-  password?: string; // Stored for custom auth
+  password?: string;
   role: 'student' | 'professor' | 'admin';
   campus: string;
   filiere: string;
@@ -38,7 +42,7 @@ export interface User {
   photo?: string;
   matricule?: string;
   contact?: string;
-  _id?: string; // API internal ID
+  _id?: string;
 }
 
 export interface Lesson { id: string; title: string; description: string; subject: string; niveau: string; filiere: string[]; campus: string[]; date: string; files: string[]; _id?: string; }
@@ -68,8 +72,8 @@ export interface ChatMessage {
 export interface Reminder {
   id: string;
   title: string;
-  date: string; // ISO date
-  time: string; // HH:mm
+  date: string;
+  time: string;
   subject: string;
   notes?: string;
   completed: boolean;
@@ -77,7 +81,7 @@ export interface Reminder {
 }
 
 export interface ScheduleSlot {
-  day: string; // "Lundi", "Mardi", ...
+  day: string;
   startTime: string;
   endTime: string;
   subject: string;
@@ -136,8 +140,12 @@ class GSIStoreClass {
 
   constructor() {
     if (typeof window !== 'undefined') {
+      // ✅ Log pour débugger
+      console.log('🔧 GSIStore initialized');
+      console.log('📡 API_BASE:', API_BASE);
+      console.log('🔐 ADMIN_CODE:', ADMIN_CODE ? '✓ Set' : '✗ Missing');
+      
       this.hydrate();
-      // Wait a bit before syncing to let UI render first
       setTimeout(() => this.startGlobalSync(), 2000);
       window.addEventListener('beforeunload', () => this.saveImmediate());
     }
@@ -148,12 +156,11 @@ class GSIStoreClass {
       const saved = localStorage.getItem('gsi_v8_master');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Deep merge to preserve structure if interface changes
         this.state = { ...initialState, ...parsed };
       }
       if (this.state.users.length === 0) this.generateMockData();
     } catch (e) {
-      console.error("Hydration failed", e);
+      console.error("❌ Hydration failed", e);
     }
   }
 
@@ -189,7 +196,7 @@ class GSIStoreClass {
       try {
         localStorage.setItem('gsi_v8_master', JSON.stringify(this.state));
       } catch (e) {
-        console.error("Failed to save GSIStore state", e);
+        console.error("❌ Failed to save GSIStore state", e);
       }
     }
   }
@@ -206,27 +213,23 @@ class GSIStoreClass {
   }
 
   private startGlobalSync() {
-    // Initial aggressive sync
+    console.log('🔄 Starting global sync...');
     this.syncAll().then(() => {
        this.autoDownloadEssentials();
     });
 
-    // Sync remote config (Admin/Prof codes)
     this.syncRemoteConfig();
 
-    // Background polling for general data
     setInterval(() => {
        this.syncAll();
     }, 30000);
 
-    // Background polling for chat (Faster for better UX)
     setInterval(() => {
        if (this.state.currentUser) {
          this.fetchChatMessages();
        }
     }, 8000);
 
-    // Background polling for announcements/notifications
     setInterval(() => {
       if (this.state.currentUser) {
         this.fetchCollection('announcements', 'announcements');
@@ -238,7 +241,6 @@ class GSIStoreClass {
      if (!this.state.currentUser) return;
      const { campus, niveau } = this.state.currentUser;
 
-     // Auto-download current schedule if structured
      const sched = this.state.schedules[`${campus}_${niveau}`];
      if (sched && (sched.fileUrl || sched.url)) {
         try {
@@ -263,7 +265,6 @@ class GSIStoreClass {
   }
 
   private async cleanOfflineFiles() {
-     // Delete offline files for lessons/assignments that are no longer in the cloud
      const progress = JSON.parse(localStorage.getItem('gsi_progress') || '{}');
      const downloaded = JSON.parse(localStorage.getItem('gsi_downloaded') || '{}');
 
@@ -272,7 +273,7 @@ class GSIStoreClass {
 
      for (const id in downloaded) {
         if (!cloudLessonIds.has(id) && !cloudAssignmentIds.has(id)) {
-           console.log(`GSIStore: Cleaning up deleted content ${id}`);
+           console.log(`🧹 Cleaning up deleted content ${id}`);
            if (progress[id]?.localPath) {
               try {
                  await Filesystem.deleteFile({ path: progress[id].localPath, directory: Directory.Data });
@@ -293,7 +294,6 @@ class GSIStoreClass {
     const data = await this.apiCall(`/db/messages?q=${q}&s={"timestamp":-1}&l=60`);
     if (data && Array.isArray(data)) {
       const newMessages = data.reverse();
-      // Only update if something changed
       if (JSON.stringify(newMessages) !== JSON.stringify(this.state.messages)) {
         this.state.messages = newMessages;
         this.notify('messages', this.state.messages);
@@ -301,14 +301,20 @@ class GSIStoreClass {
     }
   }
 
-  // --- API HELPERS ---
+  // --- API HELPERS (CORRIGÉ) ---
 
   private async apiCall(endpoint: string, method = 'GET', body?: any, redirectCount = 0): Promise<any> {
-    if (redirectCount > 3) return null;
+    if (redirectCount > 3) {
+      console.error('❌ Too many redirects');
+      return null;
+    }
 
-    // SMART CACHING:
-    // - 3 seconds for messages/chat
-    // - 5 minutes (300000ms) for stable academic data to maximize speed
+    // ✅ Validation de l'API_BASE
+    if (!API_BASE || API_BASE.length < 10) {
+      console.error('❌ Invalid API_BASE:', API_BASE);
+      return null;
+    }
+
     const cacheTime = endpoint.includes('messages') ? 3000 : 300000;
 
     if (method === 'GET' && this.apiCache[endpoint] && (Date.now() - this.apiCache[endpoint].ts < cacheTime)) {
@@ -318,7 +324,12 @@ class GSIStoreClass {
     this.syncingCount++;
     this.notify('sync_status', true);
 
-    const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+    // ✅ Construction d'URL améliorée
+    const url = endpoint.startsWith('http') 
+      ? endpoint 
+      : `${API_BASE}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+
+    console.log(`📡 API Call: ${method} ${url}`);
 
     try {
       let response: any;
@@ -327,17 +338,23 @@ class GSIStoreClass {
         const options = {
           url,
           method,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           data: body,
           connectTimeout: 15000,
           readTimeout: 15000
         };
         response = await CapacitorHttp.request(options);
 
-        // Manual Redirect Handling for 301/302/307/308
+        console.log(`📥 Response status: ${response.status}`);
+
+        // Gestion des redirections
         if (response.status >= 300 && response.status < 400) {
           const location = response.headers['Location'] || response.headers['location'];
           if (location) {
+            console.log(`↪️ Redirect to: ${location}`);
             this.syncingCount = Math.max(0, this.syncingCount - 1);
             return this.apiCall(location, method, body, redirectCount + 1);
           }
@@ -347,12 +364,18 @@ class GSIStoreClass {
         const timeoutId = setTimeout(() => controller.abort(), 15000);
         const options: RequestInit = {
           method,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           signal: controller.signal,
           body: body ? JSON.stringify(body) : undefined
         };
         const res = await fetch(url, options);
         clearTimeout(timeoutId);
+        
+        console.log(`📥 Response status: ${res.status}`);
+        
         response = {
           status: res.status,
           data: await res.json(),
@@ -367,20 +390,21 @@ class GSIStoreClass {
         if (method === 'GET') {
            this.apiCache[endpoint] = { data: response.data, ts: Date.now() };
         }
+        console.log(`✅ API Call successful`);
         return response.data;
       }
+      
+      console.warn(`⚠️ API returned status ${response.status}`);
       return null;
     } catch (e: any) {
       this.syncingCount = Math.max(0, this.syncingCount - 1);
       if (this.syncingCount === 0) this.notify('sync_status', false);
-      console.warn(`API call to ${endpoint} failed:`, e);
+      console.error(`❌ API call to ${endpoint} failed:`, e.message || e);
       return null;
     }
   }
 
   private async fetchCollection(key: keyof State, collectionName: string, queryParams = "") {
-    // If queryParams has a q=, we should ensure it's encoded if not already,
-    // but usually it's passed already formed.
     const data = await this.apiCall(`/db/${collectionName}${queryParams}`);
     if (data) {
       const cloudData = Array.isArray(data) ? data : [];
@@ -405,11 +429,9 @@ class GSIStoreClass {
 
       (this.state[key] as any) = merged;
 
-      // Sync currentUser if it's in the users collection
       if (key === 'users' && this.state.currentUser) {
         const updatedSelf = (merged as User[]).find(u => u.id === this.state.currentUser!.id);
         if (updatedSelf) {
-          // Merge but keep local password if cloud doesn't have it (for mock auth)
           this.state.currentUser = { ...this.state.currentUser, ...updatedSelf };
           this.notify('auth', this.state.currentUser);
         }
@@ -436,8 +458,11 @@ class GSIStoreClass {
         if (config.ADMIN_CODE) ADMIN_CODE = config.ADMIN_CODE;
         if (config.PROF_PASS) PROF_PASS = config.PROF_PASS;
         if (config.AI_CONFIG) AI_CONFIG = config.AI_CONFIG;
+        console.log('✅ Remote config synced');
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('⚠️ Failed to sync remote config:', e);
+    }
   }
 
   getAdminCode() { return ADMIN_CODE; }
@@ -455,24 +480,26 @@ class GSIStoreClass {
   }
 
   async login(email: string, password: string): Promise<User | null> {
+    console.log('🔐 Login attempt for:', email);
     const q = encodeURIComponent(JSON.stringify({ email, password }));
     const data = await this.apiCall(`/db/users?q=${q}`);
     if (data && Array.isArray(data) && data.length > 0) {
        const user = data[0] as User;
        this.setCurrentUser(user);
+       console.log('✅ Login successful');
        return user;
     }
-    // Check local fallback (mock accounts)
     const local = this.state.users.find(u => u.email === email && u.password === password);
     if (local) {
        this.setCurrentUser(local);
+       console.log('✅ Login successful (local)');
        return local;
     }
+    console.warn('❌ Login failed');
     return null;
   }
 
   async register(user: User): Promise<User | null> {
-    // Ensure photo is handled if present
     const res = await this.apiCall('/db/users', 'POST', user);
     if (res) {
        const finalUser = { ...user, ...res };
@@ -490,7 +517,6 @@ class GSIStoreClass {
      const q = encodeURIComponent(JSON.stringify({ email }));
      const data = await this.apiCall(`/db/users?q=${q}`);
      if (data && Array.isArray(data) && data.length > 0) {
-        // Simulated success
         return true;
      }
      return false;
@@ -752,7 +778,6 @@ class GSIStoreClass {
     this.notify('users', this.state.users);
     this.notify('auth', this.state.currentUser);
 
-    // Also update cloud immediately if _id exists
     const targetId = user._id;
     if (targetId) {
        await this.apiCall(`/db/users/${targetId}`, 'PATCH', user);
@@ -842,7 +867,6 @@ class GSIStoreClass {
     if (forEveryone) {
       const msg = this.state.messages.find(m => m.id === messageId);
       if (msg && msg.senderId === this.state.currentUser.id) {
-        // Find _id if not present
         let targetId = msg._id;
         if (!targetId) {
           const q = encodeURIComponent(JSON.stringify({ id: messageId }));
@@ -857,7 +881,6 @@ class GSIStoreClass {
       }
     }
 
-    // Local update
     this.state.messages = this.state.messages.filter(m => m.id !== messageId);
     this.notify('messages', this.state.messages);
   }
@@ -920,24 +943,19 @@ class GSIStoreClass {
   getAbsoluteUrl(url: string | undefined): string {
     if (!url || url === "undefined" || url === "null") return "";
 
-    // 1. If it's already absolute, return as is.
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
        return url;
     }
 
-    // 2. Detect raw text (non-path strings)
-    // If it has spaces and doesn't start with / or files/, it's likely raw text
     if (url.includes(' ') && !url.startsWith('/') && !url.startsWith('files/')) {
        return url;
     }
 
-    // 3. Handle special case for files/view
     if (url.startsWith('files/view/') || url.startsWith('api/files/view/') || url.startsWith('/api/files/view/')) {
        let path = url.replace('api/', '').replace('/api/', '');
        return `${MEDIA_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
     }
 
-    // 4. For relative paths from the custom API
     const base = MEDIA_BASE;
     return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
   }
@@ -958,7 +976,6 @@ class GSIStoreClass {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
-      // Ensure we pass the intended path if the server supports it
       formData.append('file', file, file.name);
       formData.append('path', path);
 
@@ -971,7 +988,6 @@ class GSIStoreClass {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const response = JSON.parse(xhr.responseText);
-            // Enhanced robustness for different API response formats
             const url = response.viewUrl || response.downloadUrl || response.url || response.path || (response.data && response.data.url);
             if (url) {
               resolve(url);
@@ -1023,7 +1039,7 @@ class GSIStoreClass {
         }
 
         if (response.status !== 200) throw new Error(`Erreur serveur (${response.status})`);
-        base64Data = response.data; // CapacitorHttp with responseType: 'blob' returns base64 on native
+        base64Data = response.data;
         contentType = response.headers['Content-Type'] || response.headers['content-type'] || "";
       } else {
         const response = await fetch(absoluteUrl);
@@ -1060,7 +1076,6 @@ class GSIStoreClass {
   async openPackFile(lessonId: string, url: string): Promise<void> {
     const lowUrl = (url || "").toLowerCase();
 
-    // 1. Determine type BEFORE calling getAbsoluteUrl to avoid mangling raw text
     let type: 'pdf' | 'docx' | 'video' | 'image' | 'text' = 'pdf';
 
     if (lowUrl.endsWith('.pdf') || lowUrl.includes('/pdf')) type = 'pdf';
@@ -1073,7 +1088,6 @@ class GSIStoreClass {
     const progress = this.getProgress(lessonId);
     const mime = (progress?.mimeType || "").toLowerCase();
 
-    // Re-verify type if mime exists
     if (mime.includes('pdf')) type = 'pdf';
     else if (mime.includes('word') || mime.includes('docx')) type = 'docx';
     else if (mime.includes('video')) type = 'video';
@@ -1093,23 +1107,19 @@ class GSIStoreClass {
     }
 
     try {
-      // 1. Check for cached/downloaded file
       if (progress?.localPath) {
         try {
           const path = progress.localPath;
           const stats = await Filesystem.stat({ path, directory: Directory.Data });
 
-          // Debug trace for local file
           console.log(`GSIStore: Found local file at ${path}, size: ${stats.size}`);
 
-          // FOR MULTIMEDIA: Use file URI directly (better for large videos/images)
           if (type === 'video' || type === 'image') {
              const fileUri = await Filesystem.getUri({ path, directory: Directory.Data });
              dispatchViewer(Capacitor.convertFileSrc(fileUri.uri));
              return;
           }
 
-          // FOR DOCUMENTS: Use Blob (better for Render Engines like PDF.js/Mammoth)
           const file = await Filesystem.readFile({ path, directory: Directory.Data });
           const dataStr = typeof file.data === 'string' ? file.data : '';
 
@@ -1131,15 +1141,12 @@ class GSIStoreClass {
         }
       }
 
-      // 2. If not cached, download then open
       if (window.navigator.onLine) {
         const fileName = absoluteUrl.split('/').pop() || (type === 'pdf' ? 'doc.pdf' : type === 'docx' ? 'doc.docx' : 'video.mp4');
         const path = await this.downloadPackFile(absoluteUrl, fileName, lessonId);
 
-        // RECURSIVE CALL to use the newly cached logic
         return this.openPackFile(lessonId, url);
       } else {
-        // Stream directly if online (fallback)
         dispatchViewer(absoluteUrl);
       }
     } catch (e: any) {
@@ -1195,7 +1202,6 @@ class GSIStoreClass {
     all[id] = { ...(all[id] || {}), ...p, ts: Date.now() };
     localStorage.setItem('gsi_progress', JSON.stringify(all));
     this.notify('progress', all);
-    // Broadcast for cross-tab or component updates
     window.dispatchEvent(new CustomEvent('gsi_progress_updated', { detail: all }));
   }
 
