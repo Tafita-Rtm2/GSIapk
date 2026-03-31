@@ -409,7 +409,7 @@ class GSIStoreClass {
     }
   }
 
-  private async fetchCollection(key: keyof State, collectionName: string, queryParams = "") {
+  private async fetchCollection(key: keyof State, collectionName: string, queryParams = "", notifySubKey?: string) {
     const data = await this.apiCall(`/db/${collectionName}${queryParams}`);
     if (data) {
       const cloudData = Array.isArray(data) ? data : [];
@@ -444,6 +444,7 @@ class GSIStoreClass {
 
       this.save();
       this.notify(key as string, merged);
+      if (notifySubKey) this.notify(notifySubKey, merged);
 
       Object.keys(this.listeners).forEach(subKey => {
          if (subKey.startsWith(`${key as string}_`)) {
@@ -623,7 +624,7 @@ class GSIStoreClass {
       cb(data.filter((p: any) => p.matricule === matricule));
     };
     applyFilter(this.state.payments);
-    this.fetchCollection('payments', 'paiements', `?q={"matricule":"${matricule}"}`);
+    this.fetchCollection('payments', 'paiements', `?q={"matricule":"${matricule}"}`, subKey);
     return () => { this.listeners[subKey] = this.listeners[subKey]?.filter(l => l !== cb); };
   }
 
