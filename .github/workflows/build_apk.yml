@@ -61,5 +61,5 @@ jobs:
       - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
-          name: Gsi
-          path: android/app/build/outputs/apk/debug/Gsi.apk
+          name: MaSuperApp-Debug
+          path: android/app/build/outputs/apk/debug/*.apk
